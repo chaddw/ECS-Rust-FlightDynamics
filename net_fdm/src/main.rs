@@ -103,7 +103,7 @@ struct FGNetFDM{ //recreate the structure
 fn main()
 {
     //create fdm data structure instance
-    let fdm: FGNetFDM = FGNetFDM { altitude: 10};
+    let fdm: FGNetFDM = FGNetFDM { altitude: 10}; //
 
 
     let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
