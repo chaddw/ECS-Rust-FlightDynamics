@@ -18,7 +18,7 @@ fn main()
     let _altitude = 150.0;
 
     //create fdm data structure instance
-    let _fdm: FGNetFDM = FGNetFDM { altitude: 10.0*D2R}; 
+    let _fdm: FGNetFDM = FGNetFDM {altitude: 10.0*D2R}; 
 
     //convert to ordered bytes
     let bytes = (_fdm.altitude).to_ne_bytes();
