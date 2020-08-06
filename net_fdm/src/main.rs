@@ -2,15 +2,16 @@ use std::net::UdpSocket;
 use socket::{AF_INET, SO_REUSEADDR, SOCK_DGRAM, Socket, SOL_SOCKET};
 use socket::htonl;
 use std::time::{Duration, SystemTime};
-use serde::{Serialize, Deserialize};
-
+//use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::{Deserialize, Serialize};
 // enum stuff {
 //     FG_MAX_ENGINES,
 //     FG_MAX_WHEELS,
 //     FG_MAX_TANKS,
 // }//{FG_MAX_ENGINES:: 4, FG_MAX_WHEELS:: 3, FG_MAX_TANKS:: 4}
-#[derive(Serialize, Deserialize, Debug)]
+
 #[derive(Default)]
+#[derive(Serialize, Deserialize)]
 struct FGNetFDM
 { //recreate the structure
 
@@ -165,12 +166,55 @@ fn main()
     socket.connect("127.0.0.1:5500").expect("connect function failed");
 
 
+    //need to send a struct encoded as a [u8]...
+//     let encoded: Vec<u8> = bincode::serialize(&fdm).unwrap(); //serialize the struct
+//    //slice the vec to a &[u8]
+//     let v_bytes: &[u8] = unsafe {
+//         std::slice::from_raw_parts(
+//             encoded.as_ptr() as *const u8,
+//             encoded.len() * std::mem::size_of::<i32>(),
+//         )
+//     };
 
-    //need to send a struct...
-   // let encoded: Vec<u8> = bincode::serialize(&fdm).unwrap();
-   // socket.send(encoded).expect("couldn't send message");
+
+let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
+println!("{:?}", bytes);
+
+    //think these 2 lines accomplish same as above...
+    // let bytes = bincode::serialize(&fdm).unwrap();
+   // println!("{:?}", bytes);
+
+    //finally send &[u8] of bytes to flight gear
+     socket.send(bytes).expect("couldn't send message");
 
 
 
 
 }
+
+
+unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    ::std::slice::from_raw_parts(
+        (p as *const T) as *const u8,
+        ::std::mem::size_of::<T>(),
+    )
+}
+
+
+
+
+
+// impl Serialize for FGNetFDM {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         // 3 is the number of fields in the struct.
+//         let mut state = serializer.serialize_struct("FGNetFDM", 4)?;
+//         state.serialize_field("version", &self.version)?;
+//         state.serialize_field("latitude", &self.latitude)?;
+//         state.serialize_field("longitude", &self.longitude)?;
+//         state.serialize_field("altitude", &self.altitude)?;
+//         state.end()
+//     }
+// }
