@@ -1,12 +1,15 @@
 use std::net::UdpSocket;
 use socket::{AF_INET, SO_REUSEADDR, SOCK_DGRAM, Socket, SOL_SOCKET};
 use socket::htonl;
+use std::time::{Duration, SystemTime};
+use serde::{Serialize, Deserialize};
 
 // enum stuff {
 //     FG_MAX_ENGINES,
 //     FG_MAX_WHEELS,
 //     FG_MAX_TANKS,
 // }//{FG_MAX_ENGINES:: 4, FG_MAX_WHEELS:: 3, FG_MAX_TANKS:: 4}
+#[derive(Serialize, Deserialize, Debug)]
 #[derive(Default)]
 struct FGNetFDM
 { //recreate the structure
@@ -22,7 +25,7 @@ struct FGNetFDM
     latitude: f64, // double latitude;		// geodetic (radians)
     altitude: f64, // double altitude;		// above sea level (meters)
     agl: f32, // float agl;			// above ground level (meters)
-    phy: f32, // float phi;			// roll (radians)
+    phi: f32, // float phi;			// roll (radians)
     theta: f32, // float theta;		// pitch (radians)
     psi: f32, // float psi;			// yaw or true heading (radians)
     alpha: f32, // float alpha;                // angle of attack (radians)
@@ -123,16 +126,51 @@ fn main()
 
     fdm.version = htonl(FG_NET_FDM_VERSION);
 
-    let lat = htonl(latitude*D2R) ;
+    //latitude
+    //longitude
+    //aktitude
+   // let lat = htonl(latitude*D2R) ;
     //let hi = (latitude*D2R).to_ne_bytes();
-    
-    //let hey = h
 
     // for i in hi.iter()
     //  {
     //      println!("{}", i);
     //  }
 
-    
-    println!("{}", lat);
+   // println!("{}", lat);
   
+        //fdm.num_engines = htonl(1);
+        //fdm.num_tanks = htonl(1);
+
+       // fdm.phi = htonl(roll*D2R);
+        //fdm.theta = htonl(pitch*D2R);
+        //fdm.psi = htonl(yaw*D2R);
+
+        //fdm.num_engines = htonl(1);
+
+        //fdm.num_tanks = htonl(1);
+
+        //fdm.fuel_quantity[0] = htonl(100.0);
+
+        //fdm.cur_time = htonl(SystemTime::now());
+
+        //fdm.warp = htonl(1);
+
+        //fdm.visibility = htonl(visibility);
+
+
+
+    //create socket and connect
+    let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
+    socket.connect("127.0.0.1:5500").expect("connect function failed");
+
+
+
+    //need to send a struct...
+   // let encoded: Vec<u8> = bincode::serialize(&fdm).unwrap();
+   // socket.send(encoded).expect("couldn't send message");
+
+
+
+
+}
