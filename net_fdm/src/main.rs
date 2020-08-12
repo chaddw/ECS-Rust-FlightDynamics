@@ -1,6 +1,6 @@
 
 use std::net::UdpSocket;
-
+use std::{thread, time};
 //use socket::{AF_INET, SO_REUSEADDR, SOCK_DGRAM, Socket, SOL_SOCKET};
 //use std::time::{Duration, SystemTime};
 //use socket::htonl;
@@ -125,10 +125,7 @@ fn main()
     let D2R = (3.14159 / 180.0) as f64; //should be float... htonl wants u32
     //println!("{}", D2R);
     let FG_NET_FDM_VERSION = 24_u32;
-
-    //let fdm = FGNetFDM{altitude: 150.0, ..Default::default() }; 
-    let mut fdm: FGNetFDM = Default::default();
-
+    let millis = time::Duration::from_millis(1000);
 
     let latitude: f64 = 45.59823;
     let longitude: f64= -120.6902;
@@ -138,7 +135,16 @@ fn main()
     let mut pitch: f32 = 0.0;
     let mut yaw: f32 = 0.0;
 
-    let visibility: f32 = 5000.0; 
+    let visibility: f32 = 5000.0;
+
+    while(true)
+    {
+
+        thread::sleep(millis);
+
+    //create fdm instance
+    //let fdm = FGNetFDM{altitude: 150.0, ..Default::default() }; 
+    let mut fdm: FGNetFDM = Default::default();
 
 
     //fdm.version = htonl(FG_NET_FDM_VERSION); //htonl is doing the same as below
@@ -148,7 +154,6 @@ fn main()
     fdm.longitude = f64::from_be_bytes((longitude * D2R).to_ne_bytes());
     fdm.altitude = f64::from_be_bytes((altitude).to_ne_bytes());
 
-    roll = 5.0; //fd.phi will be -8.807e-05
 
     //casting to make everything happy
     let _phi = roll*D2R as f32;
@@ -183,7 +188,15 @@ fn main()
     //finally send &[u8] of bytes to flight gear
      socket.send(bytes).expect("couldn't send message");
 
+    roll = roll + 5.0; 
+    if roll > 20.0
+    {
+        roll = 0.0;
+    }
+    println!("Roll: {}", roll);
 
+
+    }
 }
 
 
@@ -208,7 +221,4 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
 //sending struct as u8 slice
 //https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
 //https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
-
-
-
 
