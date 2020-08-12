@@ -1,9 +1,28 @@
+
 use std::net::UdpSocket;
+#[allow(unused_imports)]
 use socket::{AF_INET, SO_REUSEADDR, SOCK_DGRAM, Socket, SOL_SOCKET};
 use socket::htonl;
+#[allow(unused_imports)]
 use std::time::{Duration, SystemTime};
 //use serde::ser::{Serialize, Serializer, SerializeStruct};
 use serde::{Deserialize, Serialize};
+
+extern crate byteorder;
+use byteorder::{ByteOrder, NetworkEndian, BigEndian, LittleEndian, WriteBytesExt};
+use std::mem::transmute;
+
+use std::mem;
+
+
+//  #[cfg(feature = "serde_derive")] 
+//  #[allow(unused_imports)] 
+//  #[macro_use] 
+//  extern crate serde_derive; 
+//  #[cfg(feature = "serde_derive")] 
+//  #[doc(hidden)] 
+//  pub use serde_derive::*; 
+
 // enum stuff {
 //     FG_MAX_ENGINES,
 //     FG_MAX_WHEELS,
@@ -11,7 +30,8 @@ use serde::{Deserialize, Serialize};
 // }//{FG_MAX_ENGINES:: 4, FG_MAX_WHEELS:: 3, FG_MAX_TANKS:: 4}
 
 #[derive(Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+#[repr(C)] //fixed padding issue????
 struct FGNetFDM
 { //recreate the structure
 
@@ -57,7 +77,7 @@ struct FGNetFDM
     // // Pressure
     
     // // Engine status
-    num_engines: f32, // uint32_t num_engines;	     // Number of valid engines
+    num_engines: u32, // uint32_t num_engines;	     // Number of valid engines
     eng_state: [f32; 4], // uint32_t eng_state[FG_MAX_ENGINES];// Engine state (off, cranking, running)
     rpm: [f32; 4], // float rpm[FG_MAX_ENGINES];	     // Engine RPM rev/min
     fuel_flow: [f32; 4], // float fuel_flow[FG_MAX_ENGINES]; // Fuel flow gallons/hr
@@ -70,11 +90,11 @@ struct FGNetFDM
     oil_px: [f32; 4], // float oil_px[FG_MAX_ENGINES];    // Oil pressure psi
 
     // // Consumables
-    num_tanks: f32, // uint32_t num_tanks;		// Max number of fuel tanks
+    num_tanks: u32, // uint32_t num_tanks;		// Max number of fuel tanks
     fuel_quantity: [f32; 4], // float fuel_quantity[FG_MAX_TANKS];
 
     // // Gear status
-    num_wheels: f32, // uint32_t num_wheels;
+    num_wheels: u32, // uint32_t num_wheels;
     wow: [f32; 3], // uint32_t wow[FG_MAX_WHEELS];
     gear_pos: [f32; 3], // float gear_pos[FG_MAX_WHEELS];
     gear_steer: [f32; 3],// float gear_steer[FG_MAX_WHEELS];
@@ -106,10 +126,10 @@ struct FGNetFDM
 fn main()
 {
 
-    let D2R = (3.14159 / 180.0) as u32;
+    let D2R = (3.14159 / 180.0); //should be float... htonl wants u32
     let FG_NET_FDM_VERSION = 24_u32;
 
-
+    println!("{}",D2R);
 
     //let fdm = FGNetFDM{altitude: 150.0, ..Default::default() }; 
     let mut fdm: FGNetFDM = Default::default();
@@ -121,44 +141,44 @@ fn main()
 
     let roll: f32;
     let pitch: f32;
-    let roll: f32;
+    let yaw: f32;
 
     let visibility = 5000.0;
 
-    fdm.version = htonl(FG_NET_FDM_VERSION);
+
+    //fdm.version = htonl(FG_NET_FDM_VERSION);
+
+    let vers = FG_NET_FDM_VERSION.to_ne_bytes();
+    fdm.version = u32::from_be_bytes(vers);
+
+
+    //println!("{}", num);
 
     //latitude
     //longitude
-    //aktitude
-   // let lat = htonl(latitude*D2R) ;
-    //let hi = (latitude*D2R).to_ne_bytes();
+    //altitude
+   // let yo  = htonl(latitude*D2R) ;
 
-    // for i in hi.iter()
-    //  {
-    //      println!("{}", i);
-    //  }
+        roll = 5.0; //fd.phi will be -8.807e-05
 
-   // println!("{}", lat);
-  
-        //fdm.num_engines = htonl(1);
-        //fdm.num_tanks = htonl(1);
-
-       // fdm.phi = htonl(roll*D2R);
+        let _phi = (roll*D2R).to_ne_bytes(); //not rolling correct amount
+        fdm.phi = f32::from_be_bytes(_phi);
+        //println!("{}", roll*D2R);
         //fdm.theta = htonl(pitch*D2R);
         //fdm.psi = htonl(yaw*D2R);
+  
+        fdm.num_engines = htonl(1);
 
-        //fdm.num_engines = htonl(1);
-
-        //fdm.num_tanks = htonl(1);
-
+        fdm.num_tanks = htonl(1);
+        //println!("tanks: {}", fdm.num_tanks);
         //fdm.fuel_quantity[0] = htonl(100.0);
 
-        //fdm.cur_time = htonl(SystemTime::now());
+        fdm.num_wheels = htonl(1);
 
+        //fdm.cur_time = htonl(SystemTime::now());
         //fdm.warp = htonl(1);
 
         //fdm.visibility = htonl(visibility);
-
 
 
     //create socket and connect
@@ -181,23 +201,18 @@ let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
 println!("{:?}", bytes);
 
     //think these 2 lines accomplish same as above...
-    // let bytes = bincode::serialize(&fdm).unwrap();
-   // println!("{:?}", bytes);
+//     let bytes = bincode::serialize(&fdm).unwrap();
+//    println!("{:?}", bytes);
 
     //finally send &[u8] of bytes to flight gear
      socket.send(bytes).expect("couldn't send message");
-
-
 
 
 }
 
 
 unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    ::std::slice::from_raw_parts(
-        (p as *const T) as *const u8,
-        ::std::mem::size_of::<T>(),
-    )
+    ::std::slice::from_raw_parts((p as *const T) as *const u8,::std::mem::size_of::<T>(),)
 }
 
 
