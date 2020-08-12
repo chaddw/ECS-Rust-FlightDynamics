@@ -126,47 +126,49 @@ struct FGNetFDM
 fn main()
 {
 
-    let D2R = (3.14159 / 180.0); //should be float... htonl wants u32
+    let D2R = (3.14159 / 180.0) as f64; //should be float... htonl wants u32
+   println!("{}", D2R);
     let FG_NET_FDM_VERSION = 24_u32;
-
-    println!("{}",D2R);
 
     //let fdm = FGNetFDM{altitude: 150.0, ..Default::default() }; 
     let mut fdm: FGNetFDM = Default::default();
 
 
-    let latitude = 45.59823;
-    let longitude = -120.6902;
-    let altitude = 150.0;
+    let latitude: f64 = 45.59823;
+    let longitude: f64= -120.6902;
+    let altitude: f64 = 150.0;
 
-    let roll: f32;
-    let pitch: f32;
-    let yaw: f32;
+    let mut roll: f32 = 0.0;
+    let mut pitch: f32 = 0.0;
+    let mut yaw: f32 = 0.0;
 
     let visibility = 5000.0;
 
 
-    //fdm.version = htonl(FG_NET_FDM_VERSION);
+    //fdm.version = htonl(FG_NET_FDM_VERSION); //htonl is doing the same as below
+    //let vers = FG_NET_FDM_VERSION.to_ne_bytes();
+    fdm.version = u32::from_be_bytes(FG_NET_FDM_VERSION.to_ne_bytes());
+   
+     fdm.latitude = f64::from_be_bytes((latitude * D2R).to_ne_bytes());
+     fdm.longitude = f64::from_be_bytes((longitude * D2R).to_ne_bytes());
+     fdm.altitude = f64::from_be_bytes((altitude).to_ne_bytes());
 
-    let vers = FG_NET_FDM_VERSION.to_ne_bytes();
-    fdm.version = u32::from_be_bytes(vers);
+        roll = 10.0; //fd.phi will be -8.807e-05
+
+        //casting to make everything happy
+        let _phi = roll*D2R as f32;
+        let _theta = pitch*D2R as f32;
+        let _psi = yaw*D2R as f32;
+        fdm.phi = f32::from_be_bytes(_phi.to_ne_bytes());
+        fdm.theta = f32::from_be_bytes(_theta.to_ne_bytes());
+        fdm.psi = f32::from_be_bytes(_psi.to_ne_bytes());
 
 
-    //println!("{}", num);
+       // fdm.theta =  f32::from_be_bytes((pitch*D2R).to_ne_bytes());
+       // fdm.psi = f32::from_be_bytes((yaw*D2R).to_ne_bytes());
+      // println!(" theta: {}", fdm.theta);
 
-    //latitude
-    //longitude
-    //altitude
-   // let yo  = htonl(latitude*D2R) ;
 
-        roll = 5.0; //fd.phi will be -8.807e-05
-
-        let _phi = (roll*D2R).to_ne_bytes(); //not rolling correct amount
-        fdm.phi = f32::from_be_bytes(_phi);
-        //println!("{}", roll*D2R);
-        //fdm.theta = htonl(pitch*D2R);
-        //fdm.psi = htonl(yaw*D2R);
-  
         fdm.num_engines = htonl(1);
 
         fdm.num_tanks = htonl(1);
