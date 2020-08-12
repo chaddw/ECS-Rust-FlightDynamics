@@ -1,27 +1,21 @@
 
 use std::net::UdpSocket;
-#[allow(unused_imports)]
-use socket::{AF_INET, SO_REUSEADDR, SOCK_DGRAM, Socket, SOL_SOCKET};
-use socket::htonl;
-#[allow(unused_imports)]
-use std::time::{Duration, SystemTime};
+
+//use socket::{AF_INET, SO_REUSEADDR, SOCK_DGRAM, Socket, SOL_SOCKET};
+//use std::time::{Duration, SystemTime};
+//use socket::htonl;
 //use serde::ser::{Serialize, Serializer, SerializeStruct};
-use serde::{Deserialize, Serialize};
-
-extern crate byteorder;
-use byteorder::{ByteOrder, NetworkEndian, BigEndian, LittleEndian, WriteBytesExt};
-use std::mem::transmute;
-
-use std::mem;
+//use serde::{Deserialize, Serialize};
 
 
-//  #[cfg(feature = "serde_derive")] 
-//  #[allow(unused_imports)] 
-//  #[macro_use] 
-//  extern crate serde_derive; 
-//  #[cfg(feature = "serde_derive")] 
-//  #[doc(hidden)] 
-//  pub use serde_derive::*; 
+
+//#[allow(unused_imports)]
+//extern crate byteorder;
+//use byteorder::{ByteOrder, NetworkEndian, BigEndian, LittleEndian, WriteBytesExt};
+//use std::mem::transmute;
+//use std::mem;
+
+
 
 // enum stuff {
 //     FG_MAX_ENGINES,
@@ -29,9 +23,11 @@ use std::mem;
 //     FG_MAX_TANKS,
 // }//{FG_MAX_ENGINES:: 4, FG_MAX_WHEELS:: 3, FG_MAX_TANKS:: 4}
 
+
+//#[derive(Serialize, Deserialize, Debug)]
 #[derive(Default)]
-#[derive(Serialize, Deserialize, Debug)]
-#[repr(C)] //fixed padding issue????
+#[repr(C)] //fixed padding issue
+#[allow(non_snake_case)]
 struct FGNetFDM
 { //recreate the structure
 
@@ -122,12 +118,12 @@ struct FGNetFDM
 
     
 
-
+#[allow(non_snake_case)]
 fn main()
 {
 
     let D2R = (3.14159 / 180.0) as f64; //should be float... htonl wants u32
-   println!("{}", D2R);
+    //println!("{}", D2R);
     let FG_NET_FDM_VERSION = 24_u32;
 
     //let fdm = FGNetFDM{altitude: 150.0, ..Default::default() }; 
@@ -142,69 +138,47 @@ fn main()
     let mut pitch: f32 = 0.0;
     let mut yaw: f32 = 0.0;
 
-    let visibility = 5000.0;
+    let visibility: f32 = 5000.0; 
 
 
     //fdm.version = htonl(FG_NET_FDM_VERSION); //htonl is doing the same as below
-    //let vers = FG_NET_FDM_VERSION.to_ne_bytes();
     fdm.version = u32::from_be_bytes(FG_NET_FDM_VERSION.to_ne_bytes());
    
-     fdm.latitude = f64::from_be_bytes((latitude * D2R).to_ne_bytes());
-     fdm.longitude = f64::from_be_bytes((longitude * D2R).to_ne_bytes());
-     fdm.altitude = f64::from_be_bytes((altitude).to_ne_bytes());
+    fdm.latitude = f64::from_be_bytes((latitude * D2R).to_ne_bytes());
+    fdm.longitude = f64::from_be_bytes((longitude * D2R).to_ne_bytes());
+    fdm.altitude = f64::from_be_bytes((altitude).to_ne_bytes());
 
-        roll = 10.0; //fd.phi will be -8.807e-05
+    roll = 5.0; //fd.phi will be -8.807e-05
 
-        //casting to make everything happy
-        let _phi = roll*D2R as f32;
-        let _theta = pitch*D2R as f32;
-        let _psi = yaw*D2R as f32;
-        fdm.phi = f32::from_be_bytes(_phi.to_ne_bytes());
-        fdm.theta = f32::from_be_bytes(_theta.to_ne_bytes());
-        fdm.psi = f32::from_be_bytes(_psi.to_ne_bytes());
-
-
-       // fdm.theta =  f32::from_be_bytes((pitch*D2R).to_ne_bytes());
-       // fdm.psi = f32::from_be_bytes((yaw*D2R).to_ne_bytes());
-      // println!(" theta: {}", fdm.theta);
+    //casting to make everything happy
+    let _phi = roll*D2R as f32;
+    let _theta = pitch*D2R as f32;
+    let _psi = yaw*D2R as f32;
+    fdm.phi = f32::from_be_bytes(_phi.to_ne_bytes());
+    fdm.theta = f32::from_be_bytes(_theta.to_ne_bytes());
+    fdm.psi = f32::from_be_bytes(_psi.to_ne_bytes());
 
 
-        fdm.num_engines = htonl(1);
+    fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());// fdm.num_engines = htonl(1);
 
-        fdm.num_tanks = htonl(1);
-        //println!("tanks: {}", fdm.num_tanks);
-        //fdm.fuel_quantity[0] = htonl(100.0);
+    fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());// fdm.num_tanks = htonl(1);
+    //fdm.fuel_quantity[0] = htonl(100.0);
 
-        fdm.num_wheels = htonl(1);
+    fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());//fdm.num_wheels = htonl(1);
 
-        //fdm.cur_time = htonl(SystemTime::now());
-        //fdm.warp = htonl(1);
+    //fdm.cur_time = htonl(SystemTime::now());
+    fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());// fdm.warp = htonl(1);
 
-        //fdm.visibility = htonl(visibility);
+    fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());//fdm.visibility = htonl(visibility); //this doesnt actually seem to do anything
 
 
-    //create socket and connect
+    //create socket and connect to flightgear
     let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
     socket.connect("127.0.0.1:5500").expect("connect function failed");
 
-
-    //need to send a struct encoded as a [u8]...
-//     let encoded: Vec<u8> = bincode::serialize(&fdm).unwrap(); //serialize the struct
-//    //slice the vec to a &[u8]
-//     let v_bytes: &[u8] = unsafe {
-//         std::slice::from_raw_parts(
-//             encoded.as_ptr() as *const u8,
-//             encoded.len() * std::mem::size_of::<i32>(),
-//         )
-//     };
-
-
-let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
-println!("{:?}", bytes);
-
-    //think these 2 lines accomplish same as above...
-//     let bytes = bincode::serialize(&fdm).unwrap();
-//    println!("{:?}", bytes);
+    //convert struct array of u8
+    let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
+    println!("{:?}", bytes);
 
     //finally send &[u8] of bytes to flight gear
      socket.send(bytes).expect("couldn't send message");
@@ -213,25 +187,28 @@ println!("{:?}", bytes);
 }
 
 
-unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
+{
     ::std::slice::from_raw_parts((p as *const T) as *const u8,::std::mem::size_of::<T>(),)
 }
 
 
 
+//Some references:
+
+//converting to bytes
+//https://stackoverflow.com/questions/29445026/converting-number-primitives-i32-f64-etc-to-byte-representations
+
+//htonl function in rust
+//https://docs.rs/socket/0.0.7/socket/fn.htonl.html
+
+//struct padding in rust vs c++
+//https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html
+
+//sending struct as u8 slice
+//https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
+//https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
 
 
-// impl Serialize for FGNetFDM {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer,
-//     {
-//         // 3 is the number of fields in the struct.
-//         let mut state = serializer.serialize_struct("FGNetFDM", 4)?;
-//         state.serialize_field("version", &self.version)?;
-//         state.serialize_field("latitude", &self.latitude)?;
-//         state.serialize_field("longitude", &self.longitude)?;
-//         state.serialize_field("altitude", &self.altitude)?;
-//         state.end()
-//     }
-// }
+
+
