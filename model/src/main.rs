@@ -1,5 +1,7 @@
 use std::ops::{Add, Sub, Mul, Div}; //operator overload
-
+extern crate nalgebra as na;
+//use na::*; 
+use na::{Matrix3, Vector3, UnitQuaternion, Unit};
 /////VECTOR CLASS
 
 #[allow(non_snake_case)]
@@ -148,7 +150,7 @@ struct Quaternion
 {
     n: f32,
     v: Vector,
-   // v: Vec<f32> //v: [f32;3], //this is a "Vector" type defined in appendix A... might need to write that class
+   // v: Vec<f32> //v: [f32;3], //this is a "Vector" type defined in appendix A...
     //e0: f32, e1: f32, e2: f32, e3: f32
 }
 
@@ -234,14 +236,22 @@ impl Sub for Quaternion
 
 //rigid body structure to encapsulate the required data during the simulation
 #[allow(non_snake_case)]
-#[derive(Default, Debug)]
+#[derive(Debug)]
 struct RigidBody
 {
     mass: f32, //total mass
 
     //probably will not make a a custom matrix 3x3 struct...
+    //mmInertia: [[f32;3];3],      // = [[0.0; 3]; 3], //mass moment of inertia
+   // mInertiaInverse:[[f32;3];3],// inverse of mass moment in inertia
+    
     //Matrix3x3 mIntertia;      //mass moment of inertia
     //Matrix3x3 mInertiaInverse;// inverse of mass moment in inertia
+    mInertia: Matrix3<f32>,
+    mInertiaInverse: Matrix3<f32>,
+    //mInertia: Matrix3<f32, na::U3, na::U3, na::ArrayStorage<f32, na::U3, na::U3>>,
+   // mInertiaInverse: Matrix3<f32, na::U3, na::U3, na::ArrayStorage<f32, na::U3, na::U3>>,
+
 
     vPosition: Vector,          // position in earth coordinates
     vVelocity: Vector,          // velocity in earth coordinates
@@ -251,17 +261,35 @@ struct RigidBody
     fSpeed: f32,                // speed (magnitude of the velocity)
     qOrientation: Quaternion,   // orientation in earth coordinates
     vForces: Vector,            // total force on body
-    vMoments: Vector            // total moment (torque) on body
+    vMoments: Vector,          // total moment (torque) on body
 
+    //nalgeabra approach
+    Qua: UnitQuaternion<f32>
 }
 
 
 impl RigidBody
 {
     //quicker way to initialize...
-    fn new() -> RigidBody {
-        Self {
-            mass: 5000.0,  
+    fn new() -> RigidBody 
+    {
+        Self
+        {
+
+            //but this seems like a bunch of default values except for vposition and vvelocity, vforces, ... maybe dont need this new method and can just set defaults in main
+
+            mass: 0.0,  
+
+           // mmInertia: [[0.0; 3]; 3], //3x3 matrix... was using this before nalgebra
+
+           //nalgebra approach
+            mInertia: Matrix3::new(0.0, 0.0, 0.0,
+                                    0.0, 0.0, 0.0,
+                                   0.0, 0.0, 0.0),
+            mInertiaInverse: Matrix3::new(0.0, 0.0, 0.0,
+                                    0.0, 0.0, 0.0,
+                                   0.0, 0.0, 0.0),
+
             //set initial position
             vPosition: Vector{x: -5000.0, y: 0.0, z: 200.0},
 
@@ -290,47 +318,53 @@ impl RigidBody
 
             //set initial orientation
             //qOrientation: MakeQFromEulerAngles(0.0, 0.0, 0.0),  
-            qOrientation: Quaternion {n: 0.0, v: Vector{x: 0.0, y: 0.0, z: 0.0}} //default value for now
+            qOrientation: Quaternion{n: 0.0, v: Vector{x: 0.0, y: 0.0, z: 0.0}}, //default value for now
+
+ 
+            //nalgebra approach
+            Qua: UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0),
+
 
             //calculate plane's mass properties
-            //(wont go here)
+            //(wont be called here)
 
 
            
         }
+
     }
 
-    fn CalcAirplaneMassProperties(&self)
+    fn CalcAirplaneMassProperties(&mut self)
     {
-
         //the point masses are elements making up the bodystructure 
         #[allow(non_snake_case)]
         #[derive(Default, Debug)]
         struct PointMass
         {
             fmass: f32,
-            vDCoords: Vector,
+            vDCoords: Vector, //"design position"
             vLocalInertia: Vector,
             fIncidence: f32,
             fDihedral: f32,
             fArea: f32,
             iFlap: f32,
 
-            vNormal: Vector
+            vNormal: Vector,
+            vCGCoords: Vector //"corrected position"
 
         }
 
 
         //8 elements of the plane taken into account
         let mut Element = vec![
-            PointMass{fmass: 6.56, vDCoords: Vector{x: 14.5, y: 12.0, z: 2.5}, vLocalInertia: Vector{x: 13.92, y: 10.50 , z: 24.00}, fIncidence: -3.5, fDihedral: 0.0, fArea: 31.2, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}},
-            PointMass{fmass: 7.31, vDCoords: Vector{x: 14.5, y: 5.5, z: 2.5}, vLocalInertia: Vector{x: 21.95, y: 12.22, z: 33.67}, fIncidence: -3.5, fDihedral: 0.0, fArea: 36.4, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}},
-            PointMass{fmass: 7.31, vDCoords: Vector{x: 14.5, y: -5.5, z: 2.5}, vLocalInertia: Vector{x: 21.95, y: 12.22, z: 33.67}, fIncidence: -3.5, fDihedral: 0.0, fArea: 36.4, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}},
-            PointMass{fmass: 6.56, vDCoords: Vector{x: 14.5, y: -12.0, z: 2.5}, vLocalInertia: Vector{x: 13.92, y: 10.50, z: 24.00}, fIncidence: -3.5, fDihedral: 0.0, fArea: 31.2, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}},
-            PointMass{fmass: 2.62, vDCoords: Vector{x: 3.03, y: 2.5, z: 3.0}, vLocalInertia: Vector{x: 0.837, y: 0.385, z: 1.206}, fIncidence: 0.0, fDihedral: 0.0, fArea: 10.8, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}},
-            PointMass{fmass: 2.62, vDCoords: Vector{x: 3.03, y: -2.5, z: 3.0}, vLocalInertia: Vector{x: 0.837, y: 0.385, z: 1.206}, fIncidence: 0.0, fDihedral: 0.0, fArea: 10.8, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}},
-            PointMass{fmass: 2.93, vDCoords: Vector{x: 2.25, y: 0.0, z: 5.0}, vLocalInertia: Vector{x: 1.262, y: 1.942, z: 0.718}, fIncidence: 0.0, fDihedral: 90.0, fArea: 12.0, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}},
-            PointMass{fmass: 31.8, vDCoords: Vector{x: 15.25, y: 0.0, z: 1.5}, vLocalInertia: Vector{x: 66.30, y: 861.9, z: 861.9}, fIncidence: 0.0, fDihedral: 0.0, fArea: 84.0, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}}
+            PointMass{fmass: 6.56, vDCoords: Vector{x: 14.5, y: 12.0, z: 2.5}, vLocalInertia: Vector{x: 13.92, y: 10.50 , z: 24.00}, fIncidence: -3.5, fDihedral: 0.0, fArea: 31.2, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}, vCGCoords: Vector{x: 0.0, y: 0.0, z: 0.0} },
+            PointMass{fmass: 7.31, vDCoords: Vector{x: 14.5, y: 5.5, z: 2.5}, vLocalInertia: Vector{x: 21.95, y: 12.22, z: 33.67}, fIncidence: -3.5, fDihedral: 0.0, fArea: 36.4, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}, vCGCoords: Vector{x: 0.0, y: 0.0, z: 0.0} },
+            PointMass{fmass: 7.31, vDCoords: Vector{x: 14.5, y: -5.5, z: 2.5}, vLocalInertia: Vector{x: 21.95, y: 12.22, z: 33.67}, fIncidence: -3.5, fDihedral: 0.0, fArea: 36.4, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}, vCGCoords: Vector{x: 0.0, y: 0.0, z: 0.0} },
+            PointMass{fmass: 6.56, vDCoords: Vector{x: 14.5, y: -12.0, z: 2.5}, vLocalInertia: Vector{x: 13.92, y: 10.50, z: 24.00}, fIncidence: -3.5, fDihedral: 0.0, fArea: 31.2, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}, vCGCoords: Vector{x: 0.0, y: 0.0, z: 0.0} },
+            PointMass{fmass: 2.62, vDCoords: Vector{x: 3.03, y: 2.5, z: 3.0}, vLocalInertia: Vector{x: 0.837, y: 0.385, z: 1.206}, fIncidence: 0.0, fDihedral: 0.0, fArea: 10.8, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}, vCGCoords: Vector{x: 0.0, y: 0.0, z: 0.0} },
+            PointMass{fmass: 2.62, vDCoords: Vector{x: 3.03, y: -2.5, z: 3.0}, vLocalInertia: Vector{x: 0.837, y: 0.385, z: 1.206}, fIncidence: 0.0, fDihedral: 0.0, fArea: 10.8, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}, vCGCoords: Vector{x: 0.0, y: 0.0, z: 0.0} },
+            PointMass{fmass: 2.93, vDCoords: Vector{x: 2.25, y: 0.0, z: 5.0}, vLocalInertia: Vector{x: 1.262, y: 1.942, z: 0.718}, fIncidence: 0.0, fDihedral: 90.0, fArea: 12.0, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}, vCGCoords: Vector{x: 0.0, y: 0.0, z: 0.0} },
+            PointMass{fmass: 31.8, vDCoords: Vector{x: 15.25, y: 0.0, z: 1.5}, vLocalInertia: Vector{x: 66.30, y: 861.9, z: 861.9}, fIncidence: 0.0, fDihedral: 0.0, fArea: 84.0, iFlap: 0.0, vNormal: Vector{x: 0.0, y: 0.0, z: 0.0}, vCGCoords: Vector{x: 0.0, y: 0.0, z: 0.0} }
             ];
 
         let mut inn: f32;
@@ -374,13 +408,68 @@ impl RigidBody
         //calculate coordinates of each element with respect to the combined CG, relative position
         for i in Element.iter_mut()
         {
-            i.vDCoords.x = i.vDCoords.x - CG.x;
-            i.vDCoords.y = i.vDCoords.y - CG.y;
-            i.vDCoords.z = i.vDCoords.z - CG.z;
+            i.vCGCoords.x = i.vDCoords.x - CG.x;
+            i.vCGCoords.y = i.vDCoords.y - CG.y;
+            i.vCGCoords.z = i.vDCoords.z - CG.z;
         }
  
-        //now calculate the moments and products of intertia for the combined elements
+        //calculate the moments and products of intertia for the combined elements
+        let mut Ixx: f32 = 0.0;
+        let mut Iyy: f32 = 0.0;
+        let mut Izz: f32 = 0.0;
+        let mut Ixy: f32 = 0.0;
+        let mut Ixz: f32 = 0.0;
+        let mut Iyz: f32 = 0.0;
 
+        for i in Element.iter()
+        {
+            Ixx = Ixx + i.vLocalInertia.x + i.fmass *
+                (i.vCGCoords.y * i.vCGCoords.y +
+                i.vCGCoords.z * i.vCGCoords.z);
+
+            Iyy = Iyy + i.vLocalInertia.y + i.fmass *
+                (i.vCGCoords.z * i.vCGCoords.z +
+                i.vCGCoords.x * i.vCGCoords.x);
+
+            Izz = Izz + i.vLocalInertia.z + i.fmass *
+                (i.vCGCoords.x * i.vCGCoords.x +
+                i.vCGCoords.y * i.vCGCoords.y);
+
+            Ixy = Ixy + i.fmass * (i.vCGCoords.x * 
+                i.vCGCoords.y);
+
+            Ixz = Ixz + i.fmass * (i.vCGCoords.x * 
+                i.vCGCoords.z);
+            
+            Iyz = Iyz + i.fmass * (i.vCGCoords.y *
+                i.vCGCoords.z);
+        }
+    
+        //finally, set up airplanes mass and inertia matrix
+        self.mass = TotalMass;
+
+        //this was setting up matrix with 3x3 array
+        // self.mmInertia[0][0] = Ixx;
+        // self.mmInertia[0][1] = -Ixy;
+        // self.mmInertia[0][2] = -Ixz;
+    
+        // self.mmInertia[1][0] = -Ixy;
+        // self.mmInertia[1][1] = Iyy;
+        // self.mmInertia[1][2] = -Iyz;
+    
+        // self.mmInertia[2][0] = -Ixz;
+        // self.mmInertia[2][1] = -Iyz;
+        // self.mmInertia[2][2] = Izz;
+
+
+
+        //using nalgebra matrix. having trouble getting it in the rigid body 
+        self.mInertia = Matrix3::new(Ixx, -Ixy, -Ixz,
+                                -Ixy, Iyy, -Iyz,
+                                -Ixz, -Iyz, Izz);
+
+        //get inverse of matrix
+        self.mInertiaInverse = self.mInertia.try_inverse().unwrap();
 
 
     }
@@ -389,11 +478,11 @@ impl RigidBody
 
 fn main()
 {
-
+              
 
     let mut Airplane = RigidBody::new();
+    Airplane.CalcAirplaneMassProperties(); //would be nice to call this automatically in new, having some trouble with getting that to work rn...
     println!("{:#?}", Airplane);
-    Airplane.CalcAirplaneMassProperties();
 
 
     let mut myvec = Vector{x: 1.0, y: 2.0, z: 3.0};
