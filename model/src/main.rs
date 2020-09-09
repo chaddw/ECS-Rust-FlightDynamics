@@ -228,15 +228,13 @@ impl Sub for Quaternion
     }
 }
 
-//in quaternion class: need scalar multiply, scalar divide, conjugate
-//in quaternion functions and operators: needs multiplication, division and many more... some seem repeated like addition... weird. 
-// will code them when they come up in the model
+//in quaternion class: need scalar multiply, scalar divide, conjugate.... nalgebra makes this easy
 
 
 
 //rigid body structure to encapsulate the required data during the simulation
 #[allow(non_snake_case)]
-#[derive(Debug)]
+#[derive(Debug)] //nalgebra does not like default
 struct RigidBody
 {
     mass: f32, //total mass
@@ -261,6 +259,7 @@ struct RigidBody
     fSpeed: f32,                // speed (magnitude of the velocity)
     qOrientation: Quaternion,   // orientation in earth coordinates
     vForces: Vector,            // total force on body
+    Thrustforce: f32,           //magnitude of thrust
     vMoments: Vector,          // total moment (torque) on body
 
     //nalgeabra approach
@@ -305,7 +304,7 @@ impl RigidBody
 
             //set initial thrust, forces, and moments
             vForces: Vector{x: 500.0, y: 0.0, z: 0.0},
-            //Thrustforce: 500.0,   //this is not in the rigid body for some reason...
+            Thrustforce: 500.0,   //this isnt written in the rigid body intiialization for some reason...
 
             vMoments: Vector{x: 0.0, y: 0.0, z: 0.0},
 
@@ -326,9 +325,8 @@ impl RigidBody
 
 
             //calculate plane's mass properties
-            //(wont be called here)
-
-
+            //
+               // RigidBody::CalcAirplaneMassProperties
            
         }
 
@@ -471,9 +469,163 @@ impl RigidBody
         //get inverse of matrix
         self.mInertiaInverse = self.mInertia.try_inverse().unwrap();
 
-
+        
     }
-}
+
+    //calculates all of the forces and moments on the plane at any time
+    fn CalcAirplaneLoads(&mut self)
+    {
+        //may need to convert all of the custom "Vector" instances into nalgebra vector3... going to keep using custom class for now...
+
+        let fb = Vector{x: 0.0, y: 0.0, z: 0.0};
+        let Mb = Vector{x: 0.0, y: 0.0, z: 0.0};
+        let mut Thrust = Vector{x: 0.0, y: 0.0, z: 0.0};
+
+        //reset forces and moments
+        self.vForces = Vector{x: 0.0, y: 0.0, z: 0.0};
+        self.vMoments = Vector{x: 0.0, y: 0.0, z: 0.0};
+
+
+        //define thrust vector, which acts throguh the plane's center of gravity
+        Thrust = Thrust * self.Thrustforce; //vector mult by scalar
+
+
+
+
+       // RigidBody::LiftCoefficient(1.0, 1);
+       // RigidBody::DragCoefficient(1.0, 0);
+    }
+
+
+    //functions to collect airfoil performance data
+    //lift and drag coefficient data is given for a set of discrete attack angles, so then linear interpolation is used to determine the coefficients for the attack angle that falls between the discrete angles
+   
+    //given the angle of attack and status of the flaps, return lfit angle coefficient for camabred airfoil with plain trailing-edge (+/- 15 degree inflation)
+    fn LiftCoefficient(angle: f32, flaps: i32) -> f32
+    {
+
+ 
+        let clf0 = vec![(0.54 * -1.0), (0.2 * -1.0), 0.2, 0.57, 0.92, 1.21, 1.43, 1.4, 1.0]; //why cant i just make a number negative with '-'?...weird
+        let clfd = vec![0.0, 0.45, 0.85, 1.02, 1.39, 1.65, 1.75, 1.38, 1.17];
+        let clfu = vec![(0.74 * -1.0), (0.4 * -1.0), 0.0, 0.27, 0.63, 0.92, 1.03, 1.1, 0.78];
+        let a = vec![(8.0 * -1.0), (4.0 * -1.0), 0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
+
+        let mut cl: f32 = 0.0;
+
+        for i in 0..8  
+        {
+            if a[i] <= angle && a[i + 1] > angle
+            {
+                if flaps == 0 //flaps not deflected
+                {
+                    cl = clf0[i] - (a[i] - angle) * (clf0[i] - clf0[i + 1]) / (a[i] - a[i + 1]);
+                    break;
+                }
+                else if flaps == -1 //flaps down
+                {
+                    cl = clfd[i] - (a[i] - angle) * (clfd[i] - clfd[i + 1]) / (a[i] - a[i + 1]);
+                    break;
+                }
+                else if flaps == 1 //flaps up
+                {
+                    cl = clfu[i] - (a[i] - angle) * ( clfu[i] - clfu[i + 1]) / (a[i] - a[i + 1]);
+                    break;
+                }
+            }
+
+        }
+
+        return cl;
+    }
+
+    //given angle of attack and flap status, return drag coefficient for cambered airfoil with plain trailing-edge flap (+/- 15 degree deflection)
+    fn DragCoefficient(angle: f32, flaps: i32) -> f32
+    {
+        let cdf0 = vec![0.01, 0.0074, 0.004, 0.009, 0.013, 0.023, 0.05, 0.12, 0.21];
+        let cdfd = vec![0.0065, 0.0043, 0.0055, 0.0153, 0.0221, 0.0391, 0.1, 0.195, 0.3];
+        let cdfu = vec![0.005, 0.0043, 0.0055, 0.02601, 0.03757, 0.06647, 0.13, 0.1, 0.25];
+        let a = vec![(8.0 * -1.0), (4.0 * -1.0), 0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
+
+        let mut cd: f32 = 0.5;
+
+        for i in 0..8  
+        {
+            if a[i] <= angle && a[i + 1] > angle
+            {
+                if flaps == 0 //flaps not deflected
+                {
+                    cd = cdf0[i] - (a[i] - angle) * (cdf0[i] - cdf0[i + 1]) / (a[i] - a[i + 1]);
+                    break;
+                }
+                else if flaps == -1 //flaps down
+                {
+                    cd = cdfd[i] - (a[i] - angle) * (cdfd[i] - cdfd[i + 1]) / (a[i] - a[i + 1]);
+                    break;
+                }
+                else if flaps == 1 //flaps up
+                {
+                    cd = cdfu[i] - (a[i] - angle) * ( cdfu[i] - cdfu[i + 1]) / (a[i] - a[i + 1]);
+                    break;
+                }
+            }
+
+        }
+
+        return cd;
+    }
+
+
+    //Rudder lift and drag coefficients are similar to that of the wing but the coefficients themselves are different and the tail rudder does not include flaps
+    //given attack angle, return lift coefficient for a symmetric (no camber) airfoil without flaps
+    fn RudderLiftCoefficient(angle: f32) -> f32
+    {
+        let clf0 = vec![0.16, 0.456, 0.736, 0.968, 1.144, 1.12, 0.8];
+        let a = vec![0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
+
+        let mut cl: f32 = 0.0;
+        let aa: f32 = angle.abs();
+
+        for i in 0..8  
+        {
+            if a[i] <= aa && a[i + 1] > aa
+            {
+                cl = clf0[i] - (a[i] - aa) * (clf0[i] - clf0[i + 1]) / (a[i] - a[i + 1]);
+
+                if angle < 0.0
+                {
+                    cl = -cl;
+                }
+                break;
+            }
+        }
+        return cl;
+    }
+  
+     //given attack angle, return drag coefficient for a symmetric (no camber) airfoil without flaps
+     fn RudderDragCoefficient(angle: f32) -> f32
+     {
+         let cdf0 = vec![0.0032, 0.0072, 0.0104, 0.0184, 0.04, 0.096, 0.168];
+         let a = vec![0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
+ 
+         let mut cd: f32 = 0.5;
+         let aa: f32 = angle.abs();
+ 
+         for i in 0..8  
+         {
+             if a[i] <= aa && a[i + 1] > aa
+             {
+                 cd = cdf0[i] - (a[i] - aa) * (cdf0[i] - cdf0[i + 1]) / (a[i] - a[i + 1]);
+ 
+                 break;
+             }
+         }
+         return cd;
+     }
+
+
+
+
+} //end impl
 
 
 fn main()
@@ -482,6 +634,7 @@ fn main()
 
     let mut Airplane = RigidBody::new();
     Airplane.CalcAirplaneMassProperties(); //would be nice to call this automatically in new, having some trouble with getting that to work rn...
+    Airplane.CalcAirplaneLoads();
     println!("{:#?}", Airplane);
 
 
