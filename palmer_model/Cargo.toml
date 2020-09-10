@@ -1,5 +1,5 @@
 [package]
-name = "rust_simulator"
+name = "palmer_model"
 version = "0.1.0"
 authors = ["chaddw <caw14f@my.fsu.edu>"]
 edition = "2018"
