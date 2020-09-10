@@ -2,233 +2,243 @@ use std::ops::{Add, Sub, Mul, Div}; //operator overload
 extern crate nalgebra as na;
 //use na::*; 
 use na::{Matrix3, Vector3, UnitQuaternion, Unit};
+
+
+
+//commenting out old vector and quaternion class
+//////////////////////////// 
+
 /////VECTOR CLASS
 
-#[allow(non_snake_case)]
-#[derive(Default, Debug)]
-struct Vector
-{
-    x: f32,
-    y: f32,
-    z: f32
-}
+// #[allow(non_snake_case)]
+// #[derive(Default, Debug)]
+// struct Vector
+// {
+//     x: f32,
+//     y: f32,
+//     z: f32
+// }
 
-impl Vector
-{
-
-
-    //static does not want to work right now to initialize struct
-    //  fn newVec(x: f32, y: f32, z: f32) -> Vector
-    //  {
-    //     Vector{x:x, y:y, z:z};
-    //  }
+// impl Vector
+// {
 
 
-    //scalar magnitude
-    fn Magnitude(&self) -> f32
-    {
-        return (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
-    }
+//     //static does not want to work right now to initialize struct
+//     //  fn newVec(x: f32, y: f32, z: f32) -> Vector
+//     //  {
+//     //     Vector{x:x, y:y, z:z};
+//     //  }
 
-    //convert to unit vector
-    fn Normalize(&mut self) -> ()
-    {
-        const tol: f32 = 0.0001; //tolerance
-        let mut m: f32 = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
+
+//     //scalar magnitude
+//     fn Magnitude(&self) -> f32
+//     {
+//         return (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
+//     }
+
+//     //convert to unit vector
+//     fn Normalize(&mut self) -> ()
+//     {
+//         const tol: f32 = 0.0001; //tolerance
+//         let mut m: f32 = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
         
-        if m <= tol
-        {
-            m = 1.0;
-        }
+//         if m <= tol
+//         {
+//             m = 1.0;
+//         }
 
-        self.x = self.x / m;
-        self.y = self.y / m;
-        self.x = self.x / m;
+//         self.x = self.x / m;
+//         self.y = self.y / m;
+//         self.x = self.x / m;
 
-        if self.x.abs() < tol
-        {
-            self.x = 0.0;
-        }
-        if self.y.abs() < tol
-        {
-            self.y = 0.0;
-        }
-        if self.x.abs() < tol
-        {
-            self.z = 0.0;
-        }
-    }
+//         if self.x.abs() < tol
+//         {
+//             self.x = 0.0;
+//         }
+//         if self.y.abs() < tol
+//         {
+//             self.y = 0.0;
+//         }
+//         if self.x.abs() < tol
+//         {
+//             self.z = 0.0;
+//         }
+//     }
 
-    //reverse direction of vector. point in opposite direction
-    fn Reverse(&mut self) -> ()
-    {
-        self.x = -self.x;
-        self.y = -self.y;
-        self.z = -self.z;
-    }
-}
+//     //reverse direction of vector. point in opposite direction
+//     fn Reverse(&mut self) -> ()
+//     {
+//         self.x = -self.x;
+//         self.y = -self.y;
+//         self.z = -self.z;
+//     }
+// }
 
-//vector operator overloading
-impl Add for Vector 
-{
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        Self {
-
-            x: self.x + other.x, 
-            y: self.y + other.y, 
-            z: self.z + other.z
-        }
-    }
-}
-
-impl Sub for Vector 
-{
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self {
-        Self {
-
-            x: self.x - other.x, 
-            y: self.y - other.y, 
-            z: self.z - other.z
-        }
-    }
-}
-
-//multiply by a scalar
-impl Mul<f32> for Vector 
-{
-    type Output = Self;
-
-    fn mul(self, scalar: f32) -> Self {
-        Self {
-
-            x: self.x * scalar, 
-            y: self.y * scalar, 
-            z: self.z * scalar
-        }
-    }
-}
-
-//vector by vector.... fix this...
-// impl Mul for Vector 
+// //vector operator overloading
+// impl Add for Vector 
 // {
 //     type Output = Self;
 
-//     fn mul(self, other: Self) -> f32 {
-//         f32 {
+//     fn add(self, other: Self) -> Self {
+//         Self {
 
-//             self.x * other.x + self.y * other.y + self.z *
+//             x: self.x + other.x, 
+//             y: self.y + other.y, 
+//             z: self.z + other.z
 //         }
 //     }
 // }
 
-//divide by a scalar
-impl Div<f32> for Vector
-{
-    type Output = Self;
+// impl Sub for Vector 
+// {
+//     type Output = Self;
 
-    fn div(self, scalar: f32) -> Self {
-        Self {
+//     fn sub(self, other: Self) -> Self {
+//         Self {
 
-            x: self.x / scalar, 
-            y: self.y / scalar, 
-            z: self.z / scalar
-        }
-    }
-}
-//needs cross product ^, dot product *.
+//             x: self.x - other.x, 
+//             y: self.y - other.y, 
+//             z: self.z - other.z
+//         }
+//     }
+// }
+
+// //multiply by a scalar
+// impl Mul<f32> for Vector 
+// {
+//     type Output = Self;
+
+//     fn mul(self, scalar: f32) -> Self {
+//         Self {
+
+//             x: self.x * scalar, 
+//             y: self.y * scalar, 
+//             z: self.z * scalar
+//         }
+//     }
+// }
+
+// //vector by vector.... fix this...
+// // impl Mul for Vector 
+// // {
+// //     type Output = Self;
+
+// //     fn mul(self, other: Self) -> f32 {
+// //         f32 {
+
+// //             self.x * other.x + self.y * other.y + self.z *
+// //         }
+// //     }
+// // }
+
+// //divide by a scalar
+// impl Div<f32> for Vector
+// {
+//     type Output = Self;
+
+//     fn div(self, scalar: f32) -> Self {
+//         Self {
+
+//             x: self.x / scalar, 
+//             y: self.y / scalar, 
+//             z: self.z / scalar
+//         }
+//     }
+// }
+// //needs cross product ^, dot product *.
 
 
-//////QUATERNIONS
+// //////QUATERNIONS
 
-#[allow(non_snake_case)]
-#[derive(Default, Debug)]
-struct Quaternion
-{
-    n: f32,
-    v: Vector,
-   // v: Vec<f32> //v: [f32;3], //this is a "Vector" type defined in appendix A...
-    //e0: f32, e1: f32, e2: f32, e3: f32
-}
+// #[allow(non_snake_case)]
+// #[derive(Default, Debug)]
+// struct Quaternion
+// {
+//     n: f32,
+//     v: Vector,
+//    // v: Vec<f32> //v: [f32;3], //this is a "Vector" type defined in appendix A...
+//     //e0: f32, e1: f32, e2: f32, e3: f32
+// }
 
-#[allow(non_snake_case)]
-impl Quaternion
-{
-    //instance method with access to struct fields to initialize the struct... maybe this needs to be static...
-    //realized i do not need this to initialize easily
-    // fn newQuaternion(&mut self, e0: f32, e1: f32, e2: f32, e3: f32)
-    // {
-    //     self.v = Vector{x: e1, y: e2, z: e3};
-    //     //self.v = vec![0.0, 0.0, 0.0]; //x, y, z
-    //     self.n = e0;
-    //     //self.v[0] = e1; //x
-    //    // self.v[1] = e2; //y
-    //    // self.v[2] = e3; //z
-    // }
+// #[allow(non_snake_case)]
+// impl Quaternion
+// {
+//     //instance method with access to struct fields to initialize the struct... maybe this needs to be static...
+//     //realized i do not need this to initialize easily
+//     // fn newQuaternion(&mut self, e0: f32, e1: f32, e2: f32, e3: f32)
+//     // {
+//     //     self.v = Vector{x: e1, y: e2, z: e3};
+//     //     //self.v = vec![0.0, 0.0, 0.0]; //x, y, z
+//     //     self.n = e0;
+//     //     //self.v[0] = e1; //x
+//     //    // self.v[1] = e2; //y
+//     //    // self.v[2] = e3; //z
+//     // }
 
-    //intialize statically. would need to add e1,e2,e3 to the struct variables
-    //  fn newQuaternion(n: f32, mut v: Vec<f32>, e0: f32, e1: f32, e2: f32, e3: f32)
-    //  {
-    //     v = vec![e1, e2, e3]; //x, y, z
-    //     Quaternion {n: n, v: v};
-    //  }
+//     //intialize statically. would need to add e1,e2,e3 to the struct variables
+//     //  fn newQuaternion(n: f32, mut v: Vec<f32>, e0: f32, e1: f32, e2: f32, e3: f32)
+//     //  {
+//     //     v = vec![e1, e2, e3]; //x, y, z
+//     //     Quaternion {n: n, v: v};
+//     //  }
 
-    //similar to vector but take the scalar into account
-    fn Magnitude(&self) -> f32
-    {
-        return (self.n * self.n + self.v.x + self.v.x + self.v.y * self.v.y + self.v.z * self.v.z).sqrt();
-    }
+//     //similar to vector but take the scalar into account
+//     fn Magnitude(&self) -> f32
+//     {
+//         return (self.n * self.n + self.v.x + self.v.x + self.v.y * self.v.y + self.v.z * self.v.z).sqrt();
+//     }
 
-    //vector accessor
-    fn GetVector(&self) -> &Vector
-    {
-        //return vec![ self.v[0], self.v[1], self.v[2] ]
-        return &self.v;
-    }
+//     //vector accessor
+//     fn GetVector(&self) -> &Vector
+//     {
+//         //return vec![ self.v[0], self.v[1], self.v[2] ]
+//         return &self.v;
+//     }
 
-    //scaler accessor
-    fn GetScalar(&self) -> f32
-    {
-        return self.n;
-    }
+//     //scaler accessor
+//     fn GetScalar(&self) -> f32
+//     {
+//         return self.n;
+//     }
 
-}
+// }
 
-//quaternion operator overloading
-impl Add for Quaternion
-{
-    type Output = Self;
+// //quaternion operator overloading
+// impl Add for Quaternion
+// {
+//     type Output = Self;
 
-    fn add(self, other: Self) -> Self
-    {
-        Self {
+//     fn add(self, other: Self) -> Self
+//     {
+//         Self {
 
-            n: self.n + other.n, //scalar
-            v: Vector{x: self.v.x + other.v.x, y: self.v.y + other.v.y, z: self.v.z + other.v.z}
-            //v: vec![self.v[0] + other.v[0], self.v[1] + other.v[1], self.v[2] + other.v[2] ]
-        }
-    }
-}
+//             n: self.n + other.n, //scalar
+//             v: Vector{x: self.v.x + other.v.x, y: self.v.y + other.v.y, z: self.v.z + other.v.z}
+//             //v: vec![self.v[0] + other.v[0], self.v[1] + other.v[1], self.v[2] + other.v[2] ]
+//         }
+//     }
+// }
 
-impl Sub for Quaternion
-{
-    type Output = Self;
+// impl Sub for Quaternion
+// {
+//     type Output = Self;
 
-    fn sub(self, other: Self) -> Self
-    {
-        Self {
+//     fn sub(self, other: Self) -> Self
+//     {
+//         Self {
 
-            n: self.n - other.n, //scalar
-            v: Vector{x: self.v.x - other.v.x, y: self.v.y - other.v.y, z: self.v.z - other.v.z}
-            //v: vec![self.v[0] + other.v[0], self.v[1] + other.v[1], self.v[2] + other.v[2] ]
-        }
-    }
-}
+//             n: self.n - other.n, //scalar
+//             v: Vector{x: self.v.x - other.v.x, y: self.v.y - other.v.y, z: self.v.z - other.v.z}
+//             //v: vec![self.v[0] + other.v[0], self.v[1] + other.v[1], self.v[2] + other.v[2] ]
+//         }
+//     }
+// }
 
-//in quaternion class: need scalar multiply, scalar divide, conjugate.... nalgebra makes this easy
+// //in quaternion class: need scalar multiply, scalar divide, conjugate.... nalgebra makes this easy
+
+
+
+///////////////////////// end old code
 
 
 
@@ -262,8 +272,29 @@ struct RigidBody
     Thrustforce: f32,           //magnitude of thrust
     vMoments: Vector3<f32>,          // total moment (torque) on body
 
-    //nalgeabra approach
-    //Qua: UnitQuaternion<f32>
+
+
+    Element: Vec<PointMass> //vector of point mass elements
+
+
+}
+
+//the point masses are elements making up the bodystructure 
+#[allow(non_snake_case)]
+#[derive(Debug)]
+struct PointMass
+{
+    fmass: f32,
+    vDCoords: Vector3<f32>, //"design position"
+    vLocalInertia: Vector3<f32>,
+    fIncidence: f32,
+    fDihedral: f32,
+    fArea: f32,
+    iFlap: f32,
+
+    vNormal: Vector3<f32>,
+    vCGCoords: Vector3<f32> //"corrected position"
+
 }
 
 
@@ -323,6 +354,18 @@ impl RigidBody
             qOrientation: UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0),
 
 
+            //8 elements of the plane taken into account
+            Element: vec![
+                PointMass{fmass: 6.56, vDCoords: Vector3::new(14.5, 12.0, 2.5), vLocalInertia: Vector3::new(13.92, 10.50, 24.00), fIncidence: -3.5, fDihedral: 0.0, fArea: 31.2, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
+                PointMass{fmass: 7.31, vDCoords: Vector3::new(14.5, 5.5, 2.5), vLocalInertia: Vector3::new(21.95, 12.22, 33.67), fIncidence: -3.5, fDihedral: 0.0, fArea: 36.4, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
+                PointMass{fmass: 7.31, vDCoords: Vector3::new(14.5, -5.5, 2.5), vLocalInertia: Vector3::new(21.95, 12.22, 33.67), fIncidence: -3.5, fDihedral: 0.0, fArea: 36.4, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
+                PointMass{fmass: 6.56, vDCoords: Vector3::new(14.5, -12.0, 2.5), vLocalInertia: Vector3::new(13.92, 10.50, 24.00), fIncidence: -3.5, fDihedral: 0.0, fArea: 31.2, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
+                PointMass{fmass: 2.62, vDCoords: Vector3::new(3.03, 2.5, 3.0), vLocalInertia: Vector3::new(0.837, 0.385, 1.206), fIncidence: 0.0, fDihedral: 0.0, fArea: 10.8, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
+                PointMass{fmass: 2.62, vDCoords: Vector3::new(3.03, -2.5, 3.0), vLocalInertia: Vector3::new(0.837, 0.385, 1.206), fIncidence: 0.0, fDihedral: 0.0, fArea: 10.8, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
+                PointMass{fmass: 2.93, vDCoords: Vector3::new(2.25, 0.0, 5.0), vLocalInertia: Vector3::new(1.262, 1.942, 0.718), fIncidence: 0.0, fDihedral: 90.0, fArea: 12.0, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
+                PointMass{fmass: 31.8, vDCoords: Vector3::new(15.25, 0.0, 1.5), vLocalInertia: Vector3::new(66.30, 861.9, 861.9), fIncidence: 0.0, fDihedral: 0.0, fArea: 84.0, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) }
+                ]
+
             //calculate plane's mass properties
             //
                // RigidBody::CalcAirplaneMassProperties
@@ -333,42 +376,11 @@ impl RigidBody
 
     fn CalcAirplaneMassProperties(&mut self)
     {
-        //the point masses are elements making up the bodystructure 
-        #[allow(non_snake_case)]
-        #[derive(Debug)]
-        struct PointMass
-        {
-            fmass: f32,
-            vDCoords: Vector3<f32>, //"design position"
-            vLocalInertia: Vector3<f32>,
-            fIncidence: f32,
-            fDihedral: f32,
-            fArea: f32,
-            iFlap: f32,
-
-            vNormal: Vector3<f32>,
-            vCGCoords: Vector3<f32> //"corrected position"
-
-        }
-
-
-        //8 elements of the plane taken into account
-        let mut Element = vec![
-            PointMass{fmass: 6.56, vDCoords: Vector3::new(14.5, 12.0, 2.5), vLocalInertia: Vector3::new(13.92, 10.50, 24.00), fIncidence: -3.5, fDihedral: 0.0, fArea: 31.2, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
-            PointMass{fmass: 7.31, vDCoords: Vector3::new(14.5, 5.5, 2.5), vLocalInertia: Vector3::new(21.95, 12.22, 33.67), fIncidence: -3.5, fDihedral: 0.0, fArea: 36.4, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
-            PointMass{fmass: 7.31, vDCoords: Vector3::new(14.5, -5.5, 2.5), vLocalInertia: Vector3::new(21.95, 12.22, 33.67), fIncidence: -3.5, fDihedral: 0.0, fArea: 36.4, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
-            PointMass{fmass: 6.56, vDCoords: Vector3::new(14.5, -12.0, 2.5), vLocalInertia: Vector3::new(13.92, 10.50, 24.00), fIncidence: -3.5, fDihedral: 0.0, fArea: 31.2, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
-            PointMass{fmass: 2.62, vDCoords: Vector3::new(3.03, 2.5, 3.0), vLocalInertia: Vector3::new(0.837, 0.385, 1.206), fIncidence: 0.0, fDihedral: 0.0, fArea: 10.8, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
-            PointMass{fmass: 2.62, vDCoords: Vector3::new(3.03, -2.5, 3.0), vLocalInertia: Vector3::new(0.837, 0.385, 1.206), fIncidence: 0.0, fDihedral: 0.0, fArea: 10.8, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
-            PointMass{fmass: 2.93, vDCoords: Vector3::new(2.25, 0.0, 5.0), vLocalInertia: Vector3::new(1.262, 1.942, 0.718), fIncidence: 0.0, fDihedral: 90.0, fArea: 12.0, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) },
-            PointMass{fmass: 31.8, vDCoords: Vector3::new(15.25, 0.0, 1.5), vLocalInertia: Vector3::new(66.30, 861.9, 861.9), fIncidence: 0.0, fDihedral: 0.0, fArea: 84.0, iFlap: 0.0, vNormal: Vector3::new(0.0, 0.0, 0.0), vCGCoords: Vector3::new(0.0, 0.0, 0.0) }
-            ];
-
         let mut inn: f32;
         let mut di: f32;
 
         //calculate the normal (perpendicular) vector to each lifting surface. This is needed for relative air velocity to find lift and drag.
-        for  i in Element.iter_mut()
+        for  i in self.Element.iter_mut()
         {
             inn = (i.fIncidence).to_radians();
             di = (i.fDihedral).to_radians();
@@ -378,7 +390,7 @@ impl RigidBody
 
         //calculate total mass
         let mut TotalMass: f32 = 0.0;
-        for i in Element.iter()
+        for i in self.Element.iter()
         {
             TotalMass = TotalMass + i.fmass;
         }
@@ -388,7 +400,7 @@ impl RigidBody
         let mut FirstMomentX: f32 = 0.0;
         let mut FirstMomentY: f32 = 0.0;
         let mut FirstMomentZ: f32 = 0.0;
-        for i in Element.iter()
+        for i in self.Element.iter()
         {
             //X coord
             FirstMomentX = FirstMomentX + i.fmass * i.vDCoords.x;
@@ -403,7 +415,7 @@ impl RigidBody
         println!("Combined center of gravity {:?}", CG);
 
         //calculate coordinates of each element with respect to the combined CG, relative position
-        for i in Element.iter_mut()
+        for i in self.Element.iter_mut()
         {
             i.vCGCoords.x = i.vDCoords.x - CG.x;
             i.vCGCoords.y = i.vDCoords.y - CG.y;
@@ -418,7 +430,7 @@ impl RigidBody
         let mut Ixz: f32 = 0.0;
         let mut Iyz: f32 = 0.0;
 
-        for i in Element.iter()
+        for i in self.Element.iter()
         {
             Ixx = Ixx + i.vLocalInertia.x + i.fmass *
                 (i.vCGCoords.y * i.vCGCoords.y +
@@ -474,22 +486,29 @@ impl RigidBody
     //calculates all of the forces and moments on the plane at any time
     fn CalcAirplaneLoads(&mut self)
     {
-        //may need to convert all of the custom "Vector" instances into nalgebra vector3... going to keep using custom class for now...
-
         let fb = Vector3::new(0.0, 0.0, 0.0);
         let Mb = Vector3::new(0.0, 0.0, 0.0);
-        let mut Thrust = Vector3::new(0.0, 0.0, 0.0);
 
         //reset forces and moments
         self.vForces = Vector3::new(0.0, 0.0, 0.0);
         self.vMoments = Vector3::new(0.0, 0.0, 0.0);
 
-
         //define thrust vector, which acts throguh the plane's center of gravity
-        Thrust = Thrust * self.Thrustforce; //vector mult by scalar
-        //converting vector to vector 3 now...
+        let mut Thrust = Vector3::new(1.0, 0.0, 0.0);
+        Thrust = Thrust * self.Thrustforce; 
+  
+        //calculate forces and moments in body space
+        let vLocalVelocity = Vector3::new(0.0, 0.0, 0.0);
+        let fLocalSpeed: f32 = 0.0;
+        let vDragVector = Vector3::new(0.0, 0.0, 0.0);
+        let vLiftVector = Vector3::new(0.0, 0.0, 0.0);
+        let fAttackAngle: f32 = 0.0;
+        let tmp: f32 = 0.0;
+        let vResultant= Vector3::new(0.0, 0.0, 0.0);
+        let vtmp = Vector3::new(0.0, 0.0, 0.0);
+        let Stalling: bool = false;
 
-
+        
 
        // RigidBody::LiftCoefficient(1.0, 1);
        // RigidBody::DragCoefficient(1.0, 0);
