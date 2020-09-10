@@ -1,7 +1,7 @@
 //use std::ops::{Add, Sub, Mul, Div}; //operator overload
 extern crate nalgebra as na;
 //use na::*; 
-use na::{Matrix3, Vector3, UnitQuaternion, Unit}; //took off unit
+use na::{Matrix3, Vector3, UnitQuaternion, Unit, Quaternion}; //took off unit
 
 
 
@@ -265,7 +265,8 @@ struct RigidBody
     v_angular_velocity: Vector3<f32>,   // angular velocity in body coordinates
     v_euler_angles: Vector3<f32>,       // Euler angles in body coordinates
     f_speed: f32,                // speed (magnitude of the velocity)
-    q_orientation: UnitQuaternion<f32>,   // orientation in earth coordinates
+    q_orientation: Quaternion<f32>,
+    q_orientation_unit: UnitQuaternion<f32>,   // orientation in earth coordinates
     v_forces: Vector3<f32>,            // total force on body
     thrustforce: f32,           //magnitude of thrust
     v_moments: Vector3<f32>,          // total moment (torque) on body
@@ -348,7 +349,8 @@ impl RigidBody
             //q_orientation: Quaternion{n: 0.0, v: Vector{x: 0.0, y: 0.0, z: 0.0}}, //default value for now
 
             //nalgebra approach
-            q_orientation: UnitQuaternion::identity(), //from_euler_angles(0.0, 0.0, 0.0),
+            q_orientation: Quaternion::new(0.0, 0.0, 0.0, 0.0), //from_euler_angles(0.0, 0.0, 0.0),
+           q_orientation_unit: UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
 
 
             //8 elements of the plane taken into account
@@ -466,10 +468,10 @@ impl RigidBody
 
 
 
-        //using nalgebra matrix. having trouble getting it in the rigid body 
+        //using nalgebra matrix
         self.m_inertia = Matrix3::new(ixx, -ixy, -ixz,
-                                -ixy, iyy, -iyz,
-                                -ixz, -iyz, izz);
+                                     -ixy, iyy, -iyz,
+                                     -ixz, -iyz, izz);
 
         //get inverse of matrix
         self.m_inertia_inverse = self.m_inertia.try_inverse().unwrap();
@@ -515,7 +517,6 @@ impl RigidBody
 
             //calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
             //rotation part
-
 
             vtmp = self.v_angular_velocity.cross(&self.element[i].v_cg_coords); //crossproduct
 
@@ -579,8 +580,8 @@ impl RigidBody
         //add thrust
         fb = fb + thrust;
 
-        //convert forces from model space to earth space. rotates the vector by the unit quaternion
-        self.v_forces = self.q_orientation.transform_vector(&fb);
+        //convert forces from model space to earth space. rotates the vector by the unit quaternion (QVRotate function)
+        self.v_forces = self.q_orientation_unit.transform_vector(&fb);
 
         //apply gravity (g is -32.174 ft/s^2)
         self.v_forces.z = self.v_forces.z + (-32.174) * self.mass;
@@ -734,23 +735,37 @@ impl RigidBody
         self.v_position = self.v_position + self.v_velocity * dt;
 
         //handle rotations
-        let mag: f32 = 0.0;
+        let mut mag: f32 = 0.0;
 
         //calculate angular velocity of airplane in body coordinates
-       self.v_angular_velocity = self.v_angular_velocity + self.m_inertia_inverse * ( self.v_moments - ( self.v_angular_velocity.cross(&(self.m_inertia * self.v_angular_velocity)))) * dt;
-                                          
-       
+        self.v_angular_velocity = self.v_angular_velocity + self. m_inertia_inverse * ( self.v_moments - ( self.v_angular_velocity.cross(&(self.m_inertia * self.v_angular_velocity)))) * dt;
 
 
-       //STUCK HERE
+        //calculate the new rotation quaternion
 
-       //try with regular quaternions....
-       //calculate the new quaternion
-    //    let tmp0  = self.q_orientation * self.v_angular_velocity;
-    //    let addquat = tmp0 * (0.5 * dt);
+        //we need angular velocity to be in a quaternion form for the multiplication.... ( i think this gives anaccurate result...) because 
+        //nalgebra wont let me multiply the vector3 of angular velocity with the unit quaternion ( or a regular quaternion)
 
-       //self.q_orientation = self.q_orientation + tmp0;
-      // self.q_orientation = self.q_orientation + (self.q_orientation * self.v_angular_velocity) * (0.5 * dt) //STUCK ON THIS PART
+        //so create Quaternion based on the angular velocity ( i hope this math works out properly given the work around with nalgbra...)
+        let qtmp=  Quaternion::new(0.0, self.v_angular_velocity.x, self.v_angular_velocity.y, self.v_angular_velocity.z);                    
+        self.q_orientation = self.q_orientation + (self.q_orientation * qtmp) * (0.5 * dt);
+
+        //now normalize the orientation quaternion (make into unit quaternion)
+        self.q_orientation_unit = UnitQuaternion::new_normalize(self.q_orientation);
+
+        //calculate the velocity in body coordinates
+        self.v_velocity_body = self.q_orientation_unit.transform_vector(&self.v_velocity);
+
+
+        //calculate air speed
+        self.f_speed = self.v_velocity.magnitude();
+
+        //get euler angles for our info
+        let euler = self.q_orientation_unit.euler_angles();
+        self.v_euler_angles.x = euler.0; //roll
+        self.v_euler_angles.y = euler.1; //pitch
+        self.v_euler_angles.z = euler.2; //yaw
+
      }
 
 
