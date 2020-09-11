@@ -4,242 +4,16 @@ extern crate nalgebra as na;
 use na::{Matrix3, Vector3, UnitQuaternion, Unit, Quaternion}; //took off unit
 
 
+//imports for flight function
+#[macro_use]
+extern crate crossterm;
+use crossterm::cursor;
+use crossterm::event::{read, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::Print;
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
+use std::io::{stdout, Write};
 
-//commenting out old vector and quaternion class
-//////////////////////////// 
-
-/////VECTOR CLASS
-
-// #[allow(non_snake_case)]
-// #[derive(Default, Debug)]
-// struct Vector
-// {
-//     x: f32,
-//     y: f32,
-//     z: f32
-// }
-
-// impl Vector
-// {
-
-
-//     //static does not want to work right now to initialize struct
-//     //  fn newVec(x: f32, y: f32, z: f32) -> Vector
-//     //  {
-//     //     Vector{x:x, y:y, z:z};
-//     //  }
-
-
-//     //scalar magnitude
-//     fn Magnitude(&self) -> f32
-//     {
-//         return (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
-//     }
-
-//     //convert to unit vector
-//     fn Normalize(&mut self) -> ()
-//     {
-//         const tol: f32 = 0.0001; //tolerance
-//         let mut m: f32 = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
-        
-//         if m <= tol
-//         {
-//             m = 1.0;
-//         }
-
-//         self.x = self.x / m;
-//         self.y = self.y / m;
-//         self.x = self.x / m;
-
-//         if self.x.abs() < tol
-//         {
-//             self.x = 0.0;
-//         }
-//         if self.y.abs() < tol
-//         {
-//             self.y = 0.0;
-//         }
-//         if self.x.abs() < tol
-//         {
-//             self.z = 0.0;
-//         }
-//     }
-
-//     //reverse direction of vector. point in opposite direction
-//     fn Reverse(&mut self) -> ()
-//     {
-//         self.x = -self.x;
-//         self.y = -self.y;
-//         self.z = -self.z;
-//     }
-// }
-
-// //vector operator overloading
-// impl Add for Vector 
-// {
-//     type Output = Self;
-
-//     fn add(self, other: Self) -> Self {
-//         Self {
-
-//             x: self.x + other.x, 
-//             y: self.y + other.y, 
-//             z: self.z + other.z
-//         }
-//     }
-// }
-
-// impl Sub for Vector 
-// {
-//     type Output = Self;
-
-//     fn sub(self, other: Self) -> Self {
-//         Self {
-
-//             x: self.x - other.x, 
-//             y: self.y - other.y, 
-//             z: self.z - other.z
-//         }
-//     }
-// }
-
-// //multiply by a scalar
-// impl Mul<f32> for Vector 
-// {
-//     type Output = Self;
-
-//     fn mul(self, scalar: f32) -> Self {
-//         Self {
-
-//             x: self.x * scalar, 
-//             y: self.y * scalar, 
-//             z: self.z * scalar
-//         }
-//     }
-// }
-
-// //vector by vector.... fix this...
-// // impl Mul for Vector 
-// // {
-// //     type Output = Self;
-
-// //     fn mul(self, other: Self) -> f32 {
-// //         f32 {
-
-// //             self.x * other.x + self.y * other.y + self.z *
-// //         }
-// //     }
-// // }
-
-// //divide by a scalar
-// impl Div<f32> for Vector
-// {
-//     type Output = Self;
-
-//     fn div(self, scalar: f32) -> Self {
-//         Self {
-
-//             x: self.x / scalar, 
-//             y: self.y / scalar, 
-//             z: self.z / scalar
-//         }
-//     }
-// }
-// //needs cross product ^, dot product *.
-
-
-// //////QUATERNIONS
-
-// #[allow(non_snake_case)]
-// #[derive(Default, Debug)]
-// struct Quaternion
-// {
-//     n: f32,
-//     v: Vector,
-//    // v: Vec<f32> //v: [f32;3], //this is a "Vector" type defined in appendix A...
-//     //e0: f32, e1: f32, e2: f32, e3: f32
-// }
-
-// #[allow(non_snake_case)]
-// impl Quaternion
-// {
-//     //instance method with access to struct fields to initialize the struct... maybe this needs to be static...
-//     //realized i do not need this to initialize easily
-//     // fn newQuaternion(&mut self, e0: f32, e1: f32, e2: f32, e3: f32)
-//     // {
-//     //     self.v = Vector{x: e1, y: e2, z: e3};
-//     //     //self.v = vec![0.0, 0.0, 0.0]; //x, y, z
-//     //     self.n = e0;
-//     //     //self.v[0] = e1; //x
-//     //    // self.v[1] = e2; //y
-//     //    // self.v[2] = e3; //z
-//     // }
-
-//     //intialize statically. would need to add e1,e2,e3 to the struct variables
-//     //  fn newQuaternion(n: f32, mut v: Vec<f32>, e0: f32, e1: f32, e2: f32, e3: f32)
-//     //  {
-//     //     v = vec![e1, e2, e3]; //x, y, z
-//     //     Quaternion {n: n, v: v};
-//     //  }
-
-//     //similar to vector but take the scalar into account
-//     fn Magnitude(&self) -> f32
-//     {
-//         return (self.n * self.n + self.v.x + self.v.x + self.v.y * self.v.y + self.v.z * self.v.z).sqrt();
-//     }
-
-//     //vector accessor
-//     fn GetVector(&self) -> &Vector
-//     {
-//         //return vec![ self.v[0], self.v[1], self.v[2] ]
-//         return &self.v;
-//     }
-
-//     //scaler accessor
-//     fn GetScalar(&self) -> f32
-//     {
-//         return self.n;
-//     }
-
-// }
-
-// //quaternion operator overloading
-// impl Add for Quaternion
-// {
-//     type Output = Self;
-
-//     fn add(self, other: Self) -> Self
-//     {
-//         Self {
-
-//             n: self.n + other.n, //scalar
-//             v: Vector{x: self.v.x + other.v.x, y: self.v.y + other.v.y, z: self.v.z + other.v.z}
-//             //v: vec![self.v[0] + other.v[0], self.v[1] + other.v[1], self.v[2] + other.v[2] ]
-//         }
-//     }
-// }
-
-// impl Sub for Quaternion
-// {
-//     type Output = Self;
-
-//     fn sub(self, other: Self) -> Self
-//     {
-//         Self {
-
-//             n: self.n - other.n, //scalar
-//             v: Vector{x: self.v.x - other.v.x, y: self.v.y - other.v.y, z: self.v.z - other.v.z}
-//             //v: vec![self.v[0] + other.v[0], self.v[1] + other.v[1], self.v[2] + other.v[2] ]
-//         }
-//     }
-// }
-
-// //in quaternion class: need scalar multiply, scalar divide, conjugate.... nalgebra makes this easy
-
-
-
-///////////////////////// end old code
-
+use std::thread;
 
 
 //rigid body structure to encapsulate the required data during the simulation
@@ -265,6 +39,8 @@ struct RigidBody
     v_angular_velocity: Vector3<f32>,   // angular velocity in body coordinates
     v_euler_angles: Vector3<f32>,       // Euler angles in body coordinates
     f_speed: f32,                // speed (magnitude of the velocity)
+    stalling: bool,
+    flaps: bool,
     q_orientation: Quaternion<f32>,
     q_orientation_unit: UnitQuaternion<f32>,   // orientation in earth coordinates
     v_forces: Vector3<f32>,            // total force on body
@@ -341,8 +117,8 @@ impl RigidBody
             v_velocity_body: Vector3::new(0.0, 0.0, 0.0),
 
             //set these to false at first, will control later with keyboard... these are not defined in the structure
-            //stalling: false,
-            //Flaps: false,
+            stalling: false,
+            flaps: false,
 
             //set initial orientation
             //q_orientation: MakeQFromEulerAngles(0.0, 0.0, 0.0),  
@@ -372,6 +148,7 @@ impl RigidBody
 
     fn calc_airplane_mass_properties(&mut self)
     {
+        println!("{}", "calculating mass properties...");
         let mut inn: f32;
         let mut di: f32;
 
@@ -482,6 +259,8 @@ impl RigidBody
     //calculates all of the forces and moments on the plane at any time
     fn calc_airplane_loads(&mut self)
     {
+        //println!("{}", "calculating forces...");
+
         let mut fb = Vector3::new(0.0, 0.0, 0.0);
         let mut mb = Vector3::new(0.0, 0.0, 0.0);
 
@@ -502,7 +281,7 @@ impl RigidBody
         let mut tmp: f32 = 0.0;
         let mut v_resultant= Vector3::new(0.0, 0.0, 0.0);
         let mut vtmp = Vector3::new(50.0, 0.0, 0.0);
-        let mut stalling: bool = false;
+        //let mut stalling: bool = false;
 
         //loop through the 7 lifting elements, skipping the fuselage (the last element)
         for i in 0..6 
@@ -565,7 +344,7 @@ impl RigidBody
             //check for stall. if the coefficient of lift is 0, stall is occuring.
             if RigidBody::lift_coefficient(f_attack_angle, self.element[i].i_flap) == 0.0
             {
-                stalling = true; //probably will need to add stalling to rigid body variables
+                self.stalling = true; //probably will need to add stalling to rigid body variables
             }
 
             //keep running total of resultant forces (total force)
@@ -746,9 +525,9 @@ impl RigidBody
         //we need angular velocity to be in a quaternion form for the multiplication.... ( i think this gives anaccurate result...) because 
         //nalgebra wont let me multiply the vector3 of angular velocity with the unit quaternion ( or a regular quaternion)
 
-        //so create Quaternion based on the angular velocity ( i hope this math works out properly given the work around with nalgbra...)
-        let qtmp=  Quaternion::new(0.0, self.v_angular_velocity.x, self.v_angular_velocity.y, self.v_angular_velocity.z);                    
-        self.q_orientation = self.q_orientation + (self.q_orientation * qtmp) * (0.5 * dt);
+        //so create Quaternion based on the angular velocity ( i hope this math works out properly given the work around with nalgbra...) if not ill have to do it by hand
+        let qtmp =  Quaternion::new(0.0, self.v_angular_velocity.x, self.v_angular_velocity.y, self.v_angular_velocity.z);                    
+        self.q_orientation = self.q_orientation + (self.q_orientation * qtmp) * (0.5 * dt); 
 
         //now normalize the orientation quaternion (make into unit quaternion)
         self.q_orientation_unit = UnitQuaternion::new_normalize(self.q_orientation);
@@ -766,6 +545,213 @@ impl RigidBody
         self.v_euler_angles.y = euler.1; //pitch
         self.v_euler_angles.z = euler.2; //yaw
 
+        //println!("{}", self.v_euler_angles);
+
+     }
+
+
+
+     //flight controls
+     fn inc_thrust(&mut self)
+     {
+        self.thrustforce = self.thrustforce + d_thrust;
+        if self.thrustforce > maxthrust
+        {
+            self.thrustforce = maxthrust;
+        }
+        //println!("{}","increase thrust");
+     }
+     fn dec_thrust(&mut self)
+     {
+        self.thrustforce = self.thrustforce - d_thrust;
+        if self.thrustforce < 0.0
+        {
+            self.thrustforce = 0.0;
+        }
+       // println!("{}","decrease thrust");
+     }
+
+     fn left_rudder(&mut self)
+     {
+         self.element[6].f_incidence = 16.0;
+        // println!("{}","left rudder");
+     }
+     fn right_rudder(&mut self)
+     {
+         self.element[6].f_incidence = -16.0;
+        // println!("{}","right rudder");
+     }
+     fn zero_rudder(&mut self)
+     {
+         self.element[6].f_incidence = 0.0;
+       //  println!("{}","zero rudder");
+     }
+
+
+
+     fn roll_left(&mut self)
+     {
+         self.element[0].i_flap = 1;
+         self.element[3].i_flap = -1;
+         //println!("{}","roll left");
+     }
+     fn roll_right(&mut self)
+     {
+         self.element[0].i_flap = -1;
+         self.element[3].i_flap = 1;
+       //  println!("{}","roll right");
+     }
+     fn zero_ailerons(&mut self)
+     {
+         self.element[0].i_flap = 0;
+         self.element[3].i_flap = 0;
+      //   println!("{}","zero ailerons");
+     }
+
+
+
+     fn pitch_up(&mut self)
+     {
+         self.element[4].i_flap = 1;
+         self.element[5].i_flap = 1;
+       //  println!("{}","pitch up");
+     }
+     fn pitch_down(&mut self)
+     {
+         self.element[4].i_flap = -1;
+         self.element[5].i_flap = -1;
+       //  println!("{}","pitch down");
+     }
+     fn zero_elevators(&mut self)
+     {
+         self.element[4].i_flap = 0;
+         self.element[5].i_flap = 0;
+        // println!("{}","zero elevators");
+     }
+
+     
+
+     fn flaps_down(&mut self)
+     {
+         self.element[1].i_flap = -1;
+         self.element[2].i_flap = -1;
+         self.flaps = true;
+       //  println!("{}","flaps down");
+     }
+     fn zero_flaps(&mut self)
+     {
+         self.element[1].i_flap = 0;
+         self.element[2].i_flap = 0;
+         self.flaps = false;
+       //  println!("{}","zero flaps");
+     }
+
+     //use flight control input
+     fn flight(&mut self)
+     {
+        //println!("{}", "Airplane is ready for motion...");
+
+        let mut stdout = stdout();
+        //going into raw mode
+        enable_raw_mode().unwrap();
+    
+        //clearing the screen, going to top left corner and printing welcoming message
+        execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0), Print("Fly me!")) .unwrap();
+        //ctrl + q to exit, w = pitch down, s = pitch up, a = roll left, d = roll right, t = increase thrust, y = decrease thrust, z = yaw left, x = yaw right, landing flaps up = f, landing flaps down = g 
+    
+    
+        let no_modifiers = KeyModifiers::empty();
+    
+        //key detection, this needs to happen asynchronously...
+        loop {
+
+ 
+            self.zero_rudder();
+            self.zero_ailerons();
+            self.zero_elevators();
+            //going to top left corner
+            execute!(stdout, cursor::MoveTo(0, 0)).unwrap();
+
+            //matching the key
+            match read().unwrap() //like a switch statement
+            {
+                //pitch down
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('w'),
+                    modifiers: no_modifiers,
+                }) => self.pitch_down(),
+
+                //pitch up
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('s'),
+                    modifiers: no_modifiers,
+                }) => self.pitch_up(),
+
+                //roll left
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('a'),
+                    modifiers: no_modifiers,
+                }) => self.roll_left(),
+
+                //roll right
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('d'),
+                    modifiers: no_modifiers,
+                }) => self.roll_right(),
+
+                //increase thrust
+                    Event::Key(KeyEvent {
+                    code: KeyCode::Char('t'),
+                    modifiers: no_modifiers,
+                }) => self.inc_thrust(),              
+
+                //decrease thrust
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('y'),
+                    modifiers: no_modifiers,
+                }) => self.dec_thrust(),
+
+                 //yaw left
+                 Event::Key(KeyEvent {
+                    code: KeyCode::Char('z'),
+                    modifiers: no_modifiers,
+                }) => self.left_rudder(),    
+
+                //yaw right
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('x'),
+                    modifiers: no_modifiers,
+                }) => self.right_rudder(),
+
+                 //landing flaps down
+                 Event::Key(KeyEvent {
+                    code: KeyCode::Char('g'),
+                    modifiers: no_modifiers,
+                }) => self.flaps_down(), 
+                
+                
+                 //landing flaps up
+                 Event::Key(KeyEvent {
+                    code: KeyCode::Char('f'),
+                    modifiers: no_modifiers,
+                }) => self.zero_flaps(),               
+
+
+                //quit
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('q'),
+                    modifiers: KeyModifiers::CONTROL,
+                }) => break,
+                _ => (),
+            }
+
+            self.step_simulation(1.0);
+        }
+    
+
+        //disabling raw mode
+        disable_raw_mode().unwrap();
+
      }
 
 
@@ -773,16 +759,20 @@ impl RigidBody
 
 } //end impl
 
-
+static d_thrust: f32 = 100.0;
+static maxthrust: f32 = 3000.0;
 fn main()
 {
               
-
+    //create and initialize airplane
     let mut airplane = RigidBody::new();
+    println!("{}", "Airplane initialized...");
     airplane.calc_airplane_mass_properties(); //would be nice to call this automatically in new, having some trouble with getting that to work rn...
-    airplane.step_simulation(1.0);
 
-    //println!("{:#?}", Airplane);
+    //begin flight loop
+    airplane.flight();
+
+   // println!("{:#?}", Airplane);
 
 
 //     let mut myvec = Vector{x: 1.0, y: 2.0, z: 3.0};
