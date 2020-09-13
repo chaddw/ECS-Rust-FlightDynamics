@@ -481,6 +481,7 @@ impl RigidBody
      //equations of motion
      fn step_simulation(&mut self, dt: f32)
      {
+         println!("{}", "inside  step sim");
         let mut ae = Vector3::new(0.0, 0.0, 0.0);
 
         //calculate all of the forces and moments on the airplane
@@ -504,7 +505,7 @@ impl RigidBody
 
         //calculate the new rotation quaternion
 
-        //we need angular velocity to be in a quaternion form for the multiplication.... ( i think this gives anaccurate result...) because 
+        //we need angular velocity to be in a quaternion form for the multiplication.... ( i think this gives an accurate result...) because 
         //nalgebra wont let me multiply the vector3 of angular velocity with the unit quaternion ( or a regular quaternion)
 
         //so create Quaternion based on the angular velocity ( i hope this math works out properly given the work around with nalgbra...) if not ill have to do it by hand
@@ -629,7 +630,7 @@ impl RigidBody
        //  println!("{}","zero flaps");
      }
 
-     //use flight control input //
+     //use flight control input 
      fn flight_control(&mut self)
      {
 
@@ -723,11 +724,14 @@ impl RigidBody
                     code: KeyCode::Char('q'),
                     modifiers: KeyModifiers::CONTROL,
                 }) => break,
+
                 _ => (),
+
+               
             }
 
-            //self.step_simulation(1.0); //this needs to be constantly called in real time, while key press is being listened to as well...
-
+            self.step_simulation(1.0);//this needs to be constantly called in real time, while key press is being listened to as well...
+            //maybe a thread arround the 
 
         }
 
@@ -740,15 +744,21 @@ impl RigidBody
 
 
     //create and send the net fdm packet 
-    fn get_fdm_data_and_send_packet(&self)
+    fn get_fdm_data_and_send_packet(&mut self)
     {
         ///net fdm main
         let fg_net_fdm_version = 24_u32;
         let millis = time::Duration::from_millis(1000); //time in between packet sends
 
-        let latitude: f64 = 45.59823;
-        let longitude: f64= -120.6902;
+
+         let latitude: f64 = 45.59823;
+        let longitude: f64= -120.69202;
         let altitude: f64 = 150.0;
+
+        // let latitude: f64 = 21.3252;
+        // let longitude: f64= -157.943;
+        // let altitude: f64 = 10.0;
+
 
         let mut roll: f32 = 0.0;
         let pitch: f32 = 0.0;
@@ -759,8 +769,18 @@ impl RigidBody
  
         thread::sleep(millis); 
 
+
+        roll = roll + 5.0; 
+        if roll > 20.0
+        {
+            roll = 0.0;
+        }
+        println!("Roll: {}", roll);
+
         //create fdm instance
         let mut fdm: FGNetFDM = Default::default();
+
+
 
         //convert to network byte order
         fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
@@ -791,13 +811,7 @@ impl RigidBody
         //finally send &[u8] of bytes to flight gear
         socket.send(bytes).expect("couldn't send message");
 
-        //roll 5 degrees
-        roll = roll + 5.0; 
-        if roll > 20.0
-        {
-            roll = 0.0;
-        }
-        println!("Roll: {}", roll);
+
         
     }
 
@@ -911,8 +925,6 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
 
 
 
-
-
 //Some references used for networking
 
     //converting to bytes
@@ -928,9 +940,9 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
     //https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
     //https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
 
-
     //how jsbsim fills in the data socket FGOutputFG.cpp
     //https://github.com/JSBSim-Team/jsbsim/blob/4d87ce79b0ee4b0542885ae78e51c5fe7d637dea/src/input_output/FGOutputFG.cpp
+
 
 
 static d_thrust: f32 = 100.0;
@@ -942,14 +954,16 @@ fn main()
     let mut airplane = RigidBody::new();
     airplane.calc_airplane_mass_properties(); 
 
-    //equations of motion, this needs to be called repeatedly in real-time (this also creates and sends netfdm packet at the end of it)
-    airplane.step_simulation(1.0);
+   // thread::spawn(|| {
+        airplane.flight_control();
+   //  });
 
     //flight control keypress, this also needs to be listening for user input in real-time, 
     //also the function itself needs to happen concurrently because more than one key can be pressed at a time
-    airplane.flight_control();
 
 
+    //equations of motion, this needs to be called repeatedly in real-time (this also creates and sends netfdm packet at the end of it)
+    //airplane.step_simulation(1.0);
 
    // println!("{:#?}", Airplane);
 
