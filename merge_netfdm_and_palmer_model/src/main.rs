@@ -391,7 +391,9 @@ impl Plane
         fdm.latitude = f64::from_be_bytes((latitude.to_radians()).to_ne_bytes());
 
         //calculate the degrees of longitude traveled in time based on dt
-        let longitude_to_add: f64 = self.airspeed * (dt/3600.0);
+        //this is how many kilometers its traveled in dt time, need to convert to longitude traveled. 111.321 km is 1 degree
+        let mut longitude_to_add: f64 = self.airspeed * (dt/3600.0);
+        longitude_to_add = longitude_to_add / 111.321; 
         self.longitude = self.longitude + longitude_to_add;
         fdm.longitude = f64::from_be_bytes((self.longitude.to_radians()).to_ne_bytes());
         //fdm.longitude = f64::from_be_bytes(longitude.to_radians().to_ne_bytes());
@@ -456,7 +458,7 @@ impl Plane
 
     fn dec_aoa(&mut self)
     {
-        self.alpha = self.alpha - 1.0; //increased angle of attack by 1 degree
+        self.alpha = self.alpha - 1.0; //decreased angle of attack by 1 degree
         if self.alpha < -16.0
         {
             self.alpha = -16.0
@@ -616,7 +618,7 @@ fn main()
         println!("{}", "--------------------------------------");
         //println!("{:#?}", plane);
 
-        plane.flight_control(); //gets user input for next packet
+        plane.flight_control();
     }
 
 }
@@ -641,3 +643,5 @@ fn main()
 
     //how jsbsim fills in the data socket FGOutputFG.cpp
     //https://github.com/JSBSim-Team/jsbsim/blob/4d87ce79b0ee4b0542885ae78e51c5fe7d637dea/src/input_output/FGOutputFG.cpp
+
+

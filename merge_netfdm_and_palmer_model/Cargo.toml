@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 crossterm = "0.17.7"
+specs = "0.16.1"
