@@ -7,6 +7,8 @@ use crossterm::style::Print;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
 use std::io::{stdout, Write};
 
+use std::time::{Duration, Instant};
+
 
 //********************************************
 //  This structure defines the data required
@@ -55,7 +57,7 @@ use std::{thread, time};
 
 //FlightGear is ran with this line of command argumments on the fgfs executable:
 //fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,30,,5500,udp
-
+//fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,60,,5500,udp
 
 #[derive(Default)]
 #[repr(C)] //fix padding issue
@@ -220,10 +222,11 @@ impl Plane
         let mut cosT: f64 = 0.0;   //  heading angle
         let mut sinT: f64 = 0.0;   //  heading angle
        
+        let mut bank: f64 = 0.0;
         //  Convert bank angle from degrees to radians
         //  Angle of attack is not converted because the
         //  Cl-alpha curve is defined in terms of degrees.
-        self.bank = self.bank.to_radians();
+        bank = self.bank.to_radians();
 
         //  Compute the intermediate values of the 
         //  dependent variables.
@@ -300,8 +303,8 @@ impl Plane
         //  for use with the rotation matrix.
         //  Compute the sine and cosines of the climb angle,
         //  bank angle, and heading angle;
-        let cosW: f64 = self.bank.cos(); 
-        let sinW: f64 = self.bank.sin(); 
+        let cosW: f64 = bank.cos(); 
+        let sinW: f64 = bank.sin(); 
 
         if  vtotal == 0.0
         {
@@ -361,56 +364,44 @@ impl Plane
 
 
     //create and send the net fdm packet 
-    fn get_fdm_data_and_send_packet(&mut self)
+    fn get_fdm_data_and_send_packet(&mut self, socket: &UdpSocket)
     {
-        ///net fdm main
+        let visibility: f32 = 5000.0;
         let fg_net_fdm_version = 24_u32;
        // let millis = time::Duration::from_millis(1000); //time in between packet sends
 
-        //airplane automatically points north...
-        let latitude: f64 = 21.3252; //45.59823; //21.3188 put it slightly left of the runway, so increased latitude goes left of runway (latitude inc goes north), 
-        //let longitude: f64 = -157.943;   //-120.69202; //increased longitude goes east, decreased longitude goes backwards on runway.
+        let latitude: f64 = 28.6327; //21.3252; //45.59823;
+       // let longitude: f64 = -80.706; // -157.943;  
+        //miami executive airport  -80.4408 , 25.6505        
+        //mia -80.3022 , 25.7993, heading 119.6
+        //ktts -80.706 , 28.6327
+        //to go directly down the runway i need to deal with latitude...
 
+        let roll: f32 = 0.0; //no roll in 2D
+        //let pitch: f32 = 0.0; //will use angle of attack because its "easier"
+        let yaw: f32 = 90.0; //facing east
 
-       // let altitude: f64 = self.altitude;            
-
-        // let latitude: f64 = 21.3252;
-        // let longitude: f64= -157.943;
-        // let altitude: f64 = 10.0;
-
-
-        let roll: f32 = 0.0;
-        let pitch: f32 = 0.0;
-        let yaw: f32 = 52.0;
-
-        let visibility: f32 = 5000.0;
-
- 
        // thread::sleep(millis); 
-
 
         //create fdm instance
         let mut fdm: FGNetFDM = Default::default();
-
 
         //convert to network byte order
         fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
         fdm.latitude = f64::from_be_bytes((latitude.to_radians()).to_ne_bytes());
 
         //calculate the degrees of longitude traveled in time based on dt
-       let longitude_to_add: f64 = self.airspeed * (dt/3600.0);
-       self.longitude = self.longitude - longitude_to_add;
-       fdm.longitude = f64::from_be_bytes((self.longitude.to_radians()).to_ne_bytes());
-        // fdm.longitude = f64::from_be_bytes(longitude.to_radians().to_ne_bytes());
+        let longitude_to_add: f64 = self.airspeed * (dt/3600.0);
+        self.longitude = self.longitude + longitude_to_add;
+        fdm.longitude = f64::from_be_bytes((self.longitude.to_radians()).to_ne_bytes());
+        //fdm.longitude = f64::from_be_bytes(longitude.to_radians().to_ne_bytes());
 
         fdm.altitude = f64::from_be_bytes(self.q[5].to_ne_bytes());
 
-        let alpha_tmp = self.alpha as f32;
-        fdm.alpha = f32::from_be_bytes(alpha_tmp.to_ne_bytes());
-
         //convert to network byte order
+        let tmp_alpha = self.alpha as f32;
         fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
-        fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes());
+        fdm.theta = f32::from_be_bytes((tmp_alpha.to_radians()).to_ne_bytes());
         fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
 
         //convert to network byte order
@@ -420,10 +411,10 @@ impl Plane
         fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
         fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
 
-        //should only do this once...
+
         //create socket and connect to flightgear
-        let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
-        socket.connect("127.0.0.1:5500").expect("connect function failed");
+      //  let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
+       // socket.connect("127.0.0.1:5500").expect("connect function failed");
 
         //convert struct array of u8 of bytes
         let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
@@ -433,18 +424,122 @@ impl Plane
         socket.send(bytes).expect("couldn't send message");
     }
 
+    //flight controls
+    fn inc_thrust(&mut self)
+    {
+        self.throttle = self.throttle + 0.05; //increased throttle by 5%
+        if self.throttle > 1.0
+        {
+            self.throttle = 1.0;
+        }
+
+    }
+    fn dec_thrust(&mut self)
+    {
+        self.throttle = self.throttle - 0.05; //dec throttle by 5%
+        if self.throttle < 0.0
+        {
+            self.throttle = 0.0;
+        }
+
+     }
+
+    fn inc_aoa(&mut self)
+    {
+        self.alpha = self.alpha + 1.0; //increased angle of attack by 1 degree
+        if self.alpha > 20.0
+        {
+            self.alpha = 20.0;
+        }
+
+     }
+
+    fn dec_aoa(&mut self)
+    {
+        self.alpha = self.alpha - 1.0; //increased angle of attack by 1 degree
+        if self.alpha < -16.0
+        {
+            self.alpha = -16.0
+        }
+  
+    }
+
+    //use flight control input 
+     fn flight_control(&mut self)
+     {
+
+        //let mut stdout = stdout();
+        //going into raw mode
+        enable_raw_mode().unwrap();
+    
+        //clearing the screen, going to top left corner and printing welcoming message
+       //execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0), Print("Fly me! cntrl + q to quit")) .unwrap();
+        //ctrl + q to exit, w = pitch down, s = pitch up, a = roll left, d = roll right, t = increase thrust, y = decrease thrust, z = yaw left, x = yaw right, landing flaps up = f, landing flaps down = g 
+    
+    
+        let no_modifiers = KeyModifiers::empty();
+    
+        //key detection, this needs to happen asynchronously because more than 1 loop can be pressed at a time, also the simulation needs to continue synchronously
+    //    loop 
+        {
+
+            //going to top left corner
+           // execute!(stdout, cursor::MoveTo(0, 0)).unwrap();
+
+            //matching the key
+            match read().unwrap() //like a switch statement
+            {
+                
+
+                //increase thrust
+                    Event::Key(KeyEvent {
+                    code: KeyCode::Char('t'),
+                    modifiers: no_modifiers,
+                }) => self.inc_thrust(),              
+
+                //decrease thrust
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('y'),
+                    modifiers: no_modifiers,
+                }) => self.dec_thrust(),
+
+                //increase angle of attack
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('g'),
+                    modifiers: no_modifiers,
+                }) => self.inc_aoa(),   
+
+                //increase angle of attack
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('h'),
+                    modifiers: no_modifiers,
+                }) => self.dec_aoa(), 
+
+                //quit
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('q'),
+                    modifiers: KeyModifiers::CONTROL,
+                }) => println!("{}", "you cant quit now!"),
+
+                _ => (),
+
+               
+            }
 
 
+        }
+
+        //disabling raw mode
+        disable_raw_mode().unwrap();
+
+    }//https://stackoverflow.com/questions/60130532/detect-keydown-in-rust
 
 } //end impl
 
 
 
 
-
-
-
-static dt: f64 = 0.002;
+static dt: f64 = 0.5;// 0.001;
 //initialize plane and solves for the plane motion with range-kutta
 fn main()
 {
@@ -473,23 +568,28 @@ fn main()
     a: 1.83,                    //  propeller efficiency curve fit coefficient
     b:-1.32,                    //  propeller efficiency curve fit coefficient
     bank: 0.0,
-    alpha: 4.0, 
-    throttle: 1.0, 
+    alpha: 0.0, 
+    throttle: 0.0, 
     flap: String::from("0"),    //  Flap setting
     numEqns: 6, 
     s: 0.0,                     //  time
    // q: [0.0;6]
      q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0],               //  vx, x, vy, y, vz, z
-     longitude: -157.943,
+     longitude: -80.706,
      airspeed: 0.0
 
     };
 
-
-
+    //create socket and connect to flightgear
+    let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
+    socket.connect("127.0.0.1:5500").expect("connect function failed");
   
-    //accelerate the plane for 1 hour seconds
-    while plane.s < 40.0
+    // let start = Instant::now();
+    // let duration = start.elapsed();
+    // println!("{:?}", duration);
+
+    //accelerate the plane for 40 seconds
+    while plane.s < 500.0     
     {
         plane.planeRungeKutta4( dt);
 
@@ -502,16 +602,21 @@ fn main()
 
 
         //if im going x speed how many degrees of longitude did i pass in dt seconds. example for dt = 0.1. airspeed * .1/3600 hours = longitude degrees passed
-        plane.get_fdm_data_and_send_packet();
+        plane.get_fdm_data_and_send_packet(&socket);
         //println!("time = {}, x = {}, altitude = {}, airspeed = {} ", time, x, z, v);
 
         println!("time = {}", time);
         println!("x = {}", x);
-        println!("altitude = {}", z);
-        println!("airspeed = {}", v);
+        println!("altitude (m) = {}", z);
+        println!("airspeed (km/h) = {}", v);
         println!("longitude = {}", plane.longitude);
+        println!("throttle % = {}", plane.throttle);
+        println!("angle of attack (deg) = {}", plane.alpha);
+        println!("bank angle (deg) = {}", plane.bank);
         println!("{}", "--------------------------------------");
         //println!("{:#?}", plane);
+
+        plane.flight_control(); //gets user input for next packet
     }
 
 }
@@ -536,217 +641,3 @@ fn main()
 
     //how jsbsim fills in the data socket FGOutputFG.cpp
     //https://github.com/JSBSim-Team/jsbsim/blob/4d87ce79b0ee4b0542885ae78e51c5fe7d637dea/src/input_output/FGOutputFG.cpp
-
-
-
-
-
-
-    //CONTROLS TO GO INTO IMPL
-
-    
-
-    //  //flight controls
-    //  fn inc_thrust(&mut self)
-    //  {
-    //     self.thrustforce = self.thrustforce + d_thrust;
-    //     if self.thrustforce > maxthrust
-    //     {
-    //         self.thrustforce = maxthrust;
-    //     }
-    //     //println!("{}","increase thrust");
-    //  }
-    //  fn dec_thrust(&mut self)
-    //  {
-    //     self.thrustforce = self.thrustforce - d_thrust;
-    //     if self.thrustforce < 0.0
-    //     {
-    //         self.thrustforce = 0.0;
-    //     }
-    //    // println!("{}","decrease thrust");
-    //  }
-
-    //  fn left_rudder(&mut self)
-    //  {
-    //      self.element[6].f_incidence = 16.0;
-    //     // println!("{}","left rudder");
-    //  }
-    //  fn right_rudder(&mut self)
-    //  {
-    //      self.element[6].f_incidence = -16.0;
-    //     // println!("{}","right rudder");
-    //  }
-    //  fn zero_rudder(&mut self)
-    //  {
-    //      self.element[6].f_incidence = 0.0;
-    //    //  println!("{}","zero rudder");
-    //  }
-
-
-
-    //  fn roll_left(&mut self)
-    //  {
-    //      self.element[0].i_flap = 1;
-    //      self.element[3].i_flap = -1;
-    //      //println!("{}","roll left");
-    //  }
-    //  fn roll_right(&mut self)
-    //  {
-    //      self.element[0].i_flap = -1;
-    //      self.element[3].i_flap = 1;
-    //    //  println!("{}","roll right");
-    //  }
-    //  fn zero_ailerons(&mut self)
-    //  {
-    //      self.element[0].i_flap = 0;
-    //      self.element[3].i_flap = 0;
-    //   //   println!("{}","zero ailerons");
-    //  }
-
-
-
-    //  fn pitch_up(&mut self)
-    //  {
-    //      self.element[4].i_flap = 1;
-    //      self.element[5].i_flap = 1;
-    //    //  println!("{}","pitch up");
-    //  }
-    //  fn pitch_down(&mut self)
-    //  {
-    //      self.element[4].i_flap = -1;
-    //      self.element[5].i_flap = -1;
-    //    //  println!("{}","pitch down");
-    //  }
-    //  fn zero_elevators(&mut self)
-    //  {
-    //      self.element[4].i_flap = 0;
-    //      self.element[5].i_flap = 0;
-    //     // println!("{}","zero elevators");
-    //  }
-
-     
-
-    //  fn flaps_down(&mut self)
-    //  {
-    //      self.element[1].i_flap = -1;
-    //      self.element[2].i_flap = -1;
-    //      self.flaps = true;
-    //    //  println!("{}","flaps down");
-    //  }
-    //  fn zero_flaps(&mut self)
-    //  {
-    //      self.element[1].i_flap = 0;
-    //      self.element[2].i_flap = 0;
-    //      self.flaps = false;
-    //    //  println!("{}","zero flaps");
-    //  }
-
-    //  //use flight control input 
-    //  fn flight_control(&mut self)
-    //  {
-
-    //     let mut stdout = stdout();
-    //     //going into raw mode
-    //     enable_raw_mode().unwrap();
-    
-    //     //clearing the screen, going to top left corner and printing welcoming message
-    //     execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0), Print("Fly me! cntrl + q to quit")) .unwrap();
-    //     //ctrl + q to exit, w = pitch down, s = pitch up, a = roll left, d = roll right, t = increase thrust, y = decrease thrust, z = yaw left, x = yaw right, landing flaps up = f, landing flaps down = g 
-    
-    
-    //     let no_modifiers = KeyModifiers::empty();
-    
-    //     //key detection, this needs to happen asynchronously because more than 1 loop can be pressed at a time, also the simulation needs to continue synchronously
-    //     loop 
-    //     {
-    //         self.zero_rudder();
-    //         self.zero_ailerons();
-    //         self.zero_elevators();
-    //         //going to top left corner
-    //         execute!(stdout, cursor::MoveTo(0, 0)).unwrap();
-
-    //         //matching the key
-    //         match read().unwrap() //like a switch statement
-    //         {
-                
-    //             //pitch down
-    //             Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('w'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.pitch_down(),
-
-    //             //pitch up
-    //             Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('s'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.pitch_up(),
-
-    //             //roll left
-    //             Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('a'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.roll_left(),
-
-    //             //roll right
-    //             Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('d'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.roll_right(),
-
-    //             //increase thrust
-    //                 Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('t'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.inc_thrust(),              
-
-    //             //decrease thrust
-    //             Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('y'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.dec_thrust(),
-
-    //              //yaw left
-    //              Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('z'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.left_rudder(),    
-
-    //             //yaw right
-    //             Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('x'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.right_rudder(),
-
-    //              //landing flaps down
-    //              Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('g'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.flaps_down(), 
-                
-                
-    //              //landing flaps up
-    //              Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('f'),
-    //                 modifiers: no_modifiers,
-    //             }) => self.zero_flaps(),               
-
-
-    //             //quit
-    //             Event::Key(KeyEvent {
-    //                 code: KeyCode::Char('q'),
-    //                 modifiers: KeyModifiers::CONTROL,
-    //             }) => break,
-
-    //             _ => (),
-
-               
-    //         }
-
-    //        // self.step_simulation(1.0);//this needs to be constantly called in real time, while key press is being listened to as well...
-
-    //     }
-
-    //     //disabling raw mode
-    //     disable_raw_mode().unwrap();
-
-    // }//https://stackoverflow.com/questions/60130532/detect-keydown-in-rust
