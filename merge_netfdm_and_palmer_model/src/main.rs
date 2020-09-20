@@ -15,15 +15,18 @@ use specs::Entities;
 extern crate coord_transforms;
 use coord_transforms::prelude::*;
 
+//networking
+use std::net::UdpSocket;
+use std::{thread, time};
+
 
 //********************************************
 //  This structure defines the data required
-//  to model a plane.
+//  to model a plane (palmer)
 //********************************************
 #[derive(Debug)]
 struct Plane 
 {
-
     numEqns: usize, //int
     s: f64,
 
@@ -54,19 +57,14 @@ struct Plane
     airspeed: f64,
     delta_traveled: f64,
     ecef_vec: Vector3<f64>
-
-
 }
 
-
-//NET FDM CODE, which is now in get_fdm_and_send_packet method
-use std::net::UdpSocket;
-use std::{thread, time};
 
 //FlightGear is ran with this line of command argumments on the fgfs executable:
 //fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,30,,5500,udp
 //fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,60,,5500,udp
 
+//structure to model a flightgear plane
 #[derive(Default)]
 #[repr(C)] //fix padding issue
 struct FGNetFDM
@@ -155,7 +153,7 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
 }
 
 
-
+//methods to operate on the plane
 impl Plane
 {
 
@@ -165,6 +163,7 @@ impl Plane
     //************************************************************
     fn planeRungeKutta4(&mut self, mut ds: f64)
     {
+        let priorx = self.q[1]; //will be used to calculate delta_traveled
 
         let mut q = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let mut qcopy = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -194,6 +193,8 @@ impl Plane
             q[i] = q[i] + (dq1[i] + 2.0 * dq2[i] + 2.0 * dq3[i] + dq4[i]) / 6.0;
             self.q[i] = q[i];
         }
+
+        self.delta_traveled = ((self.q[1] / 3.6) - (priorx / 3.6)); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
     }
 
 
@@ -498,6 +499,7 @@ static dt: f64 = 0.5; //time in between each frame
 //initialize plane and solves for the plane motion with range-kutta
 fn main()
 {
+    //set some variables for conveinience 
     let mut x: f64 = 0.0;
     let mut y: f64 = 0.0;
     let mut z: f64 = 0.0;
@@ -529,10 +531,10 @@ fn main()
     numEqns: 6, 
     s: 0.0,                     //  time
     q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0],               //  vx, x, vy, y, vz, z
+
     airspeed: 0.0,
     delta_traveled: 0.0,
     ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236) //location of runway at 0 height
-
     };
 
     //create socket and connect to flightgear
@@ -540,23 +542,20 @@ fn main()
     socket.connect("127.0.0.1:5500").expect("connect function failed");
   
     //acclerate for time in seconds
-    while plane.s < 60.0 
+    while plane.s < 600.0 
     {
-        let priorx = plane.q[1]; //will be used to calculate delta_traveled
-
         plane.planeRungeKutta4( dt); //step simulation
 
-        //set some variables for conveinience 
+        //get and send packet data
+        plane.get_fdm_data_and_send_packet(&socket);
+
+        //set some variables for conveinience
         time = plane.s;
         x = plane.q[1];
         y = plane.q[3];
         z = plane.q[5];
         v = (plane.q[0] * plane.q[0] + plane.q[2] * plane.q[2] + plane.q[4] * plane.q[4]).sqrt();
         plane.airspeed = v;
-        plane.delta_traveled = ((x / 3.6) - (priorx / 3.6)); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
-
-        //get and send packet data
-        plane.get_fdm_data_and_send_packet(&socket);
 
         //print out some relevant info
         println!("time = {}", time);
@@ -576,6 +575,4 @@ fn main()
     }
 
 }
-
-    
 
