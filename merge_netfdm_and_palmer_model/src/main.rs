@@ -7,7 +7,13 @@ use crossterm::style::Print;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
 use std::io::{stdout, Write};
 
-use std::time::{Duration, Instant};
+//Specs
+use specs::prelude::*;
+use specs::Entities;
+
+//coordinate conversions
+extern crate coord_transforms;
+use coord_transforms::prelude::*;
 
 
 //********************************************
@@ -21,7 +27,6 @@ struct Plane
     numEqns: usize, //int
     s: f64,
 
-  //  q: [f64; 6],
     q: Vec<f64>,
  
     bank: f64,
@@ -45,8 +50,11 @@ struct Plane
     b: f64,           //  propeller efficiency coefficient
     flap: String, //&'static str,        //  flap deflection amount (pointer in c)
 
-    longitude: f64,
-    airspeed: f64
+    //added these
+    airspeed: f64,
+    delta_traveled: f64,
+    ecef_vec: Vector3<f64>
+
 
 }
 
@@ -158,12 +166,6 @@ impl Plane
     fn planeRungeKutta4(&mut self, mut ds: f64)
     {
 
-        // let mut q: [f64; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        // let mut dq1: [f64; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        // let mut dq2: [f64; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        // let mut dq3: [f64; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        // let mut dq4: [f64; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-
         let mut q = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let mut qcopy = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let mut dq1 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -177,7 +179,6 @@ impl Plane
         // Compute the four Runge-Kutta steps, The return 
         // value of planeRightHandSide method is an array
         // of delta-q values for each of the four steps.
-
         self.planeRightHandSide( &mut q, &mut qcopy, &mut ds, 0.0, &mut dq1);
         self.planeRightHandSide( &mut q, &mut dq1,   &mut ds, 0.5, &mut dq2);
         self.planeRightHandSide( &mut q, &mut dq2,   &mut ds, 0.5, &mut dq3);
@@ -212,17 +213,14 @@ impl Plane
 
         let yo = -1.0_f64;
         let pi = yo.acos();
-
         let G: f64 = -9.81;
-    
         let mut cl: f64 = 0.0;
-
         let mut cosP: f64 = 0.0;   //  climb angle
         let mut sinP: f64= 0.0;   //  climb angle
         let mut cosT: f64 = 0.0;   //  heading angle
         let mut sinT: f64 = 0.0;   //  heading angle
-       
         let mut bank: f64 = 0.0;
+
         //  Convert bank angle from degrees to radians
         //  Angle of attack is not converted because the
         //  Cl-alpha curve is defined in terms of degrees.
@@ -230,7 +228,6 @@ impl Plane
 
         //  Compute the intermediate values of the 
         //  dependent variables.
-
         for i in 0..6
         {
             newQ[i] = q[i] + qScale * deltaQ[i]; 
@@ -298,7 +295,6 @@ impl Plane
         // //  Compute drag force
         let drag: f64 = 0.5 * cd * density * vtotal * vtotal * self.wingArea;
 
-
         //  Define some shorthand convenience variables
         //  for use with the rotation matrix.
         //  Compute the sine and cosines of the climb angle,
@@ -328,7 +324,6 @@ impl Plane
             sinT = vy / vh;
         }
 
-
         //  Convert the thrust, drag, and lift forces into
         //  x-, y-, and z-components using the rotation matrix.
         let Fx: f64 = cosT * cosP * (thrust - drag) + (sinT * sinW - cosT * sinP * cosW) * lift;
@@ -354,56 +349,39 @@ impl Plane
         dq[3] = ds * vy;
         dq[4] = ds * (Fz / self.mass);
         dq[5] = ds * vz;
-        // if dq[5] < 0.0
-        // {
-        //     dq[5] == 0;
-        // }
     }
-
-
 
 
     //create and send the net fdm packet 
     fn get_fdm_data_and_send_packet(&mut self, socket: &UdpSocket)
     {
+        //ktts (shuttle landing facility) geo coordinates 28.6327 -80.706, 0.0
         let visibility: f32 = 5000.0;
         let fg_net_fdm_version = 24_u32;
-       // let millis = time::Duration::from_millis(1000); //time in between packet sends
-
-        let latitude: f64 = 28.6327; //21.3252; //45.59823;
-       // let longitude: f64 = -80.706; // -157.943;  
-        //miami executive airport  -80.4408 , 25.6505        
-        //mia -80.3022 , 25.7993, heading 119.6
-        //ktts -80.706 , 28.6327
-        //to go directly down the runway i need to deal with latitude...
 
         let roll: f32 = 0.0; //no roll in 2D
-        //let pitch: f32 = 0.0; //will use angle of attack because its "easier"
-        let yaw: f32 = 90.0; //facing east
-
-       // thread::sleep(millis); 
+        let mut pitch: f32 = 0.0; //will use angle of attack because its "easier"
+        let yaw: f32 = 90.0; //we only need to face in one direction
 
         //create fdm instance
         let mut fdm: FGNetFDM = Default::default();
 
         //convert to network byte order
         fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
-        fdm.latitude = f64::from_be_bytes((latitude.to_radians()).to_ne_bytes());
 
-        //calculate the degrees of longitude traveled in time based on dt
-        //this is how many kilometers its traveled in dt time, need to convert to longitude traveled. 111.321 km is 1 degree
-        let mut longitude_to_add: f64 = self.airspeed * (dt/3600.0);
-        longitude_to_add = longitude_to_add / 111.321; 
-        self.longitude = self.longitude + longitude_to_add;
-        fdm.longitude = f64::from_be_bytes((self.longitude.to_radians()).to_ne_bytes());
-        //fdm.longitude = f64::from_be_bytes(longitude.to_radians().to_ne_bytes());
+        //coordinate conversion
+        let ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
+        self.ecef_vec.x = self.ecef_vec.x + self.delta_traveled; //add latitude change to the ecef longitude
+        let lla = geo::ecef2lla(&self.ecef_vec, &ellipsoid); //make new geo coords
 
-        fdm.altitude = f64::from_be_bytes(self.q[5].to_ne_bytes());
+        fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
+        fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
+        fdm.altitude = f64::from_be_bytes(self.q[5].to_ne_bytes()); // we can just use the value the model operates on
 
         //convert to network byte order
-        let tmp_alpha = self.alpha as f32;
+        pitch = self.alpha as f32;
         fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
-        fdm.theta = f32::from_be_bytes((tmp_alpha.to_radians()).to_ne_bytes());
+        fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
         fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
 
         //convert to network byte order
@@ -412,11 +390,6 @@ impl Plane
         fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
         fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
         fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
-
-
-        //create socket and connect to flightgear
-      //  let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
-       // socket.connect("127.0.0.1:5500").expect("connect function failed");
 
         //convert struct array of u8 of bytes
         let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
@@ -434,7 +407,6 @@ impl Plane
         {
             self.throttle = 1.0;
         }
-
     }
     fn dec_thrust(&mut self)
     {
@@ -443,7 +415,6 @@ impl Plane
         {
             self.throttle = 0.0;
         }
-
      }
 
     fn inc_aoa(&mut self)
@@ -453,7 +424,6 @@ impl Plane
         {
             self.alpha = 20.0;
         }
-
      }
 
     fn dec_aoa(&mut self)
@@ -463,36 +433,23 @@ impl Plane
         {
             self.alpha = -16.0
         }
-  
     }
 
     //use flight control input 
      fn flight_control(&mut self)
      {
 
-        //let mut stdout = stdout();
         //going into raw mode
         enable_raw_mode().unwrap();
-    
-        //clearing the screen, going to top left corner and printing welcoming message
-       //execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0), Print("Fly me! cntrl + q to quit")) .unwrap();
-        //ctrl + q to exit, w = pitch down, s = pitch up, a = roll left, d = roll right, t = increase thrust, y = decrease thrust, z = yaw left, x = yaw right, landing flaps up = f, landing flaps down = g 
-    
-    
+
         let no_modifiers = KeyModifiers::empty();
     
         //key detection, this needs to happen asynchronously because more than 1 loop can be pressed at a time, also the simulation needs to continue synchronously
-    //    loop 
+        //loop 
         {
-
-            //going to top left corner
-           // execute!(stdout, cursor::MoveTo(0, 0)).unwrap();
-
-            //matching the key
+            //matching the key pressed
             match read().unwrap() //like a switch statement
             {
-                
-
                 //increase thrust
                     Event::Key(KeyEvent {
                     code: KeyCode::Char('t'),
@@ -501,13 +458,13 @@ impl Plane
 
                 //decrease thrust
                 Event::Key(KeyEvent {
-                    code: KeyCode::Char('y'),
+                    code: KeyCode::Char('g'),
                     modifiers: no_modifiers,
                 }) => self.dec_thrust(),
 
                 //increase angle of attack
                 Event::Key(KeyEvent {
-                    code: KeyCode::Char('g'),
+                    code: KeyCode::Char('y'),
                     modifiers: no_modifiers,
                 }) => self.inc_aoa(),   
 
@@ -521,14 +478,11 @@ impl Plane
                 Event::Key(KeyEvent {
                     code: KeyCode::Char('q'),
                     modifiers: KeyModifiers::CONTROL,
-                }) => println!("{}", "you cant quit now!"),
+                }) => println!("{}", "you cant quit now!"), //need a way to quit gracefully
 
                 _ => (),
 
-               
             }
-
-
         }
 
         //disabling raw mode
@@ -539,17 +493,16 @@ impl Plane
 } //end impl
 
 
+static dt: f64 = 0.5; //time in between each frame
 
-
-static dt: f64 = 0.5;// 0.001;
 //initialize plane and solves for the plane motion with range-kutta
 fn main()
 {
     let mut x: f64 = 0.0;
+    let mut y: f64 = 0.0;
     let mut z: f64 = 0.0;
     let mut v: f64 = 0.0;
     let mut time: f64 = 0.0;
-   // let dt = 0.0001; //determines how many steps through time
 
     //create plane, set airplane data
     let mut plane = Plane {
@@ -575,10 +528,10 @@ fn main()
     flap: String::from("0"),    //  Flap setting
     numEqns: 6, 
     s: 0.0,                     //  time
-   // q: [0.0;6]
-     q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0],               //  vx, x, vy, y, vz, z
-     longitude: -80.706,
-     airspeed: 0.0
+    q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0],               //  vx, x, vy, y, vz, z
+    airspeed: 0.0,
+    delta_traveled: 0.0,
+    ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236) //location of runway at 0 height
 
     };
 
@@ -586,62 +539,43 @@ fn main()
     let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
     socket.connect("127.0.0.1:5500").expect("connect function failed");
   
-    // let start = Instant::now();
-    // let duration = start.elapsed();
-    // println!("{:?}", duration);
-
-    //accelerate the plane for 40 seconds
-    while plane.s < 500.0     
+    //acclerate for time in seconds
+    while plane.s < 60.0 
     {
-        plane.planeRungeKutta4( dt);
+        let priorx = plane.q[1]; //will be used to calculate delta_traveled
 
+        plane.planeRungeKutta4( dt); //step simulation
+
+        //set some variables for conveinience 
         time = plane.s;
         x = plane.q[1];
+        y = plane.q[3];
         z = plane.q[5];
         v = (plane.q[0] * plane.q[0] + plane.q[2] * plane.q[2] + plane.q[4] * plane.q[4]).sqrt();
         plane.airspeed = v;
+        plane.delta_traveled = ((x / 3.6) - (priorx / 3.6)); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
 
-
-
-        //if im going x speed how many degrees of longitude did i pass in dt seconds. example for dt = 0.1. airspeed * .1/3600 hours = longitude degrees passed
+        //get and send packet data
         plane.get_fdm_data_and_send_packet(&socket);
-        //println!("time = {}, x = {}, altitude = {}, airspeed = {} ", time, x, z, v);
 
+        //print out some relevant info
         println!("time = {}", time);
-        println!("x = {}", x);
+        println!("x traveled (m) = {}", x / 3.6); //convert to meters
+        println!("x travel change (m) since last frame = {}", plane.delta_traveled);
+        println!("y = {}", y);
         println!("altitude (m) = {}", z);
         println!("airspeed (km/h) = {}", v);
-        println!("longitude = {}", plane.longitude);
         println!("throttle % = {}", plane.throttle);
         println!("angle of attack (deg) = {}", plane.alpha);
         println!("bank angle (deg) = {}", plane.bank);
         println!("{}", "--------------------------------------");
         //println!("{:#?}", plane);
 
+        //get user input and call flight control functions
         plane.flight_control();
     }
 
 }
 
-
-
-
-//Some references used for networking
-
-    //converting to bytes
-    //https://stackoverflow.com/questions/29445026/converting-number-primitives-i32-f64-etc-to-byte-representations
-
-    //htonl function in rust
-    //https://docs.rs/socket/0.0.7/socket/fn.htonl.html
-
-    //struct padding in rust vs c++
-    //https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html
-
-    //sending struct as u8 slice
-    //https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
-    //https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
-
-    //how jsbsim fills in the data socket FGOutputFG.cpp
-    //https://github.com/JSBSim-Team/jsbsim/blob/4d87ce79b0ee4b0542885ae78e51c5fe7d637dea/src/input_output/FGOutputFG.cpp
-
+    
 
