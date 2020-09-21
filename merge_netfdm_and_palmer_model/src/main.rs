@@ -27,14 +27,11 @@ use std::{thread, time};
 #[derive(Debug)]
 struct Plane 
 {
-    numEqns: usize, //int
-    s: f64,
-
-    q: Vec<f64>,
- 
-    bank: f64,
+    s: f64, //time in seconds
+    q: Vec<f64>, //will store ODE results
+    bank: f64, //bank angle
     alpha: f64,//  angle of attack
-    throttle: f64,
+    throttle: f64, //throttle percentage
     wingArea: f64,
     wingSpan: f64,
     tailArea: f64,
@@ -188,7 +185,7 @@ impl Plane
         //  values in the ODE object arrays.
         self.s = self.s + ds;
 
-        for i in 0..self.numEqns
+        for i in 0..6
         {
             q[i] = q[i] + (dq1[i] + 2.0 * dq2[i] + 2.0 * dq3[i] + dq4[i]) / 6.0;
             self.q[i] = q[i];
@@ -528,7 +525,6 @@ fn main()
     alpha: 0.0, 
     throttle: 0.0, 
     flap: String::from("0"),    //  Flap setting
-    numEqns: 6, 
     s: 0.0,                     //  time
     q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0],               //  vx, x, vy, y, vz, z
 
@@ -575,4 +571,26 @@ fn main()
     }
 
 }
+
+
+
+//Some references used for networking
+
+    //converting to bytes
+    //https://stackoverflow.com/questions/29445026/converting-number-primitives-i32-f64-etc-to-byte-representations
+
+    //htonl function in rust
+    //https://docs.rs/socket/0.0.7/socket/fn.htonl.html
+
+    //struct padding in rust vs c++
+    //https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html
+
+    //sending struct as u8 slice
+    //https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
+    //https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
+
+    //how jsbsim fills in the data socket FGOutputFG.cpp
+    //https://github.com/JSBSim-Team/jsbsim/blob/4d87ce79b0ee4b0542885ae78e51c5fe7d637dea/src/input_output/FGOutputFG.cpp
+
+
 
