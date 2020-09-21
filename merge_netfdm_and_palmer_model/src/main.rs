@@ -19,6 +19,9 @@ use coord_transforms::prelude::*;
 use std::net::UdpSocket;
 use std::{thread, time};
 
+//used for ellipsoid
+#[macro_use]
+extern crate lazy_static;
 
 //********************************************
 //  This structure defines the data required
@@ -192,6 +195,8 @@ impl Plane
         }
 
         self.delta_traveled = ((self.q[1] / 3.6) - (priorx / 3.6)); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
+      
+        self.ecef_vec.x = self.ecef_vec.x + self.delta_traveled; //add latitude change to the ecef longitude
     }
 
 
@@ -368,8 +373,6 @@ impl Plane
         fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
 
         //coordinate conversion
-        let ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
-        self.ecef_vec.x = self.ecef_vec.x + self.delta_traveled; //add latitude change to the ecef longitude
         let lla = geo::ecef2lla(&self.ecef_vec, &ellipsoid); //make new geo coords
 
         fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
@@ -492,7 +495,10 @@ impl Plane
 
 
 static dt: f64 = 0.5; //time in between each frame
-
+lazy_static!
+{
+    static ref ellipsoid:coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
+}
 //initialize plane and solves for the plane motion with range-kutta
 fn main()
 {
@@ -571,26 +577,6 @@ fn main()
     }
 
 }
-
-
-
-//Some references used for networking
-
-    //converting to bytes
-    //https://stackoverflow.com/questions/29445026/converting-number-primitives-i32-f64-etc-to-byte-representations
-
-    //htonl function in rust
-    //https://docs.rs/socket/0.0.7/socket/fn.htonl.html
-
-    //struct padding in rust vs c++
-    //https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html
-
-    //sending struct as u8 slice
-    //https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
-    //https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
-
-    //how jsbsim fills in the data socket FGOutputFG.cpp
-    //https://github.com/JSBSim-Team/jsbsim/blob/4d87ce79b0ee4b0542885ae78e51c5fe7d637dea/src/input_output/FGOutputFG.cpp
 
 
 
