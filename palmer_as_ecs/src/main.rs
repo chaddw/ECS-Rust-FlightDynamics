@@ -24,6 +24,7 @@ use coord_transforms::prelude::*;
 use std::net::UdpSocket;
 use std::{thread, time};
 
+
 //used for ellipsoid
 #[macro_use]
 extern crate lazy_static;
@@ -193,8 +194,8 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
 
 
 //System to perform physics calculations
-struct RungeKutta4;
-impl<'a> System<'a> for RungeKutta4
+struct EquationsOfMotion;
+impl<'a> System<'a> for EquationsOfMotion
 {
     type SystemData = (
         ReadStorage<'a, PerformanceData>,
@@ -210,12 +211,8 @@ impl<'a> System<'a> for RungeKutta4
 
         for (perfdata, pos, outdata, inpdata) in (&performancedata, &mut position, &mut outputdata, &mut inputdata).join() 
         {
+            println!("{}", "inside EOM for loop");
 
-            // self.planeRightHandSide( &mut q, &mut qcopy, &mut ds, 0.0, &mut dq1);
-            // self.planeRightHandSide( &mut q, &mut dq1,   &mut ds, 0.5, &mut dq2);
-            // self.planeRightHandSide( &mut q, &mut dq2,   &mut ds, 0.5, &mut dq3);
-            // self.planeRightHandSide( &mut q, &mut dq3,   &mut ds, 1.0, &mut dq4);
-            //                           q      deltQ       ds      qScale      dq
             let mut q = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
             let mut qcopy = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
             let mut dq1 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -223,7 +220,9 @@ impl<'a> System<'a> for RungeKutta4
             let mut dq3 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
             let mut dq4 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
+           
             //perfdata: PerformanceData, pos: Position, outdata: OutputData, inpdata: InputData
+            //this closure is what was "planeRightHandSide"
             let mut a = |q: &mut Vec<f64>, deltaQ: &mut Vec<f64>, &ds: & f64, qScale: f64, mut dq: &mut Vec<f64>| 
             {
 
@@ -413,6 +412,7 @@ impl<'a> System<'a> for RungeKutta4
             pos.ecef_vec.x = pos.ecef_vec.x + outdata.delta_traveled; //add latitude change to the ecef longitude
 
 
+            outdata.airspeed = (outdata.q[0] * outdata.q[0] + outdata.q[2] * outdata.q[2] + outdata.q[4] * outdata.q[4]).sqrt();
 
 
         }//end for
@@ -464,7 +464,7 @@ impl<'a> System<'a> for RungeKutta4
 //                 fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
 
 //                 //coordinate conversion
-//                 let lla = geo::ecef2lla(&self.ecef_vec, &ellipsoid); //make new geo coords
+//                 let lla = geo::ecef2lla(&self.ecef_vec, &ELLIPSOID); //make new geo coords
 
 //                 fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
 //                 fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
@@ -496,129 +496,127 @@ impl<'a> System<'a> for RungeKutta4
 // }//end system
 
 
-// //System to handle user input
-// struct GetInputFlightControl;
-// impl<'a> System<'a> for GetInputFlightControl
-// {
-//     type SystemData = (
-//         ReadStorage<'a, InputData>, //probably write data actually
-//     );
+//System to handle user input
+struct FlightControl;
+impl<'a> System<'a> for FlightControl
+{
+    type SystemData = (
+        WriteStorage<'a, InputData>, 
+        ReadStorage<'a, OutputData>,
+    );
 
-//     fn run(&mut self, (inputdata): Self::SystemData) 
-//     {
-//         for (inpdata) in (&inputdata).join() 
-//         {
-//             //fn flight_control(&mut self)
-//             {
-       
-//                //going into raw mode
-//                enable_raw_mode().unwrap();
-       
-//                let no_modifiers = KeyModifiers::empty();
-           
-//                //key detection, this needs to happen asynchronously because more than 1 loop can be pressed at a time, also the simulation needs to continue synchronously
-//                //loop 
-//                {
-//                    //matching the key pressed
-//                    match read().unwrap() //like a switch statement
-//                    {
-//                        //increase thrust
-//                            Event::Key(KeyEvent {
-//                            code: KeyCode::Char('t'),
-//                            modifiers: no_modifiers,
-//                        }) => self.inc_thrust(),              
-       
-//                        //decrease thrust
-//                        Event::Key(KeyEvent {
-//                            code: KeyCode::Char('g'),
-//                            modifiers: no_modifiers,
-//                        }) => self.dec_thrust(),
-       
-//                        //increase angle of attack
-//                        Event::Key(KeyEvent {
-//                            code: KeyCode::Char('y'),
-//                            modifiers: no_modifiers,
-//                        }) => self.inc_aoa(),   
-       
-//                        //increase angle of attack
-//                        Event::Key(KeyEvent {
-//                            code: KeyCode::Char('h'),
-//                            modifiers: no_modifiers,
-//                        }) => self.dec_aoa(), 
-       
-//                        //quit
-//                        Event::Key(KeyEvent {
-//                            code: KeyCode::Char('q'),
-//                            modifiers: KeyModifiers::CONTROL,
-//                        }) => println!("{}", "you cant quit now!"), //need a way to quit gracefully
-       
-//                        _ => (),
-       
-//                    }
-//                }
-       
-//                //disabling raw mode
-//                disable_raw_mode().unwrap();
-       
-//            }//https://stackoverflow.com/questions/60130532/detect-keydown-in-rust
-           
+    fn run(&mut self, (mut inputdata, outputdata): Self::SystemData) 
+    {
+        for (inpdata, outdata) in (&mut inputdata, &outputdata).join()
+        {
+            println!("{}", "inside flight control");
+            //input flight control closures to define the airplane behavior
+            // let mut inc_thrust = || 
+            // {
+            //     inpdata.throttle = inpdata.throttle + 0.05; //increased throttle by 5%
+            //     if inpdata.throttle > 1.0
+            //     {
+            //         inpdata.throttle = 1.0;
+            //     }
+            // };
 
-//         }//end for
-//     }//end run
-// }//end system
-
- 
-// //System depending on user input to make flight controls happen
-// struct DoFlightControl;
-// impl<'a> System<'a> for DoFlightControl
-// {
-//     type SystemData = (
-//         WriteStorage<'a, InputData>,
-//     );
-
-//     fn run(&mut self, (mut inputdata): Self::SystemData) 
-//     {
-//         for (inpdata) in (&mut inputdata).join() 
-//         {
-//             fn inc_thrust()
-//             {
-//                 self.throttle = self.throttle + 0.05; //increased throttle by 5%
-//                 if self.throttle > 1.0
-//                 {
-//                     self.throttle = 1.0;
-//                 }
-//             }
-//             fn dec_thrust()
-//             {
-//                 self.throttle = self.throttle - 0.05; //dec throttle by 5%
-//                 if self.throttle < 0.0
-//                 {
-//                     self.throttle = 0.0;
-//                 }
-//              }
+            // let mut dec_thrust = || 
+            // {
+            //     inpdata.throttle = inpdata.throttle - 0.05; //dec throttle by 5%
+            //     if inpdata.throttle < 0.0
+            //     {
+            //         inpdata.throttle = 0.0;
+            //     }
+            // };
         
-//             fn inc_aoa()
-//             {
-//                 self.alpha = self.alpha + 1.0; //increased angle of attack by 1 degree
-//                 if self.alpha > 20.0
-//                 {
-//                     self.alpha = 20.0;
-//                 }
-//              }
+            // let mut inc_aoa = || 
+            // {
+            //     inpdata.alpha = inpdata.alpha + 1.0; //increased angle of attack by 1 degree
+            //     if inpdata.alpha > 20.0
+            //     {
+            //         inpdata.alpha = 20.0;
+            //     }
+            // };
         
-//             fn dec_aoa()
-//             {
-//                 self.alpha = self.alpha - 1.0; //decreased angle of attack by 1 degree
-//                 if self.alpha < -16.0
-//                 {
-//                     self.alpha = -16.0
-//                 }
-//             }
+            // let mut dec_aoa = || 
+            // {
+            //     inpdata.alpha = inpdata.alpha - 1.0; //decreased angle of attack by 1 degree
+            //     if inpdata.alpha < -16.0
+            //     {
+            //         inpdata.alpha = -16.0
+            //     }
+            // };
            
 
-//         }//end for
-//     }//end run
-// }//end system
+               //going into raw mode
+               enable_raw_mode().unwrap();
+       
+               let no_modifiers = KeyModifiers::empty();
+           
+               //key detection, this needs to happen asynchronously because more than 1 loop can be pressed at a time, also the simulation needs to continue synchronously
+               //loop 
+               //{
+                   //matching the key pressed
+                   match read().unwrap() //like a switch statement
+                   {
+                       //increase thrust
+                           Event::Key(KeyEvent {
+                           code: KeyCode::Char('t'),
+                           modifiers: no_modifiers,
+                       }) => (if inpdata.throttle < 1.0 
+                                {
+                                    inpdata.throttle = inpdata.throttle + 0.05
+                                }),     //inc throttle by 5%         
+       
+                       //decrease thrust
+                       Event::Key(KeyEvent {
+                           code: KeyCode::Char('g'),
+                           modifiers: no_modifiers,
+                       }) => (if inpdata.throttle > 0.0 
+                                {
+                                    inpdata.throttle = inpdata.throttle - 0.05
+                                }),     //dec throttle by 5%
+       
+                       //increase angle of attack
+                       Event::Key(KeyEvent {
+                           code: KeyCode::Char('y'),
+                           modifiers: no_modifiers,
+                       }) =>  (if inpdata.alpha < 20.0
+                                {
+                                    inpdata.alpha = inpdata.alpha + 1.0            //increased angle of attack by 1 degree
+                                }),
+
+                       //increase angle of attack
+                       Event::Key(KeyEvent {
+                           code: KeyCode::Char('h'),
+                           modifiers: no_modifiers,
+                       }) => (if inpdata.alpha > -16.0
+                                {
+                                    inpdata.alpha = inpdata.alpha - 1.0             //decreased angle of attack by 1 degree
+                                }),
+
+                       //quit
+                       Event::Key(KeyEvent {
+                           code: KeyCode::Char('q'),
+                           modifiers: KeyModifiers::CONTROL,
+                       }) => println!("{}", "you cant quit now!"), //need a way to quit gracefully
+       
+                       _ => (),
+       
+                   }
+               //}
+
+       
+               //disabling raw mode
+               disable_raw_mode().unwrap();
+       
+           //https://stackoverflow.com/questions/60130532/detect-keydown-in-rust
+           
+
+        }//end for
+    }//end run
+}//end system
+
 
 
 
@@ -626,39 +624,73 @@ impl<'a> System<'a> for RungeKutta4
 static dt: f64 = 0.5; //time in between each frame
 lazy_static!
 {
-    static ref ellipsoid:coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
+    static ref ELLIPSOID: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
 }
 //initialize plane and solves for the plane motion with range-kutta
 fn main()
 {
 
-    // let mut world = World::new();
-    // // let mut dispatcher = DispatcherBuilder::new()
-    // // .with(Palmer2DFDM, "Palmer_2D_FDM", &[])
-    // // .with(FlightControls, "Flight_Controls", &[])
-    // // .with(SendPacket, "Send_Packet", &[]).build();
-    // // dispatcher.setup(&mut world);
+    let mut world = World::new();
+    let mut dispatcher = DispatcherBuilder::new()
+    .with(EquationsOfMotion, "Equations_Of_Motion", &[])
+    .with(FlightControl, "Flight_control",&[])
+    .build();
+
+    dispatcher.setup(&mut world);
+
+    //create plane entity with components
+    let plane = world.create_entity()
+    .with(Position{
+        ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236)}) //location of runway at 0 height
+    .with(PerformanceData{
+        wingArea: 16.2,             //  wing wetted area, m^2
+        wingSpan: 10.9,             //  wing span, m
+        tailArea: 2.0,              //  tail wetted area, m^2
+        clSlope0: 0.0889,           //  slope of Cl-alpha curve
+        cl0: 0.178,                 //  Cl value when alpha = 0
+        clSlope1: -0.1,             //  slope of post-stall Cl-alpha curve
+        cl1: 3.2,                   //  intercept of post-stall Cl-alpha curve
+        alphaClMax: 16.0,           //  alpha at Cl(max)
+        cdp: 0.034,                 //  parasitic drag coefficient
+        eff: 0.77,                  //  induced drag efficiency coefficient
+        mass: 1114.0,               //  airplane mass, kg
+        enginePower: 119310.0,      //  peak engine power, W
+        engineRps: 40.0,            //  engine turnover rate, rev/s
+        propDiameter: 1.905,        //  propeller diameter, m
+        a: 1.83,                    //  propeller efficiency curve fit coefficient
+        b:-1.32,                    //  propeller efficiency curve fit coefficient
+        })
+    .with(OutputData{
+        s: 0.0, //time in seconds
+        q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
+        airspeed: 0.0,
+        delta_traveled: 0.0,
+        })
+    .with(InputData{
+        bank: 0.0, //bank angle
+        alpha: 0.0,//  angle of attack
+        throttle: 0.0, //throttle percentage
+        flap: String::from("0"),  //  flap deflection amount (pointer in c)
+        })
+
+    .build();
 
 
-    // let plane = world.create_entity().with(Position{ecef_vec: Vector3::new(0.0, 0.0, 0.0)})
-    // .with(PerformanceData{
-    //     wingArea: 16.2,             //  wing wetted area, m^2
-    //     wingSpan: 10.9,             //  wing span, m
-    //     tailArea: 2.0,              //  tail wetted area, m^2
-    //     clSlope0: 0.0889,           //  slope of Cl-alpha curve
-    //     cl0: 0.178,                 //  Cl value when alpha = 0
-    //     clSlope1: -0.1,             //  slope of post-stall Cl-alpha curve
-    //     cl1: 3.2,                   //  intercept of post-stall Cl-alpha curve
-    //     alphaClMax: 16.0,           //  alpha at Cl(max)
-    //     cdp: 0.034,                 //  parasitic drag coefficient
-    //     eff: 0.77,                  //  induced drag efficiency coefficient
-    //     mass: 1114.0,               //  airplane mass, kg
-    //     enginePower: 119310.0,      //  peak engine power, W
-    //     engineRps: 40.0,            //  engine turnover rate, rev/s
-    //     propDiameter: 1.905,        //  propeller diameter, m
-    //     a: 1.83,                    //  propeller efficiency curve fit coefficient
-    //     b:-1.32,                    //  propeller efficiency curve fit coefficient
-    //     }).build();
+    let runtime = time::Duration::from_secs(1);
+    loop 
+    {
+        let start = time::Instant::now();
+        dispatcher.dispatch(&world);
+        world.maintain();
+
+        // Create frame_rate loop
+        let sleep_time = runtime.checked_sub(time::Instant::now().duration_since(start));
+        if sleep_time != None 
+        {
+            thread::sleep(sleep_time.unwrap());
+        }
+        //println!("{:#?}", plane)
+    }
 
     // //set some variables for conveinience 
     // let mut x: f64 = 0.0;
@@ -667,36 +699,7 @@ fn main()
     // let mut v: f64 = 0.0;
     // let mut time: f64 = 0.0;
 
-    // //create plane, set airplane data
-    // let mut plane = Plane {
-    // wingArea: 16.2,             //  wing wetted area, m^2
-    // wingSpan: 10.9,             //  wing span, m
-    // tailArea: 2.0,              //  tail wetted area, m^2
-    // clSlope0: 0.0889,           //  slope of Cl-alpha curve
-    // cl0: 0.178,                 //  Cl value when alpha = 0
-    // clSlope1: -0.1,             //  slope of post-stall Cl-alpha curve
-    // cl1: 3.2,                   //  intercept of post-stall Cl-alpha curve
-    // alphaClMax: 16.0,           //  alpha at Cl(max)
-    // cdp: 0.034,                 //  parasitic drag coefficient
-    // eff: 0.77,                  //  induced drag efficiency coefficient
-    // mass: 1114.0,               //  airplane mass, kg
-    // enginePower: 119310.0,      //  peak engine power, W
-    // engineRps: 40.0,            //  engine turnover rate, rev/s
-    // propDiameter: 1.905,        //  propeller diameter, m
-    // a: 1.83,                    //  propeller efficiency curve fit coefficient
-    // b:-1.32,                    //  propeller efficiency curve fit coefficient
-    // bank: 0.0,
-    // alpha: 0.0, 
-    // throttle: 0.0, 
-    // flap: String::from("0"),    //  Flap setting
-    // s: 0.0,                     //  time
-    // q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0],               //  vx, x, vy, y, vz, z
-
-    // airspeed: 0.0,
-    // delta_traveled: 0.0,
-    // ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236) //location of runway at 0 height
-    // };
-
+  
     // //create socket and connect to flightgear
     // let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
     // socket.connect("127.0.0.1:5500").expect("connect function failed");
