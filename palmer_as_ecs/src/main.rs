@@ -183,14 +183,11 @@ impl Component for FGNetFDM
 {
     type Storage = VecStorage<Self>;
 }
-
 //for converting to slice of u8 
 unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
 {
     ::std::slice::from_raw_parts((p as *const T) as *const u8,::std::mem::size_of::<T>(),)
 }
-
-
 
 
 //System to perform physics calculations
@@ -204,14 +201,10 @@ impl<'a> System<'a> for EquationsOfMotion
         WriteStorage<'a, InputData>,
     );
 
-
     fn run(&mut self, (performancedata, mut position, mut outputdata, mut inputdata): Self::SystemData) 
     {
-
-
         for (perfdata, pos, outdata, inpdata) in (&performancedata, &mut position, &mut outputdata, &mut inputdata).join() 
         {
-            println!("{}", "inside EOM for loop");
 
             let mut q = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
             let mut qcopy = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -227,159 +220,151 @@ impl<'a> System<'a> for EquationsOfMotion
             {
 
  
-                     let mut newQ = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; //[f64; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; // intermediate dependent variable values 
-                 
-                     let yo = -1.0_f64;
-                     let pi = yo.acos();
-                     let G: f64 = -9.81;
-                     let mut cl: f64 = 0.0;
-                     let mut cosP: f64 = 0.0;   //  climb angle
-                     let mut sinP: f64= 0.0;   //  climb angle
-                     let mut cosT: f64 = 0.0;   //  heading angle
-                     let mut sinT: f64 = 0.0;   //  heading angle
-                     let mut bank: f64 = 0.0;
-                 
-                     //  Convert bank angle from degrees to radians
-                     //  Angle of attack is not converted because the
-                     //  Cl-alpha curve is defined in terms of degrees.
-                     bank = inpdata.bank.to_radians();
-                 
-                     //  Compute the intermediate values of the 
-                     //  dependent variables.
-                     for i in 0..6
-                     {
-                         newQ[i] = q[i] + qScale * deltaQ[i]; 
-                     }
-                 
-                     //  Assign convenenience variables to the intermediate 
-                     //  values of the locations and velocities.
-                     let vx: f64 = newQ[0];
-                     let vy: f64 = newQ[2];
-                     let vz: f64 = newQ[4];
-                     let x: f64 = newQ[1];
-                     let y: f64 = newQ[3];
-                     let z: f64 = newQ[5];
-                     let vh: f64 = (vx * vx + vy * vy).sqrt();
-                     let vtotal: f64 = (vx * vx + vy * vy + vz * vz).sqrt();
-                 
-                     //  Compute the air density
-                     let temperature: f64 = 288.15 - 0.0065 * z;
-                     let grp: f64 = 1.0 - 0.0065 * z / 288.15;
-                     let pressure: f64 = 101325.0 * (grp.powf(5.25));
-                     let density: f64 = 0.00348 * pressure / temperature;
-                 
-                     //  Compute power drop-off factor
-                     let omega: f64 = density / 1.225;
-                     let factor: f64 = (omega - 0.12)/  0.88;
-                 
-                     //  Compute thrust
-                     let advanceRatio: f64 = vtotal / (perfdata.engineRps * perfdata.propDiameter);
-                     let thrust: f64 = inpdata.throttle * factor * perfdata.enginePower * (perfdata.a + perfdata.b * advanceRatio * advanceRatio) / (perfdata.engineRps * perfdata.propDiameter);
-                 
-                     //  Compute lift coefficient. The Cl curve is 
-                     //  modeled using two straight lines.
-                     if  inpdata.alpha < perfdata.alphaClMax
-                     {
-                         cl = perfdata.clSlope0 * inpdata.alpha + perfdata.cl0;
-                     }
-                     else 
-                     {
-                         cl = perfdata.clSlope1 * inpdata.alpha + perfdata.cl1;
-                     }
-                 
-                     //  Include effects of flaps and ground effects.
-                     //  Ground effects are present if the plane is
-                     //  within 5 meters of the ground.
-                     if inpdata.flap == "20"
-                     {
-                         cl += 0.25;
-                     }
-                     if inpdata.flap == "40"
-                     {
-                         cl += 0.5;
-                     }
-                     if z < 5.0
-                     {
-                         cl += 0.25;
-                     }
-                 
-                     //  Compute lift
-                     let lift: f64 = 0.5 * cl * density * vtotal * vtotal * perfdata.wingArea;
-                 
-                     // //  Compute drag coefficient
-                     let aspectRatio: f64 = perfdata.wingSpan * perfdata.wingSpan / perfdata.wingArea;
-                     let cd = perfdata.cdp + cl * cl / (pi * aspectRatio * perfdata.eff);
-                     
-                     // //  Compute drag force
-                     let drag: f64 = 0.5 * cd * density * vtotal * vtotal * perfdata.wingArea;
-                 
-                     //  Define some shorthand convenience variables
-                     //  for use with the rotation matrix.
-                     //  Compute the sine and cosines of the climb angle,
-                     //  bank angle, and heading angle;
-                     let cosW: f64 = bank.cos(); 
-                     let sinW: f64 = bank.sin(); 
-                 
-                     if  vtotal == 0.0
-                     {
-                         cosP = 1.0;
-                         sinP = 0.0;
-                     }
-                     else
-                     {
-                         cosP = vh / vtotal;  
-                         sinP = vz / vtotal;  
-                     }
-                     
-                     if vh == 0.0
-                     {
-                         cosT = 1.0;
-                         sinT = 0.0;
-                     }
-                     else
-                     {
-                         cosT = vx / vh;
-                         sinT = vy / vh;
-                     }
-                 
-                     //  Convert the thrust, drag, and lift forces into
-                     //  x-, y-, and z-components using the rotation matrix.
-                     let Fx: f64 = cosT * cosP * (thrust - drag) + (sinT * sinW - cosT * sinP * cosW) * lift;
-                     let Fy: f64 = sinT * cosP * (thrust - drag) + (-cosT * sinW - sinT * sinP * cosW) * lift;
-                     let mut Fz: f64 = sinP * (thrust - drag) + cosP * cosW * lift;
-                 
-                     //  Add the gravity force to the z-direction force.
-                     Fz = Fz + perfdata.mass * G;
-                 
-                     //  Since the plane can't sink into the ground, if the
-                     //  altitude is less than or equal to zero and the z-component
-                     //  of force is less than zero, set the z-force
-                     //  to be zero.
-                     if  z <= 0.0 && Fz <= 0.0  
-                     {
-                         Fz = 0.0;
-                     }
-                 
-                     //  Load the right-hand sides of the ODE's
-                     dq[0] = ds * (Fx / perfdata.mass);
-                     dq[1] = ds * vx;
-                     dq[2] = ds * (Fy / perfdata.mass);
-                     dq[3] = ds * vy;
-                     dq[4] = ds * (Fz / perfdata.mass);
-                     dq[5] = ds * vz;
+                let mut newQ = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; //[f64; 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; // intermediate dependent variable values 
+            
+                let yo = -1.0_f64;
+                let pi = yo.acos();
+                let G: f64 = -9.81;
+                let mut cl: f64 = 0.0;
+                let mut cosP: f64 = 0.0;   //  climb angle
+                let mut sinP: f64= 0.0;   //  climb angle
+                let mut cosT: f64 = 0.0;   //  heading angle
+                let mut sinT: f64 = 0.0;   //  heading angle
+                let mut bank: f64 = 0.0;
+            
+                //  Convert bank angle from degrees to radians
+                //  Angle of attack is not converted because the
+                //  Cl-alpha curve is defined in terms of degrees.
+                bank = inpdata.bank.to_radians();
+            
+                //  Compute the intermediate values of the 
+                //  dependent variables.
+                for i in 0..6
+                {
+                    newQ[i] = q[i] + qScale * deltaQ[i]; 
+                }
+            
+                //  Assign convenenience variables to the intermediate 
+                //  values of the locations and velocities.
+                let vx: f64 = newQ[0];
+                let vy: f64 = newQ[2];
+                let vz: f64 = newQ[4];
+                let x: f64 = newQ[1];
+                let y: f64 = newQ[3];
+                let z: f64 = newQ[5];
+                let vh: f64 = (vx * vx + vy * vy).sqrt();
+                let vtotal: f64 = (vx * vx + vy * vy + vz * vz).sqrt();
+            
+                //  Compute the air density
+                let temperature: f64 = 288.15 - 0.0065 * z;
+                let grp: f64 = 1.0 - 0.0065 * z / 288.15;
+                let pressure: f64 = 101325.0 * (grp.powf(5.25));
+                let density: f64 = 0.00348 * pressure / temperature;
+            
+                //  Compute power drop-off factor
+                let omega: f64 = density / 1.225;
+                let factor: f64 = (omega - 0.12)/  0.88;
+            
+                //  Compute thrust
+                let advanceRatio: f64 = vtotal / (perfdata.engineRps * perfdata.propDiameter);
+                let thrust: f64 = inpdata.throttle * factor * perfdata.enginePower * (perfdata.a + perfdata.b * advanceRatio * advanceRatio) / (perfdata.engineRps * perfdata.propDiameter);
+            
+                //  Compute lift coefficient. The Cl curve is 
+                //  modeled using two straight lines.
+                if  inpdata.alpha < perfdata.alphaClMax
+                {
+                    cl = perfdata.clSlope0 * inpdata.alpha + perfdata.cl0;
+                }
+                else 
+                {
+                    cl = perfdata.clSlope1 * inpdata.alpha + perfdata.cl1;
+                }
+            
+                //  Include effects of flaps and ground effects.
+                //  Ground effects are present if the plane is
+                //  within 5 meters of the ground.
+                if inpdata.flap == "20"
+                {
+                    cl += 0.25;
+                }
+                if inpdata.flap == "40"
+                {
+                    cl += 0.5;
+                }
+                if z < 5.0
+                {
+                    cl += 0.25;
+                }
+            
+                //  Compute lift
+                let lift: f64 = 0.5 * cl * density * vtotal * vtotal * perfdata.wingArea;
+            
+                // //  Compute drag coefficient
+                let aspectRatio: f64 = perfdata.wingSpan * perfdata.wingSpan / perfdata.wingArea;
+                let cd = perfdata.cdp + cl * cl / (pi * aspectRatio * perfdata.eff);
                 
- 
- 
-            };
-
+                // //  Compute drag force
+                let drag: f64 = 0.5 * cd * density * vtotal * vtotal * perfdata.wingArea;
+            
+                //  Define some shorthand convenience variables
+                //  for use with the rotation matrix.
+                //  Compute the sine and cosines of the climb angle,
+                //  bank angle, and heading angle;
+                let cosW: f64 = bank.cos(); 
+                let sinW: f64 = bank.sin(); 
+            
+                if  vtotal == 0.0
+                {
+                    cosP = 1.0;
+                    sinP = 0.0;
+                }
+                else
+                {
+                    cosP = vh / vtotal;  
+                    sinP = vz / vtotal;  
+                }
+                
+                if vh == 0.0
+                {
+                    cosT = 1.0;
+                    sinT = 0.0;
+                }
+                else
+                {
+                    cosT = vx / vh;
+                    sinT = vy / vh;
+                }
+            
+                //  Convert the thrust, drag, and lift forces into
+                //  x-, y-, and z-components using the rotation matrix.
+                let Fx: f64 = cosT * cosP * (thrust - drag) + (sinT * sinW - cosT * sinP * cosW) * lift;
+                let Fy: f64 = sinT * cosP * (thrust - drag) + (-cosT * sinW - sinT * sinP * cosW) * lift;
+                let mut Fz: f64 = sinP * (thrust - drag) + cosP * cosW * lift;
+            
+                //  Add the gravity force to the z-direction force.
+                Fz = Fz + perfdata.mass * G;
+            
+                //  Since the plane can't sink into the ground, if the
+                //  altitude is less than or equal to zero and the z-component
+                //  of force is less than zero, set the z-force
+                //  to be zero.
+                if  z <= 0.0 && Fz <= 0.0  
+                {
+                    Fz = 0.0;
+                }
+            
+                //  Load the right-hand sides of the ODE's
+                dq[0] = ds * (Fx / perfdata.mass);
+                dq[1] = ds * vx;
+                dq[2] = ds * (Fy / perfdata.mass);
+                dq[3] = ds * vy;
+                dq[4] = ds * (Fz / perfdata.mass);
+                dq[5] = ds * vz;
+            }; //end "planeRightHandSide"
 
 
             //begin what was "rangeKutta4" method
             let priorx = outdata.q[1]; //will be used to calculate delta_traveled
-
-            // let mut q = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-            // let mut qcopy = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-            // let mut dq1 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
             //retrieve value of dependent variable
             q = outdata.q.clone();
@@ -392,10 +377,10 @@ impl<'a> System<'a> for EquationsOfMotion
             // of delta-q values for each of the four steps
 
             //calls "planeRightHandSide 4 times"
-                a(&mut q, &mut qcopy,  &ds, 0.0, &mut dq1);
-                a(&mut q, &mut dq1,    &ds, 0.5, &mut dq2);
-                a(&mut q, &mut dq2,    &ds, 0.5, &mut dq3);
-                a(&mut q, &mut dq3,    &ds, 1.0, &mut dq4);
+            a(&mut q, &mut qcopy,  &ds, 0.0, &mut dq1);
+            a(&mut q, &mut dq1,    &ds, 0.5, &mut dq2);
+            a(&mut q, &mut dq2,    &ds, 0.5, &mut dq3);
+            a(&mut q, &mut dq3,    &ds, 1.0, &mut dq4);
 
             //  Update the dependent and independent variable values
             //  at the new dependent variable location and store the
@@ -410,10 +395,8 @@ impl<'a> System<'a> for EquationsOfMotion
     
             outdata.delta_traveled = ((outdata.q[1] / 3.6) - (priorx / 3.6)); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
             pos.ecef_vec.x = pos.ecef_vec.x + outdata.delta_traveled; //add latitude change to the ecef longitude
-
-
+            
             outdata.airspeed = (outdata.q[0] * outdata.q[0] + outdata.q[2] * outdata.q[2] + outdata.q[4] * outdata.q[4]).sqrt();
-
 
         }//end for
     }//end run
@@ -421,79 +404,81 @@ impl<'a> System<'a> for EquationsOfMotion
 
 
 
-
-
-
-
-
-
-
-
-
-
 // //System to send packets
-// struct SendPacket;
-// impl<'a> System<'a> for SendPacket
-// {
-//     type SystemData = (
-//         ReadStorage<'a, Position>,
-//         ReadStorage<'a, OutputData>,
-//         WriteStorage<'a, FGNetFDM>,
-//     );
+struct SendPacket;
+impl<'a> System<'a> for SendPacket
+{
+    type SystemData = (
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, OutputData>,
+        WriteStorage<'a, FGNetFDM>,
+        ReadStorage<'a, InputData>,
+    );
 
-//     fn run(&mut self, (position, outdata, mut fgnetfdm): Self::SystemData) 
-//     {
-//         for (pos, outdata, netfdm) in (&pposition, &outdata, &mut fgnetfdm).join() 
-//         {
+    fn run(&mut self, (position, outdata, mut fgnetfdm, inputdata): Self::SystemData) 
+    {
+        for (pos, outdata, netfdm, inpdata) in (&position, &outdata, &mut fgnetfdm, &inputdata).join() 
+        {
+            //ktts (shuttle landing facility) geo coordinates 28.6327 -80.706, 0.0
+            let visibility: f32 = 5000.0;
+            let fg_net_fdm_version = 24_u32;
 
-//             //create and send the net fdm packet 
-//            // fn get_fdm_data_and_send_packet(socket: &UdpSocket)
-//             {
-//                 //ktts (shuttle landing facility) geo coordinates 28.6327 -80.706, 0.0
-//                 let visibility: f32 = 5000.0;
-//                 let fg_net_fdm_version = 24_u32;
+            let roll: f32 = 0.0; //no roll in 2D
+            let mut pitch: f32 = 0.0; //will use angle of attack because its "easier"
+            let yaw: f32 = 90.0; //we only need to face in one direction
 
-//                 let roll: f32 = 0.0; //no roll in 2D
-//                 let mut pitch: f32 = 0.0; //will use angle of attack because its "easier"
-//                 let yaw: f32 = 90.0; //we only need to face in one direction
+            //create fdm instance
+            let mut fdm: FGNetFDM = Default::default();
 
-//                 //create fdm instance
-//                 let mut fdm: FGNetFDM = Default::default();
+            //convert to network byte order
+            fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
 
-//                 //convert to network byte order
-//                 fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
+            //coordinate conversion
+            let lla = geo::ecef2lla(&pos.ecef_vec, &ELLIPSOID); //make new geo coords
 
-//                 //coordinate conversion
-//                 let lla = geo::ecef2lla(&self.ecef_vec, &ELLIPSOID); //make new geo coords
+            fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
+            fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
+            fdm.altitude = f64::from_be_bytes(outdata.q[5].to_ne_bytes()); // we can just use the value the model operates on (try lla.z tho)
 
-//                 fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
-//                 fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
-//                 fdm.altitude = f64::from_be_bytes(self.q[5].to_ne_bytes()); // we can just use the value the model operates on
+            //convert to network byte order
+            pitch = inpdata.alpha as f32;
+            fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
+            fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
+            fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
 
-//                 //convert to network byte order
-//                 pitch = self.alpha as f32;
-//                 fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
-//                 fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
-//                 fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
+            //convert to network byte order
+            fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());
+            fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());
+            fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
+            fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
+            fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
 
-//                 //convert to network byte order
-//                 fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());
-//                 fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());
-//                 fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
-//                 fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
-//                 fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
+            //convert struct array of u8 of bytes
+            let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
+            //println!("{:?}", bytes);
 
-//                 //convert struct array of u8 of bytes
-//                 let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
-//                 //println!("{:?}", bytes);
+            //finally send &[u8] of bytes to flight gear
+            //connect first (would be nice to only do this once...)
+            socket.connect("127.0.0.1:5500").expect("connect function failed");
+            //and send
+            socket.send(bytes).expect("couldn't send message");
 
-//                 //finally send &[u8] of bytes to flight gear
-//                 socket.send(bytes).expect("couldn't send message");
-//             }
 
-//         }//end for
-//     }//end run
-// }//end system
+            //print some relevant data
+            println!("time = {}", outdata.s);
+            println!("x traveled (m) = {}", outdata.q[1] / 3.6); //convert to meters
+            println!("x travel change (m) since last frame = {}", outdata.delta_traveled);
+            println!("y = {}", outdata.q[3]);
+            println!("altitude (m) = {}", outdata.q[5]);
+            println!("airspeed (km/h) = {}", outdata.airspeed);
+            println!("throttle % = {}", inpdata.throttle);
+            println!("angle of attack (deg) = {}", inpdata.alpha);
+            println!("bank angle (deg) = {}", inpdata.bank);
+
+
+        }//end for
+    }//end run
+}//end system
 
 
 //System to handle user input
@@ -507,124 +492,83 @@ impl<'a> System<'a> for FlightControl
 
     fn run(&mut self, (mut inputdata, outputdata): Self::SystemData) 
     {
-        for (inpdata, outdata) in (&mut inputdata, &outputdata).join()
+        for (inpdata, outdata) in (&mut inputdata, &outputdata).join() //dont need outdata but wasnt letting me have the for loop... actually i dont think i need the for loop
         {
-            println!("{}", "inside flight control");
-            //input flight control closures to define the airplane behavior
-            // let mut inc_thrust = || 
-            // {
-            //     inpdata.throttle = inpdata.throttle + 0.05; //increased throttle by 5%
-            //     if inpdata.throttle > 1.0
-            //     {
-            //         inpdata.throttle = 1.0;
-            //     }
-            // };
+            //going into raw mode
+            enable_raw_mode().unwrap();
+    
+            let no_modifiers = KeyModifiers::empty();
+    
 
-            // let mut dec_thrust = || 
-            // {
-            //     inpdata.throttle = inpdata.throttle - 0.05; //dec throttle by 5%
-            //     if inpdata.throttle < 0.0
-            //     {
-            //         inpdata.throttle = 0.0;
-            //     }
-            // };
-        
-            // let mut inc_aoa = || 
-            // {
-            //     inpdata.alpha = inpdata.alpha + 1.0; //increased angle of attack by 1 degree
-            //     if inpdata.alpha > 20.0
-            //     {
-            //         inpdata.alpha = 20.0;
-            //     }
-            // };
-        
-            // let mut dec_aoa = || 
-            // {
-            //     inpdata.alpha = inpdata.alpha - 1.0; //decreased angle of attack by 1 degree
-            //     if inpdata.alpha < -16.0
-            //     {
-            //         inpdata.alpha = -16.0
-            //     }
-            // };
-           
+            //key detection, this needs to happen asynchronously because more than 1 loop can be pressed at a time, also the simulation needs to continue synchronously
+            //loop
+            match read().unwrap() //like a switch statement
+            {
+                //increase thrust
+                    Event::Key(KeyEvent {
+                    code: KeyCode::Char('t'),
+                    modifiers: no_modifiers,
+                }) => (if inpdata.throttle < 1.0 
+                        {
+                            inpdata.throttle = inpdata.throttle + 0.05
+                        }),     //inc throttle by 5%         
 
-               //going into raw mode
-               enable_raw_mode().unwrap();
-       
-               let no_modifiers = KeyModifiers::empty();
-           
-               //key detection, this needs to happen asynchronously because more than 1 loop can be pressed at a time, also the simulation needs to continue synchronously
-               //loop 
-               //{
-                   //matching the key pressed
-                   match read().unwrap() //like a switch statement
-                   {
-                       //increase thrust
-                           Event::Key(KeyEvent {
-                           code: KeyCode::Char('t'),
-                           modifiers: no_modifiers,
-                       }) => (if inpdata.throttle < 1.0 
-                                {
-                                    inpdata.throttle = inpdata.throttle + 0.05
-                                }),     //inc throttle by 5%         
-       
-                       //decrease thrust
-                       Event::Key(KeyEvent {
-                           code: KeyCode::Char('g'),
-                           modifiers: no_modifiers,
-                       }) => (if inpdata.throttle > 0.0 
-                                {
-                                    inpdata.throttle = inpdata.throttle - 0.05
-                                }),     //dec throttle by 5%
-       
-                       //increase angle of attack
-                       Event::Key(KeyEvent {
-                           code: KeyCode::Char('y'),
-                           modifiers: no_modifiers,
-                       }) =>  (if inpdata.alpha < 20.0
-                                {
-                                    inpdata.alpha = inpdata.alpha + 1.0            //increased angle of attack by 1 degree
-                                }),
+                //decrease thrust
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('g'),
+                    modifiers: no_modifiers,
+                }) => (if inpdata.throttle > 0.0 
+                        {
+                            inpdata.throttle = inpdata.throttle - 0.05
+                        }),     //dec throttle by 5%
 
-                       //increase angle of attack
-                       Event::Key(KeyEvent {
-                           code: KeyCode::Char('h'),
-                           modifiers: no_modifiers,
-                       }) => (if inpdata.alpha > -16.0
-                                {
-                                    inpdata.alpha = inpdata.alpha - 1.0             //decreased angle of attack by 1 degree
-                                }),
+                //increase angle of attack
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('y'),
+                    modifiers: no_modifiers,
+                }) =>  (if inpdata.alpha < 20.0
+                        {
+                            inpdata.alpha = inpdata.alpha + 1.0           
+                        }), //increased angle of attack by 1 degree
 
-                       //quit
-                       Event::Key(KeyEvent {
-                           code: KeyCode::Char('q'),
-                           modifiers: KeyModifiers::CONTROL,
-                       }) => println!("{}", "you cant quit now!"), //need a way to quit gracefully
-       
-                       _ => (),
-       
-                   }
-               //}
+                //increase angle of attack
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('h'),
+                    modifiers: no_modifiers,
+                }) => (if inpdata.alpha > -16.0
+                        {
+                            inpdata.alpha = inpdata.alpha - 1.0            
+                        }), //decreased angle of attack by 1 degree
 
-       
-               //disabling raw mode
-               disable_raw_mode().unwrap();
-       
-           //https://stackoverflow.com/questions/60130532/detect-keydown-in-rust
-           
+                //quit
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('q'),
+                    modifiers: KeyModifiers::CONTROL,
+                }) => println!("{}", "you cant quit now!"), //need a way to quit gracefully
 
+                _ => (),
+
+            }        //https://stackoverflow.com/questions/60130532/detect-keydown-in-rust
+            
+            //disabling raw mode
+            disable_raw_mode().unwrap();
+    
         }//end for
     }//end run
 }//end system
 
 
+//create socket and connect to flightgear
 
 
 
 static dt: f64 = 0.5; //time in between each frame
 lazy_static!
 {
+    //define earth ellipsoid
     static ref ELLIPSOID: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
+    //create socket
+    static ref socket: std::net::UdpSocket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
 }
 //initialize plane and solves for the plane motion with range-kutta
 fn main()
@@ -634,6 +578,7 @@ fn main()
     let mut dispatcher = DispatcherBuilder::new()
     .with(EquationsOfMotion, "Equations_Of_Motion", &[])
     .with(FlightControl, "Flight_control",&[])
+    .with(SendPacket, "Send_Packet", &[])
     .build();
 
     dispatcher.setup(&mut world);
@@ -672,69 +617,32 @@ fn main()
         throttle: 0.0, //throttle percentage
         flap: String::from("0"),  //  flap deflection amount (pointer in c)
         })
+    .with(FGNetFDM{
+        ..Default::default()
+
+        })
 
     .build();
 
 
-    let runtime = time::Duration::from_secs(1);
+    //let runtime = time::Duration::from_secs(1);
     loop 
     {
-        let start = time::Instant::now();
+        //let start = time::Instant::now();
         dispatcher.dispatch(&world);
         world.maintain();
 
         // Create frame_rate loop
-        let sleep_time = runtime.checked_sub(time::Instant::now().duration_since(start));
-        if sleep_time != None 
-        {
-            thread::sleep(sleep_time.unwrap());
-        }
+        // let sleep_time = runtime.checked_sub(time::Instant::now().duration_since(start));
+        // if sleep_time != None 
+        // {
+        //     thread::sleep(sleep_time.unwrap());
+        // }
         //println!("{:#?}", plane)
     }
 
-    // //set some variables for conveinience 
-    // let mut x: f64 = 0.0;
-    // let mut y: f64 = 0.0;
-    // let mut z: f64 = 0.0;
-    // let mut v: f64 = 0.0;
-    // let mut time: f64 = 0.0;
+  
 
   
-    // //create socket and connect to flightgear
-    // let socket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
-    // socket.connect("127.0.0.1:5500").expect("connect function failed");
-  
-    // //acclerate for time in seconds
-    // while plane.s < 60.0 
-    // {
-    //     plane.planeRungeKutta4( dt); //step simulation
-
-    //     //get and send packet data
-    //     plane.get_fdm_data_and_send_packet(&socket);
-
-    //     //set some variables for conveinience
-    //     time = plane.s;
-    //     x = plane.q[1];
-    //     y = plane.q[3];
-    //     z = plane.q[5];
-    //     v = (plane.q[0] * plane.q[0] + plane.q[2] * plane.q[2] + plane.q[4] * plane.q[4]).sqrt();
-    //     plane.airspeed = v;
-
-    //     //print out some relevant info
-    //     println!("time = {}", time);
-    //     println!("x traveled (m) = {}", x / 3.6); //convert to meters
-    //     println!("x travel change (m) since last frame = {}", plane.delta_traveled);
-    //     println!("y = {}", y);
-    //     println!("altitude (m) = {}", z);
-    //     println!("airspeed (km/h) = {}", v);
-    //     println!("throttle % = {}", plane.throttle);
-    //     println!("angle of attack (deg) = {}", plane.alpha);
-    //     println!("bank angle (deg) = {}", plane.bank);
-    //     println!("{}", "--------------------------------------");
-    //     //println!("{:#?}", plane);
-
-    //     //get user input and call flight control functions
-    //     //plane.flight_control();
-    // }
 
 }
