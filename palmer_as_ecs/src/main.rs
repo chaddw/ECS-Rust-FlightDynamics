@@ -1,4 +1,4 @@
-
+#![recursion_limit="256"]
 //FlightGear is ran with this line of command argumments on the fgfs executable:
 //fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,30,,5500,udp
 //fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,60,,5500,udp
@@ -6,11 +6,39 @@
 //imports for flight control function
 #[macro_use]
 extern crate crossterm;
+//17.5
+// use crossterm::event::{poll, read, Event, KeyCode, KeyEvent, KeyModifiers};
+// use crossterm::style::Print;
+// use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
+// use std::io::{stdout, Write};
+// use std::time::Duration;
+//0.9
+// use crossterm::{input, InputEvent, KeyEvent, RawScreen};
+// use std::{thread, time::Duration};
+
+
+//async std crossterm
+use std::{
+    io::{stdout, Write},
+    time::Duration,
+};
+
+use futures::{future::FutureExt, select, StreamExt};
+use futures_timer::Delay;
+
+use crossterm::{
+    cursor::position,
+    event::{DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode},
+    Result,
+};
+//crossterm pretty printing
 use crossterm::cursor;
-use crossterm::event::{read, Event, KeyCode, KeyEvent, KeyModifiers};
+
 use crossterm::style::Print;
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
-use std::io::{stdout, Write};
+use crossterm::terminal::{ Clear, ClearType};
+
 
 //Specs
 use specs::prelude::*;
@@ -22,12 +50,13 @@ use coord_transforms::prelude::*;
 
 //networking
 use std::net::UdpSocket;
-use std::{thread, time};
-
 
 //used for ellipsoid
 #[macro_use]
 extern crate lazy_static;
+
+
+
 
 
 //////Component Position
@@ -40,6 +69,21 @@ impl Component for Position
 {
     type Storage = VecStorage<Self>;
 }
+
+//////Component State Machine for keyboard
+#[derive(Debug)]
+struct KeyboardState
+{
+    thrust_up: bool,
+    thrust_down: bool,
+    aoa_up: bool,
+    aoa_down: bool,
+}
+impl Component for KeyboardState
+{
+    type Storage = VecStorage<Self>;
+}
+
 
 //////Component Performance data of the airplane
 #[derive(Debug)]
@@ -199,13 +243,14 @@ impl<'a> System<'a> for EquationsOfMotion
         WriteStorage<'a, Position>,
         WriteStorage<'a, OutputData>,
         WriteStorage<'a, InputData>,
+        ReadStorage<'a, KeyboardState>
     );
 
-    fn run(&mut self, (performancedata, mut position, mut outputdata, mut inputdata): Self::SystemData) 
+    fn run(&mut self, (performancedata, mut position, mut outputdata, mut inputdata, keyboardstate): Self::SystemData) 
     {
-        for (perfdata, pos, outdata, inpdata) in (&performancedata, &mut position, &mut outputdata, &mut inputdata).join() 
+        for (perfdata, pos, outdata, inpdata, keystate) in (&performancedata, &mut position, &mut outputdata, &mut inputdata, &keyboardstate).join() 
         {
-
+           // println!("{}", "inside eom");
             let mut q = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
             let mut qcopy = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
             let mut dq1 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -213,7 +258,29 @@ impl<'a> System<'a> for EquationsOfMotion
             let mut dq3 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
             let mut dq4 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
-           
+
+            //get the thrust state
+            if inpdata.throttle < 1.0 && keystate.thrust_up == true
+            {
+                inpdata.throttle = inpdata.throttle + 0.05;
+                
+            }   
+            else if inpdata.throttle > 0.0 && keystate.thrust_down == true
+            {
+                inpdata.throttle = inpdata.throttle - 0.05;
+            
+            }  
+            //get angle of attack state
+            else if inpdata.alpha < 20.0 && keystate.aoa_up == true
+            {
+                inpdata.alpha = inpdata.alpha + 1.0;
+            
+            }  
+            else if inpdata.alpha > -16.0 && keystate.aoa_down == true
+            {
+                inpdata.alpha = inpdata.alpha - 1.0
+            }  
+        
             //perfdata: PerformanceData, pos: Position, outdata: OutputData, inpdata: InputData
             //this closure is what was "planeRightHandSide"
             let mut a = |q: &mut Vec<f64>, deltaQ: &mut Vec<f64>, &ds: & f64, qScale: f64, mut dq: &mut Vec<f64>| 
@@ -265,7 +332,7 @@ impl<'a> System<'a> for EquationsOfMotion
                 let omega: f64 = density / 1.225;
                 let factor: f64 = (omega - 0.12)/  0.88;
             
-                //  Compute thrust
+                //  Compute thrust 
                 let advanceRatio: f64 = vtotal / (perfdata.engineRps * perfdata.propDiameter);
                 let thrust: f64 = inpdata.throttle * factor * perfdata.enginePower * (perfdata.a + perfdata.b * advanceRatio * advanceRatio) / (perfdata.engineRps * perfdata.propDiameter);
             
@@ -419,6 +486,10 @@ impl<'a> System<'a> for SendPacket
     {
         for (pos, outdata, netfdm, inpdata) in (&position, &outdata, &mut fgnetfdm, &inputdata).join() 
         {
+
+           // println!("{}", "inside send packet");
+           // loop{
+            //thread::sleep(Duration::from_millis(5000));
             //ktts (shuttle landing facility) geo coordinates 28.6327 -80.706, 0.0
             let visibility: f32 = 5000.0;
             let fg_net_fdm_version = 24_u32;
@@ -467,102 +538,360 @@ impl<'a> System<'a> for SendPacket
             //print some relevant data
             println!("time = {}", outdata.s);
             println!("x traveled (m) = {}", outdata.q[1] / 3.6); //convert to meters
-            println!("x travel change (m) since last frame = {}", outdata.delta_traveled);
-            println!("y = {}", outdata.q[3]);
+           // println!("x travel change (m) since last frame = {}", outdata.delta_traveled);
+            //println!("y = {}", outdata.q[3]);
             println!("altitude (m) = {}", outdata.q[5]);
             println!("airspeed (km/h) = {}", outdata.airspeed);
             println!("throttle % = {}", inpdata.throttle);
             println!("angle of attack (deg) = {}", inpdata.alpha);
-            println!("bank angle (deg) = {}", inpdata.bank);
-
+           // println!("bank angle (deg) = {}", inpdata.bank);
+           // }
 
         }//end for
     }//end run
 }//end system
 
 
+async fn handle_input(mut thrust_up: &mut bool, mut thrust_down: &mut bool,    mut aoa_up: &mut bool, mut aoa_down: &mut bool ) {
+    let mut reader = EventStream::new();
+  //  let mut reader2 = EventStream::new();
+
+   // loop { //WORKS BETTER WITHOUT THIS LOOP...
+        let mut delay = Delay::new(Duration::from_millis(50)).fuse();
+        let mut event = reader.next().fuse();
+       // let mut event2 = reader2.next().fuse();
+
+        select!
+        {
+            _ = delay => //either dalAY or event happens and it starts over
+            { 
+                return; //println!(".\r");
+            }, 
+
+            maybe_event = event =>
+            {
+                match maybe_event 
+                {
+                    Some(Ok(event)) => 
+                    {
+                        println!("Event::{:?}\r", event);
+
+                        if event == Event::Key(KeyCode::Char('t').into()) 
+                        {
+                            *thrust_up = true;
+                        }
+                       else  if event == Event::Key(KeyCode::Char('g').into()) 
+                        {
+                            *thrust_down = true;
+                        }
+
+                        else  if event == Event::Key(KeyCode::Char('y').into()) 
+                        {
+                            *aoa_up = true;
+                        }
+                        else  if event == Event::Key(KeyCode::Char('h').into()) 
+                        {
+                            *aoa_down = true;
+                        }
+
+                    }
+                    Some(Err(e)) => println!("Error: {:?}\r", e),
+
+
+
+                    None => return,
+                }
+            },
+
+            // maybe_event2 = event2 =>
+            // {
+            //     match maybe_event2 
+            //     {
+            //         Some(Ok(event2)) => 
+            //         {
+            //             println!("Event::{:?}\r", event2);
+
+            //             if event2 == Event::Key(KeyCode::Char('g').into()) 
+            //             {
+            //                 *thrust_down = true;
+            //             }
+
+            //         }
+            //         Some(Err(e)) => println!("Error: {:?}\r", e),
+
+            //         None => return,
+            //     }
+            // },
+
+
+        };
+    //}
+}
+
+
+
+
+//crossterm = {version = "0.17.7", features = ["event-stream"]}
 //System to handle user input
 struct FlightControl;
 impl<'a> System<'a> for FlightControl
 {
-    type SystemData = (
-        WriteStorage<'a, InputData>, 
-        ReadStorage<'a, OutputData>,
+    type SystemData = ( //new component called state, which is writable here. then in eom it will adjust accordingly (writeable there) 
+                        //or... make it readable and it gets set to false when 
+                        //it comes back to its system for the second time without keypress also on.. if no work do system for each press
+        ReadStorage<'a, InputData>, //sytem for each press? .. maybe need a system for not doing anything and continuing to send packet?
+        WriteStorage<'a, KeyboardState>,
     );
 
-    fn run(&mut self, (mut inputdata, outputdata): Self::SystemData) 
+    fn run(&mut self, (inputdata, mut keyboardstate): Self::SystemData) 
     {
-        for (inpdata, outdata) in (&mut inputdata, &outputdata).join() //dont need outdata but wasnt letting me have the for loop... actually i dont think i need the for loop
+        for (inpdata, keystate) in (&inputdata, &mut keyboardstate).join() 
         {
+            //println!("{}", "inside flt cntrl  system");
+
+            keystate.thrust_up = false; //false unless we know its breing pressed
+            keystate.thrust_down = false;
+            keystate.aoa_up = false;
+            keystate.aoa_down = false;
+
+            enable_raw_mode();
+
+            let mut stdout = stdout();
+
+            //makes output not as ugly...
+            execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0)) .unwrap();
+           
+            //handle flight control
+            async_std::task::block_on(handle_input(&mut keystate.thrust_up, &mut keystate.thrust_down,&mut keystate.aoa_up, &mut keystate.aoa_down ));
+        
+            disable_raw_mode();
+
+
+
+
+//OTHER EXAMPLE I TRIED.. LEAVING HERE FOR NOW
+
+//     // Enable raw mode and keep the `_raw` around otherwise the raw mode will be disabled
+//     let _raw = RawScreen::into_raw_mode();
+
+//     // Create an input from our screen
+//     let input = input();
+
+//     // Create an async reader
+//     let mut reader = input.read_async();
+
+//     //loop 
+//     //{
+//         if let Some(event) = reader.next() { // Not a blocking call
+//             match event {
+//                 InputEvent::Keyboard(KeyEvent::Up) => 
+//                 {
+//                     keystate.thrust_up = true;
+                    
+//                 }
+
+//                  InputEvent::Mouse(event) => { /* Mouse event */ }
+
+//                  _ => { keystate.thrust_up = false }
+//             }
+//         }
+//    // }
+
+
+
             //going into raw mode
-            enable_raw_mode().unwrap();
+           // enable_raw_mode().unwrap();
     
-            let no_modifiers = KeyModifiers::empty();
-    
+            // let no_modifiers = KeyModifiers::empty();
+            // match read().unwrap() //like a switch statement
+            // {
+            //     //increase thrust by 5%
+            //         Event::Key(KeyEvent {
+            //         code: KeyCode::Char('t'),
+            //         modifiers: no_modifiers,
+            //     }) => (keystate.thrust_up = true),           
 
-            //key detection, this needs to happen asynchronously because more than 1 loop can be pressed at a time, also the simulation needs to continue synchronously
-            //loop
-            match read().unwrap() //like a switch statement
-            {
-                //increase thrust
-                    Event::Key(KeyEvent {
-                    code: KeyCode::Char('t'),
-                    modifiers: no_modifiers,
-                }) => (if inpdata.throttle < 1.0 
-                        {
-                            inpdata.throttle = inpdata.throttle + 0.05
-                        }),     //inc throttle by 5%         
 
-                //decrease thrust
-                Event::Key(KeyEvent {
-                    code: KeyCode::Char('g'),
-                    modifiers: no_modifiers,
-                }) => (if inpdata.throttle > 0.0 
-                        {
-                            inpdata.throttle = inpdata.throttle - 0.05
-                        }),     //dec throttle by 5%
+            //     //else
+            //     _ => (keystate.thrust_up = false),
 
-                //increase angle of attack
-                Event::Key(KeyEvent {
-                    code: KeyCode::Char('y'),
-                    modifiers: no_modifiers,
-                }) =>  (if inpdata.alpha < 20.0
-                        {
-                            inpdata.alpha = inpdata.alpha + 1.0           
-                        }), //increased angle of attack by 1 degree
-
-                //increase angle of attack
-                Event::Key(KeyEvent {
-                    code: KeyCode::Char('h'),
-                    modifiers: no_modifiers,
-                }) => (if inpdata.alpha > -16.0
-                        {
-                            inpdata.alpha = inpdata.alpha - 1.0            
-                        }), //decreased angle of attack by 1 degree
-
-                //quit
-                Event::Key(KeyEvent {
-                    code: KeyCode::Char('q'),
-                    modifiers: KeyModifiers::CONTROL,
-                }) => println!("{}", "you cant quit now!"), //need a way to quit gracefully
-
-                _ => (),
-
-            }        //https://stackoverflow.com/questions/60130532/detect-keydown-in-rust
+            // }  
             
             //disabling raw mode
-            disable_raw_mode().unwrap();
+           // disable_raw_mode().unwrap();
+    
     
         }//end for
     }//end run
 }//end system
 
 
-//create socket and connect to flightgear
 
 
 
-static dt: f64 = 0.5; //time in between each frame
+
+//System to handle user input
+// struct FlightControl;
+// impl<'a> System<'a> for FlightControl
+// {
+//     type SystemData = ( //new component called state, which is writable here. then in eom it will adjust accordingly (writeable there) 
+//                         //or... make it readable and it gets set to false when 
+//                         //it comes back to its system for the second time without keypress also on.. if no work do system for each press
+//         ReadStorage<'a, InputData>, //sytem for each press?
+//         WriteStorage<'a, KeyboardState>,
+//     );
+
+//     fn run(&mut self, (inputdata, mut keyboardstate): Self::SystemData) 
+//     {
+//         for (inpdata, keystate) in (&inputdata, &mut keyboardstate).join() //dont need outdata but wasnt letting me have the for loop... actually i dont think i need the for loop
+//         {
+
+
+//             //going into raw mode
+//             enable_raw_mode().unwrap();
+    
+//             let no_modifiers = KeyModifiers::empty();
+
+    
+//             // match read().unwrap() //like a switch statement
+//             // {
+//             //     //increase thrust by 5%
+//             //         Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('t'),
+//             //         modifiers: no_modifiers,
+//             //     }) => (keystate.thrust_up = true),           
+
+//             //     //decrease thrust by 5%
+//             //     Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('g'),
+//             //         modifiers: no_modifiers,
+//             //     }) => (keystate.thrust_down = true), 
+
+//             //     //increase angle of attack by 1 degree
+//             //     Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('y'),
+//             //         modifiers: no_modifiers,
+//             //     }) =>  (keystate.aoa_up = true),
+
+//             //     //increase angle of attack by 1 degree
+//             //     Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('h'),
+//             //         modifiers: no_modifiers,
+//             //     }) => (keystate.aoa_down = true),
+
+//             //     //quit
+//             //     Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('q'),
+//             //         modifiers: KeyModifiers::CONTROL,
+//             //     }) => println!("{}", "you cant quit now!"), //need a way to quit gracefully
+
+//             //     _ => ( ),
+
+//             // }  
+
+
+
+
+//             // //inc throttle by 5%  
+//             // if read().unwrap() == Event::Key(KeyEvent {code: KeyCode::Char('t'), modifiers: no_modifiers,})
+//             // {
+//             //     if inpdata.throttle < 1.0 
+//             //     {
+//             //         inpdata.throttle = inpdata.throttle + 0.05;
+//             //     }       
+//             // }
+
+//             // //dec throttle by 5%  
+//             // if read().unwrap() == Event::Key(KeyEvent {code: KeyCode::Char('g'), modifiers: no_modifiers,})
+//             // {
+//             //     if inpdata.throttle > 0.0 
+//             //     {
+//             //         inpdata.throttle = inpdata.throttle - 0.05;
+//             //     }   
+//             // }
+
+//             // //inc angle of attack by 1 degree
+//             // if read().unwrap() == Event::Key(KeyEvent {code: KeyCode::Char('y'), modifiers: no_modifiers,})
+//             // {
+//             //     if inpdata.alpha < 20.0 
+//             //     {
+//             //         inpdata.alpha = inpdata.alpha + 1.0;
+//             //     }   
+//             // }
+
+//             // //dec angle of attack by 1 degree
+//             // if read().unwrap() == Event::Key(KeyEvent {code: KeyCode::Char('h'), modifiers: no_modifiers,})
+//             // {
+//             //     if inpdata.alpha > -16.0 
+//             //     {
+//             //         inpdata.alpha = inpdata.alpha - 1.0;
+//             //     }   
+//             // }
+
+
+
+//             //-----match
+
+           
+//             // match read().unwrap() //like a switch statement
+//             // {
+//             //     //increase thrust by 5%
+//             //         Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('t'),
+//             //         modifiers: no_modifiers,
+//             //     }) => (if inpdata.throttle < 1.0 
+//             //             {
+//             //                 inpdata.throttle = inpdata.throttle + 0.05
+//             //             }),           
+
+//             //     //decrease thrust by 5%
+//             //     Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('g'),
+//             //         modifiers: no_modifiers,
+//             //     }) => (if inpdata.throttle > 0.0 
+//             //             {
+//             //                 inpdata.throttle = inpdata.throttle - 0.05
+//             //             }),  
+
+//             //     //increase angle of attack by 1 degree
+//             //     Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('y'),
+//             //         modifiers: no_modifiers,
+//             //     }) =>  (if inpdata.alpha < 20.0
+//             //             {
+//             //                 inpdata.alpha = inpdata.alpha + 1.0           
+//             //             }), 
+
+//             //     //increase angle of attack by 1 degree
+//             //     Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('h'),
+//             //         modifiers: no_modifiers,
+//             //     }) => (if inpdata.alpha > -16.0
+//             //             {
+//             //                 inpdata.alpha = inpdata.alpha - 1.0            
+//             //             }), 
+
+//             //     //quit
+//             //     Event::Key(KeyEvent {
+//             //         code: KeyCode::Char('q'),
+//             //         modifiers: KeyModifiers::CONTROL,
+//             //     }) => println!("{}", "you cant quit now!"), //need a way to quit gracefully
+
+//             //     _ => (),
+
+//             // }        //https://stackoverflow.com/questions/60130532/detect-keydown-in-rust
+            
+//             //disabling raw mode
+//             disable_raw_mode().unwrap();
+    
+    
+//         }//end for
+//     }//end run
+// }//end system
+
+
+
+static dt: f64 = 0.5; //0.0167 //time in between each eom calculation
 lazy_static!
 {
     //define earth ellipsoid
@@ -575,10 +904,17 @@ fn main()
 {
 
     let mut world = World::new();
+    world.register::<Position>();
+    world.register::<PerformanceData>();
+    world.register::<OutputData>();
+    world.register::<InputData>();
+    world.register::<FGNetFDM>();
+    world.register::<KeyboardState>();
+
     let mut dispatcher = DispatcherBuilder::new()
-    .with(EquationsOfMotion, "Equations_Of_Motion", &[])
-    .with(FlightControl, "Flight_control",&[])
-    .with(SendPacket, "Send_Packet", &[])
+    .with(FlightControl, "flightcontrol", &[])
+    .with(EquationsOfMotion, "EOM", &[])
+    .with(SendPacket, "sendpacket", &[])
     .build();
 
     dispatcher.setup(&mut world);
@@ -621,6 +957,12 @@ fn main()
         ..Default::default()
 
         })
+    .with(KeyboardState{
+        thrust_up: false,
+        thrust_down: false,
+        aoa_up: false,
+        aoa_down: false,
+    })
 
     .build();
 
