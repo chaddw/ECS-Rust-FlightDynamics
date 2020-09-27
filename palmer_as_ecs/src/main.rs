@@ -39,6 +39,9 @@ use std::net::UdpSocket;
 #[macro_use]
 extern crate lazy_static;
 
+//Exit program
+use std::process;
+
 
 //////Component Position
 #[derive(Debug)]
@@ -231,8 +234,7 @@ impl<'a> System<'a> for EquationsOfMotion
     {
         for (perfdata, pos, outdata, inpdata, keystate) in (&performancedata, &mut position, &mut outputdata, &mut inputdata, &keyboardstate).join() 
         {
-           // println!("{}", "inside eom");
-
+            
             let mut qcopy = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
             let mut dq1 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
             let mut dq2 = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -348,11 +350,11 @@ impl<'a> System<'a> for EquationsOfMotion
                 //  Compute lift
                 let lift: f64 = 0.5 * cl * density * vtotal * vtotal * perfdata.wing_area;
             
-                // //  Compute drag coefficient
+                // Compute drag coefficient
                 let aspect_ratio: f64 = perfdata.wing_span * perfdata.wing_span / perfdata.wing_area;
                 let cd = perfdata.cdp + cl * cl / (pi * aspect_ratio * perfdata.eff);
                 
-                // //  Compute drag force
+                //  Compute drag force
                 let drag: f64 = 0.5 * cd * density * vtotal * vtotal * perfdata.wing_area;
             
                 //  Define some shorthand convenience variables
@@ -469,42 +471,44 @@ impl<'a> System<'a> for SendPacket
     {
         for (pos, outdata, _netfdm, inpdata) in (&position, &outdata, &fgnetfdm, &inputdata).join() 
         {
-            let visibility: f32 = 5000.0;
-            let fg_net_fdm_version = 24_u32;
+            //All data passed into the FGNetFDM struct is converted to network byte order
 
+            //Create fdm instance
+            let mut fdm: FGNetFDM = Default::default();
+
+            //Set Roll, Pitch, Yaw
             let roll: f32 = 0.0; //No roll in 2D
             let pitch: f32 = inpdata.alpha as f32; //Will use angle of attack because its "easier"
             let yaw: f32 = 90.0; //Only need to face in one direction
 
-            //create fdm instance
-            let mut fdm: FGNetFDM = Default::default();
+            //Coordinate conversion: cartesian to geodetic
+            let lla = geo::ecef2lla(&pos.ecef_vec, &ELLIPSOID); 
 
-            //convert to network byte order
-            fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
-
-            //coordinate conversion
-            let lla = geo::ecef2lla(&pos.ecef_vec, &ELLIPSOID); //make new geo coords
-
+            //Set lat, long, alt
             fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
             fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
-            fdm.altitude = f64::from_be_bytes(outdata.q[5].to_ne_bytes()); // we can just use the value the model operates on (try lla.z tho)
+            fdm.altitude = f64::from_be_bytes(outdata.q[5].to_ne_bytes()); //lla.z seems to increase altitude artificially...
 
-            //convert to network byte order
+            //Roll, Pitch, Yaw
             fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
             fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
             fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
 
-            //convert to network byte order
+            //Other airplane data
+            let fg_net_fdm_version = 24_u32;
+            let visibility: f32 = 5000.0;
+            fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
             fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());
             fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());
             fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
             fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
             fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
 
-            //convert struct array of u8 of bytes
+
+            //Convert struct array of u8 of bytes
             let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
 
-            //finally send &[u8] of bytes to flight gear
+            //Finally send &[u8] of bytes to flight gear
             //Connect first (would be nice to only do this once...)
             SOCKET.connect("127.0.0.1:5500").expect("connect function failed");
             //Send!
@@ -557,20 +561,29 @@ async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, aoa_up: &mut
                     {
                         *thrust_up = true;
                     }
-                    else  if event == Event::Key(KeyCode::Char('g').into()) 
+                    else if event == Event::Key(KeyCode::Char('g').into()) 
                     {
                         *thrust_down = true;
                     }
 
                     //Angle of attack
-                    else  if event == Event::Key(KeyCode::Char('y').into()) 
+                    else if event == Event::Key(KeyCode::Char('y').into()) 
                     {
                         *aoa_up = true;
                     }
-                    else  if event == Event::Key(KeyCode::Char('h').into()) 
+                    else if event == Event::Key(KeyCode::Char('h').into()) 
                     {
                         *aoa_down = true;
                     }
+
+                    else if event == Event::Key(KeyCode::Char('q').into()) 
+                    {
+                        //Exit program... maybe a better weay to do this?
+                        disable_raw_mode().unwrap();
+                        process::exit(1);
+                    }
+
+
                 }
                 Some(Err(e)) => println!("Error: {:?}\r", e),
 
@@ -599,6 +612,7 @@ impl<'a> System<'a> for FlightControl
             keystate.aoa_up = false;
             keystate.aoa_down = false;
 
+            //Enter raw mode for terminal input
             enable_raw_mode().unwrap();
 
             let mut stdout = stdout();
@@ -616,6 +630,9 @@ impl<'a> System<'a> for FlightControl
 }//end system
 
 
+
+
+//Set some global variables:
 
 //Time in between each eom calculation
 static DT: f64 = 0.5; //0.0167 
@@ -647,7 +664,6 @@ fn main()
     .with(EquationsOfMotion, "EOM", &[])
     .with(SendPacket, "sendpacket", &[])
     .build();
-
     dispatcher.setup(&mut world);
 
     //Create plane entity with components
