@@ -345,7 +345,7 @@ fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
                                  -ixz, -iyz, izz);
 
     //get inverse of matrix
-    //rigidbod.m_inertia_inverse = rigidbod.m_inertia.try_inverse().unwrap();
+    rigidbod.m_inertia_inverse = rigidbod.m_inertia.try_inverse().unwrap();
 
     
 }
@@ -488,7 +488,7 @@ impl<'a> System<'a> for EquationsOfMotion
         for (mut rigidbod, keystate) in (&mut rigidbody, &keyboardstate).join() 
         {
             
-            println!("{}", "inside  step sim");
+            println!("{}", "inside eom");
             let mut ae = Vector3::new(0.0, 0.0, 0.0);
     
             //calculate all of the forces and moments on the airplane
@@ -535,9 +535,6 @@ impl<'a> System<'a> for EquationsOfMotion
             rigidbod.v_euler_angles.y = euler.1; //pitch
             rigidbod.v_euler_angles.z = euler.2; //yaw
     
-    
-            //create and send netfdm packet
-           // self.get_fdm_data_and_send_packet();
 
         }//end for
     }//end run
@@ -545,80 +542,87 @@ impl<'a> System<'a> for EquationsOfMotion
 
 
 
-// //System to send packets
-// struct SendPacket;
-// impl<'a> System<'a> for SendPacket
-// {
-//     type SystemData = (
-//             ReadStorage<'a, RigidBody>,
-//             ReadStorage<'a, FGNetFDM>,
-//     );
+//System to send packets
+struct SendPacket;
+impl<'a> System<'a> for SendPacket
+{
+    type SystemData = (
+            ReadStorage<'a, RigidBody>,
+            ReadStorage<'a, FGNetFDM>,
+    );
 
-//     fn run(&mut self, (rigidbody, fgnetfdm): Self::SystemData) 
-//     {
-//         for (rigidbod, _netfdm,) in (&rigidbody, &fgnetfdm).join() 
-//         {
-//             //All data passed into the FGNetFDM struct is converted to network byte order
+    fn run(&mut self, (rigidbody, fgnetfdm): Self::SystemData) 
+    {
+        for (rigidbod, _netfdm,) in (&rigidbody, &fgnetfdm).join() 
+        {
 
-//             //Create fdm instance
-//             let mut fdm: FGNetFDM = Default::default();
-
-//             //Set Roll, Pitch, Yaw
-//             let roll: f32 = 0.0; //No roll in 2D
-//             let pitch: f32 = inpdata.alpha as f32; //Will use angle of attack because its "easier"
-//             let yaw: f32 = 90.0; //Only need to face in one direction
-
-//             //Coordinate conversion: cartesian to geodetic
-//             let lla = geo::ecef2lla(&pos.ecef_vec, &ELLIPSOID); 
-
-//             //Set lat, long, alt
-//             fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
-//             fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
-//             fdm.altitude = f64::from_be_bytes(outdata.q[5].to_ne_bytes()); //lla.z seems to increase altitude artificially...
-
-//             //Roll, Pitch, Yaw
-//             fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
-//             fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
-//             fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
-
-//             //Other airplane data
-//             let fg_net_fdm_version = 24_u32;
-//             let visibility: f32 = 5000.0;
-//             fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
-//             fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());
-//             fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());
-//             fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
-//             fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
-//             fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
+            println!("{}", "inside send packet");
 
 
-//             //Convert struct array of u8 of bytes
-//             let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
+            //All data passed into the FGNetFDM struct is converted to network byte order
 
-//             //Finally send &[u8] of bytes to flight gear
-//             //Connect first (would be nice to only do this once...)
-//             SOCKET.connect("127.0.0.1:5500").expect("connect function failed");
-//             //Send!
-//             SOCKET.send(bytes).expect("couldn't send message");
+            //Create fdm instance
+            let mut fdm: FGNetFDM = Default::default();
+
+            //Set Roll, Pitch, Yaw
+            let roll: f32 = rigidbod.v_euler_angles.x;
+            let pitch: f32 =  rigidbod.v_euler_angles.y; 
+            let yaw: f32 = rigidbod.v_euler_angles.z;  
+
+            //Coordinate conversion: cartesian to geodetic
+            //Need to first make the position vector into f64 to make coordinate transform happy
+            let temp_ecef_vec: Vector3<f64> = Vector3::new(rigidbod.v_position.x as f64, rigidbod.v_position.y as f64, rigidbod.v_position.z as f64);
+            let lla = geo::ecef2lla(&temp_ecef_vec, &ELLIPSOID); 
+
+            //Set lat, long, alt
+            fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
+            fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
+            fdm.altitude = f64::from_be_bytes(lla.z.to_ne_bytes()); //lla.z seems to increase altitude artificially...
+
+            //Roll, Pitch, Yaw
+            fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
+            fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
+            fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
+
+            //Other airplane data
+            let fg_net_fdm_version = 24_u32;
+            let visibility: f32 = 5000.0;
+            fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
+            fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());
+            fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());
+            fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
+            fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
+            fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
 
 
-//             //Print some relevant data
-//             disable_raw_mode().unwrap(); //Get out of raw mode to print clearly
-//             println!("time = {}", outdata.s);
-//             println!("x traveled (m) = {}", outdata.q[1] / 3.6); //converted to meters
-//             println!("altitude (m) = {}", outdata.q[5]);
-//             println!("airspeed (km/h) = {}", outdata.airspeed);
-//             println!("throttle % = {}", inpdata.throttle);
-//             println!("angle of attack (deg) = {}", inpdata.alpha);
-//             println!("x travel change (m) since last frame = {}", outdata.delta_traveled);
-//             //println!("bank angle (deg) = {}", inpdata.bank);
-//             //println!("y = {}", outdata.q[3]);
-//             enable_raw_mode().unwrap(); //Return to raw
+            //Convert struct array of u8 of bytes
+            let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
+
+            //Finally send &[u8] of bytes to flight gear
+            //Connect first (would be nice to only do this once...)
+            SOCKET.connect("127.0.0.1:5500").expect("connect function failed");
+            //Send!
+            SOCKET.send(bytes).expect("couldn't send message");
+
+
+            //Print some relevant data
+            disable_raw_mode().unwrap(); //Get out of raw mode to print clearly
+            //println!("time = {}", outdata.s);
+            //println!("x traveled (m) = {}", outdata.q[1] / 3.6); //converted to meters
+            println!("{}", rigidbod.v_position);
+           // println!("altitude (m) = {}", lla.z);
+            //println!("airspeed (km/h) = {}", outdata.airspeed);
+            //println!("throttle % = {}", inpdata.throttle);
+           // println!("angle of attack (deg) = {}", inpdata.alpha);
+            //println!("x travel change (m) since last frame = {}", outdata.delta_traveled);
+            //println!("bank angle (deg) = {}", inpdata.bank);
+            //println!("y = {}", outdata.q[3]);
+            enable_raw_mode().unwrap(); //Return to raw
   
 
-//         }//end for
-//     }//end run
-// }//end system
+        }//end for
+    }//end run
+}//end system
 
 
 async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, left_rudder: &mut bool, right_rudder: &mut bool, roll_left: &mut bool, roll_right: &mut bool, pitch_up: &mut bool, pitch_down: &mut bool, flaps_down: &mut bool, zero_flaps: &mut bool) 
@@ -737,6 +741,7 @@ impl<'a> System<'a> for FlightControl
     {
         for (rigidbod, keystate) in (&rigidbody, &mut keyboardstate).join() 
         {
+            println!("{}", "inside flight control");
             //Set all states false before we know if they are being activated
             keystate.thrust_up = false; 
             keystate.thrust_down = false;
@@ -808,26 +813,23 @@ fn main()
     let mut dispatcher = DispatcherBuilder::new()
     .with(FlightControl, "flightcontrol", &[])
     .with(EquationsOfMotion, "EOM", &[])
- //   .with(SendPacket, "sendpacket", &[])
+    .with(SendPacket, "sendpacket", &[])
     .build();
     dispatcher.setup(&mut world);
 
 
 
-    let mut dummyairplane = Default::default();
-    calc_airplane_mass_properties(&mut dummyairplane);
+
     //need its mass, inertia, and intertia inverse
-
-
-    //Create plane entity with components
-    let _plane = world.create_entity()
- //   .with(Position{
-   //     ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236)}) //location of runway at 0 height
-    .with(RigidBody{
-        mass: dummyairplane.mass,
-        m_inertia: dummyairplane.m_inertia,
-        m_inertia_inverse: dummyairplane.m_inertia_inverse,
-        v_position: Vector3::new(-5000.0, 0.0, 200.0),        //set initial position
+    let mut myairplane = RigidBody{
+        mass: 0.0,
+        m_inertia: Matrix3::new(0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0),
+        m_inertia_inverse: Matrix3::new(0.0, 0.0, 0.0,
+                                        0.0, 0.0, 0.0,
+                                        0.0, 0.0, 0.0),
+        v_position: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236),        //set initial position
         v_velocity: Vector3::new(60.0, 0.0, 0.0),        //set initial velocity
         v_euler_angles: Vector3::new(0.0, 0.0,0.0), //not defined in book here
         f_speed: 60.0,
@@ -851,6 +853,33 @@ fn main()
             PointMass{f_mass: 2.93, v_d_coords: Vector3::new(2.25, 0.0, 5.0), v_local_inertia: Vector3::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
             PointMass{f_mass: 31.8, v_d_coords: Vector3::new(15.25, 0.0, 1.5), v_local_inertia: Vector3::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) }
             ]
+    };
+    //work on dummyairplane
+    calc_airplane_mass_properties(&mut myairplane);
+
+
+
+    //Create plane entity with components (using dummy airplane to take on the calculated mass properties)
+    let _plane = world.create_entity()
+    .with(RigidBody{
+        mass: myairplane.mass,
+        m_inertia: myairplane.m_inertia,
+        m_inertia_inverse: myairplane.m_inertia_inverse,
+        v_position: myairplane.v_position,        //set initial position
+        v_velocity: myairplane.v_velocity,        //set initial velocity
+        v_euler_angles: myairplane.v_euler_angles, //not defined in book here
+        f_speed: myairplane.f_speed,
+        v_angular_velocity: myairplane.v_angular_velocity,        //set angular velocity
+        v_forces: myairplane.v_forces,        //set initial thrust, forces, and moments
+        thrustforce: myairplane.thrustforce,   //this isnt written in the rigid body intiialization for some reason...
+        v_moments: myairplane.v_moments,
+        v_velocity_body: myairplane.v_velocity_body,        //zero the velocity in body space coordinates
+        //set these to false at first, will control later with keyboard... these are not defined in the structure
+        stalling: false,
+        flaps: false,
+        q_orientation: myairplane.q_orientation, //from_euler_angles(0.0, 0.0, 0.0),
+        q_orientation_unit: myairplane.q_orientation_unit,
+        element: myairplane.element
     })
     .with(KeyboardState{
         thrust_up: false,
@@ -871,46 +900,10 @@ fn main()
         flaps_down: false,
         zero_flaps: false,
     })
+    .with(FGNetFDM{
+        ..Default::default()
+        })
     .build();
-////
-    // .with(Position{
-    //     ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236)}) //location of runway at 0 height
-    // .with(PerformanceData{
-    //     wing_area: 16.2,             //  wing wetted area, m^2
-    //     wing_span: 10.9,             //  wing span, m
-    //     tail_area: 2.0,              //  tail wetted area, m^2
-    //     cl_slope0: 0.0889,           //  slope of Cl-alpha curve
-    //     cl0: 0.178,                 //  Cl value when alpha = 0
-    //     cl_slope1: -0.1,             //  slope of post-stall Cl-alpha curve
-    //     cl1: 3.2,                   //  intercept of post-stall Cl-alpha curve
-    //     alpha_cl_max: 16.0,           //  alpha at Cl(max)
-    //     cdp: 0.034,                 //  parasitic drag coefficient
-    //     eff: 0.77,                  //  induced drag efficiency coefficient
-    //     mass: 1114.0,               //  airplane mass, kg
-    //     engine_power: 119310.0,      //  peak engine power, W
-    //     engine_rps: 40.0,            //  engine turnover rate, rev/s
-    //     prop_diameter: 1.905,        //  propeller diameter, m
-    //     a: 1.83,                    //  propeller efficiency curve fit coefficient
-    //     b:-1.32,                    //  propeller efficiency curve fit coefficient
-    //     })
-    // .with(OutputData{
-    //     s: 0.0, //time in seconds
-    //     q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
-    //     airspeed: 0.0,
-    //     delta_traveled: 0.0,
-    //     })
-    // .with(InputData{
-    //     bank: 0.0, //bank angle
-    //     alpha: 0.0,//  angle of attack
-    //     throttle: 0.0, //throttle percentage
-    //     flap: String::from("0"),  //  flap deflection amount (pointer in c)
-    //     })
-    // .with(FGNetFDM{
-    //     ..Default::default()
-    //     })
-
-    // .build();
-
 
 
     //Loop simulation
