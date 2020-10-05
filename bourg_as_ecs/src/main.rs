@@ -228,7 +228,7 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
 //MASS PROP ONLY CALLED ONCE AT BEGGINING
 fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
 {
-    println!("{}", "calculating mass properties...");
+    //println!("{}", "calculating mass properties...");
     let mut inn: f64;
     let mut di: f64;
 
@@ -238,7 +238,8 @@ fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
         inn = (i.f_incidence).to_radians();
         di = (i.f_dihedral).to_radians();
         i.v_normal = Vector3::new(inn.sin(), inn.cos() * di.sin(), inn.cos() * di.cos());
-        i.v_normal = i.v_normal.normalize();
+        i.v_normal = i.v_normal.normalize(); //not an issue here...
+        //println!("{}",i.v_normal );
     }
 
     //calculate total mass
@@ -382,8 +383,12 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         //calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
        
         //rotation part
+
+        
         vtmp = rigidbod.v_angular_velocity.cross(&rigidbod.element[i].v_cg_coords); //crossproduct
-        //println!("{}", vtmp); //during third time thru eom it goes bad
+       // println!("{}", rigidbod.v_angular_velocity); //bad after first eom loop
+        //println!("{}", vtmp); //BAD AFTER FIRST
+        //println!("{}", rigidbod.element[i].v_cg_coords); ALWAYS WORKS
 
         v_local_velocity = rigidbod.v_velocity_body + vtmp;
 
@@ -403,21 +408,39 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
 
         //find direction that lift will act. lift is perpendicular to the drag vector
         //(i think there is a problem with normalizing)
-
-        //println!("{}", v_drag_vector);
-        //println!("{}", v_lift_vector);
-
-        //println!("{}", v_drag_vector);
       
-
         //v_lift_vector = (v_drag_vector.cross(&rigidbod.element[i].v_normal)).cross(&v_drag_vector);
         let lift_tmp = v_drag_vector.cross(&rigidbod.element[i].v_normal);
         v_lift_vector = lift_tmp.cross(&v_drag_vector);
         //println!("{}", v_lift_vector);
         tmp = v_lift_vector.magnitude();
+        //println!("{}", tmp); //alwaysok
 
-        v_lift_vector = v_lift_vector.normalize(); //THIS LINE MAKES DATA BAD FROM VERY BEGGINING 
-        //println!("{}", v_lift_vector);
+        //v_lift_vector = v_lift_vector.normalize(); //THIS WAS THE ONE LINE MESSING EVERYTHIGN UP //////////////////////////!!!!!!!!!!!!!!!!!!!!!!
+  
+        //FINDING NORMALIZED VECTOR BY HAND BECAUSE FOR SOME REASON THE ABOVE LINE SPITS OUT NAN
+        let tol:f64 = 0.0001;
+        let mut m: f64 = (v_lift_vector.x * v_lift_vector.x + v_lift_vector.y * v_lift_vector.y + v_lift_vector.z * v_lift_vector.z).sqrt();
+        if m <= tol
+        {
+             m = 1.0;
+        }
+        v_lift_vector.x /= m;
+        v_lift_vector.y /= m;
+        v_lift_vector.z /= m;
+        if v_lift_vector.x.abs() < tol 
+        {
+            v_lift_vector.x = 0.0;
+        }
+        if v_lift_vector.y.abs() < tol
+        { 
+            v_lift_vector.y = 0.0;
+        }
+        if v_lift_vector.z.abs() < tol
+        {
+            v_lift_vector.z = 0.0;
+        }
+       // println!("{}", v_lift_vector);
 
         //find the angle of attack. its the angle between the lfit vector and eelement normal vector. 
         tmp = v_drag_vector.dot(&rigidbod.element[i].v_normal);
@@ -436,17 +459,19 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         //determine lift and drag force on the element (rho is 1.225 in the book)
         // println!("{}", f_local_speed); ////bad after first eom loop
         tmp = 0.5 * 1.225 * f_local_speed * f_local_speed * rigidbod.element[i].f_area;
-        // println!("{}", tmp); ////bad after first eom loop
+         //println!("{}", tmp); ////bad after first eom loop
+        //println!("{}", v_resultant); //only good for first element every time, so after ti goes thru else it gets messed up
         if i == 6 //tail/ rudder
         {
             v_resultant = (v_lift_vector * rudder_lift_coefficient(f_attack_angle) + v_drag_vector * rudder_drag_coefficient(f_attack_angle)) * tmp;
         }
-
         else
         {
+            
             v_resultant = (v_lift_vector * lift_coefficient(f_attack_angle, rigidbod.element[i].i_flap) + v_drag_vector * drag_coefficient(f_attack_angle, rigidbod.element[i].i_flap)) * tmp;
+            //println!("{}", v_resultant); //always bad below this line, but its good for first element when above this line GETTING RID OF NORMALIZE ON VLIFT VECTOR HELPEDF
         }
-        //println!("{}", v_resultant); //V RESULTANT BAD AFTER THE FIRST EOM LOOP
+        
 
         //check for stall. if the coefficient of lift is 0, stall is occuring.
         if lift_coefficient(f_attack_angle, rigidbod.element[i].i_flap) == 0.0
@@ -461,7 +486,9 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
 
         //calculate the moment about the center of gravity of this element's force and keep them in a running total of these moments (total moment)
         vtmp = rigidbod.element[i].v_cg_coords.cross(&v_resultant);
-        // println!("{}", vtmp);
+        //println!("{}", rigidbod.element[i].v_cg_coords); //this is fine
+         //println!("{}", vtmp); //bad always!
+         //println!("{}", v_resultant); //bad always!!!!!
 
         mb = mb + vtmp;
     }
@@ -469,21 +496,29 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     //add thrust
     fb = fb + thrust;
 
-    
+    //DID THIS FIRST
      //convert forces from model space to earth space. rotates the vector by the unit quaternion (QVRotate function)
     //this should ne doing this to the regular quaterinon... (QVRotate)
-    // rigidbod.v_forces = rigidbod.q_orientation_unit.transform_vector(&fb); //i think this messes everything up because we need to be working on the non unit version right now
+     rigidbod.v_forces = rigidbod.q_orientation_unit.transform_vector(&fb); //i think this messes everything up because we need to be working on the non unit version right now
 
+    //THEN TRIED THIS
     //Doing QVRotate by hand w/o using unit quaternion. I cannot multiply fb by the quaternion so i will put fb into a quaternion first and then multiply
     //Doing all this because we arent doing stuff with unit quaternion yet
-    let fbtmp =  Quaternion::new(0.0, fb.x, fb.y, fb.z);   
-    let quatmp = rigidbod.q_orientation * fbtmp * rigidbod.q_orientation.conjugate();
-    let vectmp = quatmp.as_vector();
-    rigidbod.v_forces = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);  // Recall that the quaternion is stored internally as (i, j, k, w)
-                                                                        // while the crate::new constructor takes the arguments as (w, i, j, k).
+    //THIS WOULD BE JUST USING REGULAR QUAT UNTIL I HAVE TO USE UNIT
+    // let fbtmp =  Quaternion::new(0.0, fb.x, fb.y, fb.z);   
+    // let quatmp = rigidbod.q_orientation * fbtmp * rigidbod.q_orientation.conjugate();
+    // let vectmp = quatmp.as_vector();
+    // rigidbod.v_forces = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);  // Recall that the quaternion is stored internally as (i, j, k, w)
+    //                                                                     // while the crate::new constructor takes the arguments as (w, i, j, k).
 
+    // //NOW TRY THIS THIRD
+    // //convert q orientatino to a unit quaternion in order to do the transform_vector call
+    // let quat_to_unit = UnitQuaternion::from_quaternion(rigidbod.q_orientation); 
+    // rigidbod.v_forces = quat_to_unit.transform_vector(&fb);
 
-
+    //TRY FOURTH
+    //TAKE UNIT QUATERNION, MAKE QUATERNION OUT OF IT (WITH SCALAR 0), AND THEN MAKE QUATERNION OUT OF FB IN ORDER TO DO QVROATE BY HAND FOR VFORCES
+    //idea is that i need to stay consistent with when i am using quaternion vs unit quaternion
 
 
 
@@ -491,6 +526,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
 
     rigidbod.v_moments = rigidbod.v_moments + mb;
+   // println!("{}", rigidbod.v_moments);
 }
 
 
@@ -510,7 +546,8 @@ impl<'a> System<'a> for EquationsOfMotion
         for (mut rigidbod, keystate) in (&mut rigidbody, &keyboardstate).join() 
         {
 
-            println!("{}", "inside eom");
+            //println!("{}", rigidbod.q_orientation_unit);
+           // println!("{}", "inside eom");
             let max_thrust = 3000.0; //max thrust value
             let d_thrust = 100.0;   //change in thrust per keypress
 
@@ -582,7 +619,7 @@ impl<'a> System<'a> for EquationsOfMotion
                 rigidbod.element[2].i_flap = -1;
                 rigidbod.flaps = true;
             } 
-            else if keystate.zero_flaps == true
+            else //if keystate.zero_flaps == true
             { 
                 rigidbod.element[1].i_flap = 0;
                 rigidbod.element[2].i_flap = 0;
@@ -594,6 +631,8 @@ impl<'a> System<'a> for EquationsOfMotion
     
             //Calculate all of the forces and moments on the airplane
             calc_airplane_loads(&mut rigidbod);
+
+            //println!("{:#?}", rigidbod);
     
             //Calculate acceleration of airplane in earth coordinates
             let ae: Vector3<f64> = rigidbod.v_forces / rigidbod.mass;
@@ -612,7 +651,8 @@ impl<'a> System<'a> for EquationsOfMotion
     
             //Calculate angular velocity of airplane in body coordinates
             rigidbod.v_angular_velocity = rigidbod.v_angular_velocity + rigidbod.m_inertia_inverse * ( rigidbod.v_moments - ( rigidbod.v_angular_velocity.cross(&(rigidbod.m_inertia * rigidbod.v_angular_velocity)))) * DT;
-           // println!("{}", rigidbod.v_angular_velocity); //this goes bad after first eom
+           // println!("{}", rigidbod.v_angular_velocity); //this is always bad
+            //println!("{}", rigidbod.v_moments); //ALWAYS BAD!
     
             //Calculate the new rotation quaternion
             //we need angular velocity to be in a quaternion form for the multiplication.... ( i think this gives an accurate result...) because 
@@ -620,21 +660,37 @@ impl<'a> System<'a> for EquationsOfMotion
             //so im going to create Quaternion based on the angular velocity ( i hope this math works out properly given the work around with nalgbra...) if not ill have to do it by hand
             //I think this is correct and ok because Bourgs book has a vector * quaternion function: "This operator multiplies the quaternion q by the vector v as though the vector v were a quaternion with its scalar component equal to 0.
 
+            //TRIED THIS FIRST
             //making the quaternion based on angular velocity and scalar as 0
-            let qtmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
-            rigidbod.q_orientation = rigidbod.q_orientation + (rigidbod.q_orientation * qtmp) * (0.5 * DT); 
-            //println!("{}", qtmp);////always bad
+            // let qtmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
+            // rigidbod.q_orientation = rigidbod.q_orientation + (rigidbod.q_orientation * qtmp) * (0.5 * DT); 
+            // //println!("{}", qtmp);////always bad
             //println!("{}", rigidbod.q_orientation); //this goes bad after first eom
 
+            //TRY THIS SECOND
+            //make quaternion from the unit quaternion
+            let unitq_to_q = UnitQuaternion::quaternion(&rigidbod.q_orientation_unit);
+            //make a quaternion based on angular velocity (scalar is 0)
+            let ang_q_tmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
+            //do the operations for new rotation quaternion based on angular velocity
+            let new_unitq_to_q = unitq_to_q + (unitq_to_q * ang_q_tmp) * (0.5 * DT); 
+            //println!("{}", new_unitq_to_q);
 
+            //println!("{}", unitq_to_q); //1-000
+            //println!("{}", ang_q_tmp);//1-nnn angular velocity must be bad
+            //println!("{}", new_unitq_to_q);// n-nnn
             //Now normalize the orientation quaternion (make into unit quaternion)
-            //Oct 1, dont think this works rn because the unit quat is operated on in calc loads and we are overwriting it here
-            rigidbod.q_orientation_unit = UnitQuaternion::new_normalize(rigidbod.q_orientation);
-           
+            //TRIED THIS FIRST
+            //rigidbod.q_orientation_unit = UnitQuaternion::new_normalize(rigidbod.q_orientation);
             // println!("{}", rigidbod.q_orientation_unit); //always bad
+
+            //TRYING THIS SECOND
+            //take quaternion created above to the new unit quaternion (input gets normalized)
+            rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(new_unitq_to_q);
+            //println!("{}", rigidbod.q_orientation_unit);
     
             //calculate the velocity in body coordinates
-            rigidbod.v_velocity_body = rigidbod.q_orientation_unit.transform_vector(&rigidbod.v_velocity);
+            rigidbod.v_velocity_body = (rigidbod.q_orientation_unit.conjugate()).transform_vector(&rigidbod.v_velocity);
             //println!("{}", rigidbod.v_velocity_body); //always bad
     
     
@@ -648,6 +704,7 @@ impl<'a> System<'a> for EquationsOfMotion
             rigidbod.v_euler_angles.y = euler.1; //pitch
             rigidbod.v_euler_angles.z = euler.2; //yaw
 
+            
             //println!("{:?}", euler); //roll is always bad
     
 
@@ -671,7 +728,7 @@ impl<'a> System<'a> for SendPacket
         for (rigidbod, _netfdm,) in (&rigidbody, &fgnetfdm).join() 
         {
 
-            println!("{}", "inside send packet");
+            //println!("{}", "inside send packet");
 
 
             //All data passed into the FGNetFDM struct is converted to network byte order
@@ -721,7 +778,7 @@ impl<'a> System<'a> for SendPacket
 
             //Print some relevant data
             disable_raw_mode().unwrap(); //Get out of raw mode to print clearly
-           // println!("{:#?}", rigidbod);
+            println!("{:#?}", rigidbod);
             //println!("time = {}", outdata.s);
             //println!("x traveled (m) = {}", outdata.q[1] / 3.6); //converted to meters
             //println!("{}", rigidbod.v_position);
@@ -761,7 +818,7 @@ async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, left_rudder:
             {
                 Some(Ok(event)) => 
                 {
-                    println!("Event::{:?}\r", event);
+                    //println!("Event::{:?}\r", event);
 
                     //Thrust
                     if event == Event::Key(KeyCode::Char('t').into()) 
@@ -857,7 +914,7 @@ impl<'a> System<'a> for FlightControl
     {
         for (rigidbod, keystate) in (&rigidbody, &mut keyboardstate).join() 
         {
-            println!("{}", "inside flight control");
+            //println!("{}", "inside flight control");
             //Set all states false before we know if they are being activated
             keystate.thrust_up = false; 
             keystate.thrust_down = false;
@@ -959,7 +1016,7 @@ fn main()
         stalling: false,
         flaps: false,
         q_orientation: Quaternion::new(0.0, 0.0, 0.0, 0.0), //start with something
-        q_orientation_unit: UnitQuaternion::new_normalize(Quaternion::new(0.0, 0.0, 0.0, 0.0)),
+        q_orientation_unit: UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0), //UnitQuaternion::new_normalize(Quaternion::new(0.0, 0.0, 0.0, 0.0)),
         element: vec![
             PointMass{f_mass: 6.56, v_d_coords: Vector3::new(14.5, 12.0, 2.5), v_local_inertia: Vector3::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
             PointMass{f_mass: 7.31, v_d_coords: Vector3::new(14.5, 5.5, 2.5), v_local_inertia: Vector3::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
