@@ -375,12 +375,12 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
             let inn: f64 = (rigidbod.element[i].f_incidence).to_radians();
             let di: f64 = (rigidbod.element[i].f_dihedral).to_radians();
             rigidbod.element[i].v_normal = Vector3::new(inn.sin(), inn.cos() * di.sin(), inn.cos() * di.cos());
-            rigidbod.element[i].v_normal = rigidbod.element[i].v_normal.normalize(); //NORMALIZE DOESNT SEEM TO BE AN ISSUE HERE...
+            rigidbod.element[i].v_normal = rigidbod.element[i].v_normal.normalize(); //normalize not an issue here..
             //println!("{}", rigidbod.element[i].v_normal);
         }
 
        
-         //Calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
+        //Calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
        
         //Rotation part
         vtmp = rigidbod.v_angular_velocity.cross(&rigidbod.element[i].v_cg_coords); //crossproduct
@@ -536,7 +536,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
 
 
     //apply gravity (g is -32.174 ft/s^2)
-    //rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
+   // rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
     //println!("{}", rigidbod.v_forces);
 
     rigidbod.v_moments = rigidbod.v_moments + mb;
@@ -565,7 +565,7 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //println!("{}", rigidbod.q_orientation_unit);
            // println!("{}", "inside eom");
-            let max_thrust = 3000.0; //max thrust value
+            let max_thrust = 3000.0; //max thrustforce value
             let d_thrust = 100.0;   //change in thrust per keypress
 
             //Handle the input states
@@ -689,8 +689,8 @@ impl<'a> System<'a> for EquationsOfMotion
             //making the quaternion based on angular velocity and scalar as 0
             // let qtmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
             // rigidbod.q_orientation = rigidbod.q_orientation + (rigidbod.q_orientation * qtmp) * (0.5 * DT); 
-            // //println!("{}", qtmp);////always bad
-            //println!("{}", rigidbod.q_orientation); //this goes bad after first eom
+            // //println!("{}", qtmp);
+            //println!("{}", rigidbod.q_orientation); 
 
             //TRY THIS SECOND
             //make quaternion from the unit quaternion
@@ -715,13 +715,13 @@ impl<'a> System<'a> for EquationsOfMotion
     
             //Calculate the velocity in body coordinates
             rigidbod.v_velocity_body = (rigidbod.q_orientation_unit.conjugate()).transform_vector(&rigidbod.v_velocity);
-            //println!("{}", rigidbod.v_velocity_body); //THIS GOES BACK TO VVELOCITY AND AE FROM UP THERE THAT DIDTN SEEM RIGHT
+            //println!("{}", rigidbod.v_velocity_body); 
             //GOT RID OF GRAVITY ADDITION IN CAL LOADS FOR NOW
     
             //calculate air speed
-            rigidbod.f_speed = rigidbod.v_velocity.magnitude(); //THIS LINE IS VERY BAD
+            rigidbod.f_speed = rigidbod.v_velocity.magnitude(); 
             // rigidbod.f_speed = (rigidbod.v_velocity.x * rigidbod.v_velocity.x + rigidbod.v_velocity.y * rigidbod.v_velocity.y + rigidbod.v_velocity.z * rigidbod.v_velocity.z).sqrt();
-            // println!("{}", rigidbod.f_speed); //becomes infinite and then nan...
+            // println!("{}", rigidbod.f_speed); 
     
             //get euler angles for our info
             let euler = rigidbod.q_orientation_unit.euler_angles();
@@ -801,7 +801,17 @@ impl<'a> System<'a> for SendPacket
 
             //Print some relevant data
             disable_raw_mode().unwrap(); //Get out of raw mode to print clearly
-            println!("{:#?}", rigidbod);
+            //println!("{:#?}", rigidbod);
+
+            println!("position: {:?}", rigidbod.v_position);
+            println!("velocity: {:?}", rigidbod.v_velocity);
+            println!("velocity body: {:?}", rigidbod.v_velocity_body);
+            println!("angular velocity: {:?}", rigidbod.v_angular_velocity);
+            println!("euler angles: {:?}", rigidbod.v_euler_angles);
+            println!("speed: {:?}", rigidbod.f_speed);
+            println!("unit quaternion: {:?}", rigidbod.q_orientation_unit);
+            println!("forces: {:?}", rigidbod.v_forces);
+            println!("moments: {:?}", rigidbod.v_moments);
             //println!("time = {}", outdata.s);
             //println!("x traveled (m) = {}", outdata.q[1] / 3.6); //converted to meters
             //println!("{}", rigidbod.v_position);
