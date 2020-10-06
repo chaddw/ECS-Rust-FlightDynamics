@@ -107,21 +107,21 @@ struct RigidBody
     mass: f64, //total mass
     m_inertia: Matrix3<f64>,
     m_inertia_inverse: Matrix3<f64>,
-    v_position: Vector3<f64>,          // position in earth coordinates
-    v_velocity: Vector3<f64>,          // velocity in earth coordinates
+    v_position: Vector3<f64>,           // position in earth coordinates
+    v_velocity: Vector3<f64>,           // velocity in earth coordinates
     v_velocity_body: Vector3<f64>,      // velocity in body coordinates
     v_angular_velocity: Vector3<f64>,   // angular velocity in body coordinates
     v_euler_angles: Vector3<f64>,       // Euler angles in body coordinates
-    f_speed: f64,                // speed (magnitude of the velocity)
+    f_speed: f64,                       // speed (magnitude of the velocity)
     stalling: bool,
     flaps: bool,
     q_orientation: Quaternion<f64>,
-    q_orientation_unit: UnitQuaternion<f64>,   // orientation in earth coordinates
-    v_forces: Vector3<f64>,            // total force on body
-    thrustforce: f64,           //magnitude of thrust
-    v_moments: Vector3<f64>,          // total moment (torque) on body
+    q_orientation_unit: UnitQuaternion<f64>,    // orientation in earth coordinates
+    v_forces: Vector3<f64>,                     // total force on body
+    thrustforce: f64,                           //magnitude of thrust
+    v_moments: Vector3<f64>,                    // total moment (torque) on body
 
-    element: Vec<PointMass> //vector of point mass elements
+    element: Vec<PointMass>                     //vector of point mass elements
 }
 impl Component for RigidBody
 {
@@ -225,7 +225,7 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
 
 
 
-//MASS PROP ONLY CALLED ONCE AT BEGGINING
+//MASS PROPERTIES ONLY CALLED ONCE AT BEGGINING
 fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
 {
     //println!("{}", "calculating mass properties...");
@@ -354,7 +354,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     //Define thrust vector, which acts throguh the plane's center of gravity
     let mut thrust = Vector3::new(1.0, 0.0, 0.0);
     thrust = thrust * rigidbod.thrustforce; 
-    //println!("{}", rigidbod.thrustforce);
+    //println!("{}", thrust);
 
     //Calculate forces and moments in body space
     let mut v_local_velocity = Vector3::new(0.0, 0.0, 0.0);
@@ -364,10 +364,10 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     let mut f_attack_angle: f64 = 0.0;
     let mut tmp: f64 = 0.0;
     let mut v_resultant= Vector3::new(0.0, 0.0, 0.0);
-    let mut vtmp = Vector3::new(50.0, 0.0, 0.0);
+    let mut vtmp = Vector3::new(0.0, 0.0, 0.0);
     rigidbod.stalling = false;
 
-    //loop through the 7 lifting elements, skipping the fuselage (8th element)
+    //Loop through the 7 lifting elements, skipping the fuselage (8th element)
     for i in 0..7 
     {
         if i == 6 //Tail rudder. its a special case because it can rotate, so the normal vector is recalculated
@@ -376,47 +376,55 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
             let di: f64 = (rigidbod.element[i].f_dihedral).to_radians();
             rigidbod.element[i].v_normal = Vector3::new(inn.sin(), inn.cos() * di.sin(), inn.cos() * di.cos());
             rigidbod.element[i].v_normal = rigidbod.element[i].v_normal.normalize(); //NORMALIZE DOESNT SEEM TO BE AN ISSUE HERE...
-           // println!("{}", rigidbod.element[i].v_normal);
+            //println!("{}", rigidbod.element[i].v_normal);
         }
 
        
-        //calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
+         //Calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
        
-        //rotation part
-
-        
+        //Rotation part
         vtmp = rigidbod.v_angular_velocity.cross(&rigidbod.element[i].v_cg_coords); //crossproduct
-       // println!("{}", rigidbod.v_angular_velocity); //bad after first eom loop
-        //println!("{}", vtmp); //BAD AFTER FIRST
-        //println!("{}", rigidbod.element[i].v_cg_coords); ALWAYS WORKS
+        // println!("{}", rigidbod.v_angular_velocity); 
+        // println!("{}", vtmp); 
+        //println!("{}", rigidbod.element[i].v_cg_coords); 
 
         v_local_velocity = rigidbod.v_velocity_body + vtmp;
+        //println!("{}", v_local_velocity);
 
-        //calculate local air speed
-        // println!("{}", f_local_speed); ////bad after first loop, but bad for all EXCEPT first element in loop,
-        // println!("{}", rigidbod.v_velocity_body); ////bad after first eom loop
-        f_local_speed = rigidbod.v_velocity_body.magnitude();
-        // println!("{}", f_local_speed); //bad after first eom loop
+        //Calculate local air speed
+        // println!("{}", f_local_speed);
+        // println!("{}", rigidbod.v_velocity_body); 
 
-        //find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
+
+        f_local_speed = rigidbod.v_velocity_body.magnitude(); //THIS LINE IS VERY BAD
+        //f_local_speed = (rigidbod.v_velocity_body.x * rigidbod.v_velocity_body.x + rigidbod.v_velocity_body.y * rigidbod.v_velocity_body.y + rigidbod.v_velocity_body.z * rigidbod.v_velocity_body.z).sqrt();
+        //println!("{}", f_local_speed); 
+         // println!("{}", rigidbod.v_velocity_body); 
+
+        //Find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
         if f_local_speed > 1.0
         {
             //flocal speed probably messing up vdrag vector
             v_drag_vector = -v_local_velocity / f_local_speed;
+
         }
+       // println!("{}", v_drag_vector);
 
-
-        //find direction that lift will act. lift is perpendicular to the drag vector
-        //(i think there is a problem with normalizing)
+        //Find direction that lift will act. lift is perpendicular to the drag vector
       
         //v_lift_vector = (v_drag_vector.cross(&rigidbod.element[i].v_normal)).cross(&v_drag_vector);
         let lift_tmp = v_drag_vector.cross(&rigidbod.element[i].v_normal);
         v_lift_vector = lift_tmp.cross(&v_drag_vector);
-        //println!("{}", v_lift_vector);
-        tmp = v_lift_vector.magnitude();
-        //println!("{}", tmp); //alwaysok
+        //println!("{}", v_drag_vector);  
+        //println!("{}", v_lift_vector); 
 
-        //v_lift_vector = v_lift_vector.normalize(); //THIS WAS THE ONE LINE MESSING EVERYTHIGN UP //////////////////////////!!!!!!!!!!!!!!!!!!!!!!
+        tmp = v_lift_vector.magnitude(); 
+        //tmp = (v_lift_vector.x * v_lift_vector.x + v_lift_vector.y * v_lift_vector.y + v_lift_vector.z * v_lift_vector.z).sqrt();
+        //println!("{}", tmp); //THIS LINE IS VERY BAD (WITHOUT MAGNITUDE IT GETS HUGE)
+
+        //v_lift_vector = v_lift_vector.normalize(); //THIS WAS ONE LINE MESSING EVERYTHIGN UP //////////////////////////!!!!!!!!!!!!!!!!!!!!!!
+        //now i have everything becoming nan later
+        //println!("{}", v_lift_vector);
   
         //FINDING NORMALIZED VECTOR BY HAND BECAUSE FOR SOME REASON THE ABOVE LINE SPITS OUT NAN
         let tol:f64 = 0.0001;
@@ -440,11 +448,11 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         {
             v_lift_vector.z = 0.0;
         }
-       // println!("{}", v_lift_vector);
+        //println!("{}", v_lift_vector);
 
-        //find the angle of attack. its the angle between the lfit vector and eelement normal vector. 
+        //Find the angle of attack. its the angle between the lift vector and element normal vector 
         tmp = v_drag_vector.dot(&rigidbod.element[i].v_normal);
-        //println!("{}", tmp); nevr seems bad (until later)
+       // println!("{}", tmp);
         if tmp > 1.0
         {
             tmp = 1.0;
@@ -455,51 +463,56 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         }
 
         f_attack_angle = (tmp.sin()).to_radians();
+        // println!("{}", f_attack_angle);
 
-        //determine lift and drag force on the element (rho is 1.225 in the book)
-        // println!("{}", f_local_speed); ////bad after first eom loop
+
+        //Determine lift and drag force on the element (rho is 1.225 in the book)
+        //println!("{}", f_local_speed); 
         tmp = 0.5 * 1.225 * f_local_speed * f_local_speed * rigidbod.element[i].f_area;
-         //println!("{}", tmp); ////bad after first eom loop
-        //println!("{}", v_resultant); //only good for first element every time, so after ti goes thru else it gets messed up
+        //println!("{}", tmp); 
+        //println!("{}", v_resultant);
+        
         if i == 6 //tail/ rudder
         {
             v_resultant = (v_lift_vector * rudder_lift_coefficient(f_attack_angle) + v_drag_vector * rudder_drag_coefficient(f_attack_angle)) * tmp;
         }
         else
         {
-            
             v_resultant = (v_lift_vector * lift_coefficient(f_attack_angle, rigidbod.element[i].i_flap) + v_drag_vector * drag_coefficient(f_attack_angle, rigidbod.element[i].i_flap)) * tmp;
-            //println!("{}", v_resultant); //always bad below this line, but its good for first element when above this line GETTING RID OF NORMALIZE ON VLIFT VECTOR HELPEDF
         }
-        
+        //println!("{}", v_resultant);
 
-        //check for stall. if the coefficient of lift is 0, stall is occuring.
+        //Check for stall. if the coefficient of lift is 0, stall is occuring.
         if lift_coefficient(f_attack_angle, rigidbod.element[i].i_flap) == 0.0
         {
             rigidbod.stalling = true; 
         }
 
-        //keep running total of resultant forces (total force)
+        //Keep running total of resultant forces (total force)
         fb = fb + v_resultant;
 
         //println!("{}", fb);
 
         //calculate the moment about the center of gravity of this element's force and keep them in a running total of these moments (total moment)
         vtmp = rigidbod.element[i].v_cg_coords.cross(&v_resultant);
-        //println!("{}", rigidbod.element[i].v_cg_coords); //this is fine
-         //println!("{}", vtmp); //bad always!
-         //println!("{}", v_resultant); //bad always!!!!!
+        //println!("{}", rigidbod.element[i].v_cg_coords); 
+        //println!("{}", vtmp); 
+        //println!("{}", v_resultant); 
 
         mb = mb + vtmp;
+        //println!("{}", mb);
+
     }
 
-    //add thrust
+    //Add thrust
     fb = fb + thrust;
+    //println!("{}", fb);
 
     //DID THIS FIRST
-     //convert forces from model space to earth space. rotates the vector by the unit quaternion (QVRotate function)
-    //this should ne doing this to the regular quaterinon... (QVRotate)
-     rigidbod.v_forces = rigidbod.q_orientation_unit.transform_vector(&fb); //i think this messes everything up because we need to be working on the non unit version right now
+    //Convert forces from model space to earth space. rotates the vector by the unit quaternion (QVRotate function)
+    rigidbod.v_forces = rigidbod.q_orientation_unit.transform_vector(&fb); //this doesnt play well with unit q later on..
+    //println!("{}", rigidbod.q_orientation_unit);
+    //println!("{}", rigidbod.v_forces);
 
     //THEN TRIED THIS
     //Doing QVRotate by hand w/o using unit quaternion. I cannot multiply fb by the quaternion so i will put fb into a quaternion first and then multiply
@@ -523,10 +536,14 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
 
 
     //apply gravity (g is -32.174 ft/s^2)
-    rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
+    //rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
+    //println!("{}", rigidbod.v_forces);
 
     rigidbod.v_moments = rigidbod.v_moments + mb;
-   // println!("{}", rigidbod.v_moments);
+    //println!("{}", rigidbod.v_moments);
+
+
+
 }
 
 
@@ -633,26 +650,34 @@ impl<'a> System<'a> for EquationsOfMotion
             calc_airplane_loads(&mut rigidbod);
 
             //println!("{:#?}", rigidbod);
-    
+
+
             //Calculate acceleration of airplane in earth coordinates
             let ae: Vector3<f64> = rigidbod.v_forces / rigidbod.mass;
-           // println!("{}", rigidbod.v_forces); //this goes bad after first eom
-    
+            //println!("{}", rigidbod.v_forces);
+           // println!("{}", ae);
+            //println!("{}", rigidbod.mass);
+
             //Calculate velocity of airplane in earth coordinates
-            rigidbod.v_velocity = rigidbod.v_velocity + ae * DT;
-            //println!("{}", rigidbod.v_velocity); //this goes bad after first eom
+            rigidbod.v_velocity = rigidbod.v_velocity + ae * DT; //this doesnt seem correct...
+            //println!("{}", rigidbod.v_velocity); 
     
             //Calculate position of airplane in earth coordinates
             rigidbod.v_position = rigidbod.v_position + rigidbod.v_velocity * DT;
-           // println!("{}", rigidbod.v_position); //this goes bad after first eom
+            //gravity was automatically acting on the plane on the ground
+            if rigidbod.v_position.z < 3038225.36497236 //starting altitude in geodetic...
+            {
+                rigidbod.v_position.z = 3038225.36497236; //set it back to start altitude
+            }
+           // println!("{}", rigidbod.v_position);
     
             //Now handle rotations
             let mut mag: f64 = 0.0;
     
             //Calculate angular velocity of airplane in body coordinates
             rigidbod.v_angular_velocity = rigidbod.v_angular_velocity + rigidbod.m_inertia_inverse * ( rigidbod.v_moments - ( rigidbod.v_angular_velocity.cross(&(rigidbod.m_inertia * rigidbod.v_angular_velocity)))) * DT;
-           // println!("{}", rigidbod.v_angular_velocity); //this is always bad
-            //println!("{}", rigidbod.v_moments); //ALWAYS BAD!
+            //println!("{}", rigidbod.v_angular_velocity); 
+            //println!("{}", rigidbod.v_moments);
     
             //Calculate the new rotation quaternion
             //we need angular velocity to be in a quaternion form for the multiplication.... ( i think this gives an accurate result...) because 
@@ -674,38 +699,36 @@ impl<'a> System<'a> for EquationsOfMotion
             let ang_q_tmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
             //do the operations for new rotation quaternion based on angular velocity
             let new_unitq_to_q = unitq_to_q + (unitq_to_q * ang_q_tmp) * (0.5 * DT); 
+            //println!("{}", unitq_to_q); 
+            //println!("{}", ang_q_tmp);
             //println!("{}", new_unitq_to_q);
 
-            //println!("{}", unitq_to_q); //1-000
-            //println!("{}", ang_q_tmp);//1-nnn angular velocity must be bad
-            //println!("{}", new_unitq_to_q);// n-nnn
             //Now normalize the orientation quaternion (make into unit quaternion)
             //TRIED THIS FIRST
             //rigidbod.q_orientation_unit = UnitQuaternion::new_normalize(rigidbod.q_orientation);
-            // println!("{}", rigidbod.q_orientation_unit); //always bad
+            // println!("{}", rigidbod.q_orientation_unit);
 
             //TRYING THIS SECOND
             //take quaternion created above to the new unit quaternion (input gets normalized)
             rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(new_unitq_to_q);
             //println!("{}", rigidbod.q_orientation_unit);
     
-            //calculate the velocity in body coordinates
+            //Calculate the velocity in body coordinates
             rigidbod.v_velocity_body = (rigidbod.q_orientation_unit.conjugate()).transform_vector(&rigidbod.v_velocity);
-            //println!("{}", rigidbod.v_velocity_body); //always bad
-    
+            //println!("{}", rigidbod.v_velocity_body); //THIS GOES BACK TO VVELOCITY AND AE FROM UP THERE THAT DIDTN SEEM RIGHT
+            //GOT RID OF GRAVITY ADDITION IN CAL LOADS FOR NOW
     
             //calculate air speed
-            rigidbod.f_speed = rigidbod.v_velocity.magnitude();
-           // println!("{}", rigidbod.f_speed); //this goes bad after first eom
+            rigidbod.f_speed = rigidbod.v_velocity.magnitude(); //THIS LINE IS VERY BAD
+            // rigidbod.f_speed = (rigidbod.v_velocity.x * rigidbod.v_velocity.x + rigidbod.v_velocity.y * rigidbod.v_velocity.y + rigidbod.v_velocity.z * rigidbod.v_velocity.z).sqrt();
+            // println!("{}", rigidbod.f_speed); //becomes infinite and then nan...
     
             //get euler angles for our info
             let euler = rigidbod.q_orientation_unit.euler_angles();
             rigidbod.v_euler_angles.x = euler.0; //roll
             rigidbod.v_euler_angles.y = euler.1; //pitch
             rigidbod.v_euler_angles.z = euler.2; //yaw
-
-            
-            //println!("{:?}", euler); //roll is always bad
+            //println!("{:?}", euler); 
     
 
         }//end for
@@ -748,7 +771,7 @@ impl<'a> System<'a> for SendPacket
             fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
             fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
             fdm.altitude = f64::from_be_bytes(lla.z.to_ne_bytes()); //lla.z seems to increase altitude artificially...
-
+           // println!("{}", lla.z);
             //Roll, Pitch, Yaw
             fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
             fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
@@ -1004,11 +1027,11 @@ fn main()
                                         0.0, 0.0, 0.0,
                                         0.0, 0.0, 0.0),
         v_position: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236),        //set initial position
-        v_velocity: Vector3::new(60.0, 0.0, 0.0),        //set initial velocity
-        v_euler_angles: Vector3::new(0.0, 0.0,0.0), //not defined in book here
-        f_speed: 60.0,
+        v_velocity: Vector3::new(0.0, 0.0, 0.0),        //set initial velocity //was 60 in x...
+        v_euler_angles: Vector3::new(0.0, 0.0, 0.0), //not defined in book here
+        f_speed: 0.0, //was 60..
         v_angular_velocity: Vector3::new(0.0, 0.0, 0.0),        //set angular velocity
-        v_forces: Vector3::new(500.0, 0.0, 0.0),        //set initial thrust, forces, and moments
+        v_forces: Vector3::new(0.0, 0.0, 0.0),        //set initial thrust, forces, and moments //was 500 in x
         thrustforce: 0.0,   //this isnt written in the rigid body intiialization for some reason...
         v_moments: Vector3::new(0.0, 0.0, 0.0),
         v_velocity_body: Vector3::new(0.0, 0.0, 0.0),        //zero the velocity in body space coordinates
