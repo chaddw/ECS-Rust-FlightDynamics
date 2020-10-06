@@ -510,7 +510,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
 
     //DID THIS FIRST
     //Convert forces from model space to earth space. rotates the vector by the unit quaternion (QVRotate function)
-    rigidbod.v_forces = rigidbod.q_orientation_unit.transform_vector(&fb); //this doesnt play well with unit q later on..
+    //rigidbod.v_forces = rigidbod.q_orientation_unit.transform_vector(&fb); 
     //println!("{}", rigidbod.q_orientation_unit);
     //println!("{}", rigidbod.v_forces);
 
@@ -518,16 +518,23 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     //Doing QVRotate by hand w/o using unit quaternion. I cannot multiply fb by the quaternion so i will put fb into a quaternion first and then multiply
     //Doing all this because we arent doing stuff with unit quaternion yet
     //THIS WOULD BE JUST USING REGULAR QUAT UNTIL I HAVE TO USE UNIT
-    // let fbtmp =  Quaternion::new(0.0, fb.x, fb.y, fb.z);   
-    // let quatmp = rigidbod.q_orientation * fbtmp * rigidbod.q_orientation.conjugate();
-    // let vectmp = quatmp.as_vector();
-    // rigidbod.v_forces = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);  // Recall that the quaternion is stored internally as (i, j, k, w)
-    //                                                                     // while the crate::new constructor takes the arguments as (w, i, j, k).
+    //quat*quat
+    let fbtmp =  Quaternion::new(0.0, fb.x, fb.y, fb.z);   //make a quaternion with scalar 0
+    let quatmp = rigidbod.q_orientation * fbtmp * rigidbod.q_orientation.conjugate();
+    let vectmp = quatmp.vector();
+    rigidbod.v_forces = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);  // Recall that the quaternion is stored internally as (i, j, k, w)
+                                                                        // while the crate::new constructor takes the arguments as (w, i, j, k).
+    //OR vec*vec (doesnt work "as well" as above)
+    // let qvec = rigidbod.q_orientation.vector(); //make vec out of quaternion (dont need scalar)
+    // let qvec3 = Vector3::new(qvec[0], qvec[1], qvec[2]); //populate nalgebra vec with the values
+    // let qvec3_conj = Vector3::new(-qvec[0], -qvec[1], -qvec[2]);
+    // rigidbod.v_forces = (qvec3.cross(&fb)).cross(&qvec3_conj);
+
 
     // //NOW TRY THIS THIRD
     // //convert q orientatino to a unit quaternion in order to do the transform_vector call
-    // let quat_to_unit = UnitQuaternion::from_quaternion(rigidbod.q_orientation); 
-    // rigidbod.v_forces = quat_to_unit.transform_vector(&fb);
+    //let quat_to_unit = UnitQuaternion::from_quaternion(rigidbod.q_orientation); 
+    //rigidbod.v_forces = quat_to_unit.transform_vector(&fb);
 
     //TRY FOURTH
     //TAKE UNIT QUATERNION, MAKE QUATERNION OUT OF IT (WITH SCALAR 0), AND THEN MAKE QUATERNION OUT OF FB IN ORDER TO DO QVROATE BY HAND FOR VFORCES
@@ -685,38 +692,57 @@ impl<'a> System<'a> for EquationsOfMotion
             //so im going to create Quaternion based on the angular velocity ( i hope this math works out properly given the work around with nalgbra...) if not ill have to do it by hand
             //I think this is correct and ok because Bourgs book has a vector * quaternion function: "This operator multiplies the quaternion q by the vector v as though the vector v were a quaternion with its scalar component equal to 0.
 
+
             //TRIED THIS FIRST
-            //making the quaternion based on angular velocity and scalar as 0
-            // let qtmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
-            // rigidbod.q_orientation = rigidbod.q_orientation + (rigidbod.q_orientation * qtmp) * (0.5 * DT); 
-            // //println!("{}", qtmp);
+            //making the quaternion based on angular velocity and scalar as 0 (because we cant just multiply quaternion by vector, but we can multiply quaternion by quaternion)
+            let qtmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
+            rigidbod.q_orientation = rigidbod.q_orientation + (rigidbod.q_orientation * qtmp) * (0.5 * DT); 
+            //println!("{}", qtmp);
             //println!("{}", rigidbod.q_orientation); 
 
             //TRY THIS SECOND
             //make quaternion from the unit quaternion
-            let unitq_to_q = UnitQuaternion::quaternion(&rigidbod.q_orientation_unit);
+           ///////let unitq_to_q = UnitQuaternion::quaternion(&rigidbod.q_orientation_unit);
             //make a quaternion based on angular velocity (scalar is 0)
-            let ang_q_tmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
+            //////////let ang_q_tmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
             //do the operations for new rotation quaternion based on angular velocity
-            let new_unitq_to_q = unitq_to_q + (unitq_to_q * ang_q_tmp) * (0.5 * DT); 
+           /////////let new_unitq_to_q = unitq_to_q + (unitq_to_q * ang_q_tmp) * (0.5 * DT); 
             //println!("{}", unitq_to_q); 
             //println!("{}", ang_q_tmp);
             //println!("{}", new_unitq_to_q);
 
             //Now normalize the orientation quaternion (make into unit quaternion)
             //TRIED THIS FIRST
-            //rigidbod.q_orientation_unit = UnitQuaternion::new_normalize(rigidbod.q_orientation);
+           // rigidbod.q_orientation_unit = UnitQuaternion::new_normalize(rigidbod.q_orientation);
             // println!("{}", rigidbod.q_orientation_unit);
 
             //TRYING THIS SECOND
             //take quaternion created above to the new unit quaternion (input gets normalized)
-            rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(new_unitq_to_q);
+            /////////////rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(new_unitq_to_q);
             //println!("{}", rigidbod.q_orientation_unit);
-    
+
+            //TRYING THIS THIRD
+            //take the quaternion that we track and make it into unit. this will update each loop
+            rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(rigidbod.q_orientation);
+            
+            //TRYING THIS FOURTH
+            //dont actually make a unit quaternion... just normalize the regular one
+            //rigidbod.q_orientation = rigidbod.q_orientation.normalize();
+
             //Calculate the velocity in body coordinates
+            //TRYING FIRST TO USE THE VECTOR TRANSFORM
             rigidbod.v_velocity_body = (rigidbod.q_orientation_unit.conjugate()).transform_vector(&rigidbod.v_velocity);
             //println!("{}", rigidbod.v_velocity_body); 
             //GOT RID OF GRAVITY ADDITION IN CAL LOADS FOR NOW
+
+            //SECOND TRYING TO DO QVROTATE BY HAND (MAYBE DONT MAKE UNIT VECTOR UNTIL AFTER QVROTATE BY HAND, OR NORMALIZE REGULAR QUATERNINO AND DO QVR ROTATE BY HAND)
+            // let veltmp =  Quaternion::new(0.0, rigidbod.v_velocity.x, rigidbod.v_velocity.y, rigidbod.v_velocity.z);   
+            // let quatmp = rigidbod.q_orientation * veltmp * rigidbod.q_orientation.conjugate();
+            // let vectmp = quatmp.vector();
+            // rigidbod.v_velocity_body = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);
+
+
+
     
             //calculate air speed
             rigidbod.f_speed = rigidbod.v_velocity.magnitude(); 
@@ -810,6 +836,7 @@ impl<'a> System<'a> for SendPacket
             println!("euler angles: {:?}", rigidbod.v_euler_angles);
             println!("speed: {:?}", rigidbod.f_speed);
             println!("unit quaternion: {:?}", rigidbod.q_orientation_unit);
+            println!("quaternion: {:?}", rigidbod.q_orientation);
             println!("forces: {:?}", rigidbod.v_forces);
             println!("moments: {:?}", rigidbod.v_moments);
             //println!("time = {}", outdata.s);
@@ -1007,7 +1034,7 @@ lazy_static!
 }
 
 //Time in between each eom calculation
-static DT: f64 = 0.5; //0.0167 
+static DT: f64 = 0.0167;
 fn main()
 {
     //Create world
@@ -1048,8 +1075,8 @@ fn main()
         //set these to false at first, will control later with keyboard... these are not defined in the structure
         stalling: false,
         flaps: false,
-        q_orientation: Quaternion::new(0.0, 0.0, 0.0, 0.0), //start with something
-        q_orientation_unit: UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0), //UnitQuaternion::new_normalize(Quaternion::new(0.0, 0.0, 0.0, 0.0)),
+        q_orientation: Quaternion::new(1.0, 0.0, 0.0, 0.0), //start with something
+        q_orientation_unit: UnitQuaternion::identity(),//UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0), //UnitQuaternion::new_normalize(Quaternion::new(0.0, 0.0, 0.0, 0.0)),
         element: vec![
             PointMass{f_mass: 6.56, v_d_coords: Vector3::new(14.5, 12.0, 2.5), v_local_inertia: Vector3::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
             PointMass{f_mass: 7.31, v_d_coords: Vector3::new(14.5, 5.5, 2.5), v_local_inertia: Vector3::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
