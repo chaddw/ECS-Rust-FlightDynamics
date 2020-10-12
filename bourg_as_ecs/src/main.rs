@@ -121,7 +121,9 @@ struct RigidBody
     thrustforce: f64,                           //magnitude of thrust
     v_moments: Vector3<f64>,                    // total moment (torque) on body
 
-    element: Vec<PointMass>                     //vector of point mass elements
+    element: Vec<PointMass>,                     //vector of point mass elements
+
+    delta_x_pos: f64
 }
 impl Component for RigidBody
 {
@@ -334,14 +336,11 @@ fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
 
 
 
-
-
-
-
 //FORCES
 //calculates all of the forces and moments on the plane at any time (called inside eom system)
 fn calc_airplane_loads(rigidbod: &mut RigidBody)
 {
+
     //println!("{}", "calculating forces...");
 
     let mut fb = Vector3::new(0.0, 0.0, 0.0);
@@ -359,8 +358,8 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     //Calculate forces and moments in body space
     let mut v_local_velocity = Vector3::new(0.0, 0.0, 0.0);
     let mut f_local_speed: f64 = 0.0;
-    let mut v_drag_vector = Vector3::new(0.0, 0.0, 0.0);
-    let mut v_lift_vector = Vector3::new(0.0, 0.0, 0.0);
+    let mut v_drag_vector = Vector3::new(1.0, 1.0, 1.0); //VERY IMPORTANT THAT THESE WERE SET TO 1.0...
+    let mut v_lift_vector = Vector3::new(1.0, 1.0, 1.0);
     let mut f_attack_angle: f64 = 0.0;
     let mut tmp: f64 = 0.0;
     let mut v_resultant= Vector3::new(0.0, 0.0, 0.0);
@@ -376,79 +375,77 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
             let di: f64 = (rigidbod.element[i].f_dihedral).to_radians();
             rigidbod.element[i].v_normal = Vector3::new(inn.sin(), inn.cos() * di.sin(), inn.cos() * di.cos());
             rigidbod.element[i].v_normal = rigidbod.element[i].v_normal.normalize(); //normalize not an issue here..
-            //println!("{}", rigidbod.element[i].v_normal);
+            //println!("{}", inn);
+            //println!("{}", di);
         }
-
+           // println!("{}", rigidbod.element[i].v_normal);
+            
        
         //Calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
        
         //Rotation part
-        vtmp = rigidbod.v_angular_velocity.cross(&rigidbod.element[i].v_cg_coords); //crossproduct
+        vtmp = rigidbod.v_angular_velocity.cross(&rigidbod.element[i].v_cg_coords); 
         // println!("{}", rigidbod.v_angular_velocity); 
         // println!("{}", vtmp); 
         //println!("{}", rigidbod.element[i].v_cg_coords); 
 
         v_local_velocity = rigidbod.v_velocity_body + vtmp;
-        //println!("{}", v_local_velocity);
+       // println!("{}", v_local_velocity);
+        //println!("{}", f_local_speed);
+       // println!("{}", rigidbod.v_velocity_body); 
 
         //Calculate local air speed
-        // println!("{}", f_local_speed);
-        // println!("{}", rigidbod.v_velocity_body); 
-
-
-        f_local_speed = rigidbod.v_velocity_body.magnitude(); //THIS LINE IS VERY BAD
-        //f_local_speed = (rigidbod.v_velocity_body.x * rigidbod.v_velocity_body.x + rigidbod.v_velocity_body.y * rigidbod.v_velocity_body.y + rigidbod.v_velocity_body.z * rigidbod.v_velocity_body.z).sqrt();
+        f_local_speed = rigidbod.v_velocity_body.magnitude(); 
         //println!("{}", f_local_speed); 
          // println!("{}", rigidbod.v_velocity_body); 
+
 
         //Find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
         if f_local_speed > 1.0
         {
-            //flocal speed probably messing up vdrag vector
             v_drag_vector = -v_local_velocity / f_local_speed;
-
         }
-       // println!("{}", v_drag_vector);
+        //println!("{}", v_drag_vector);
+       
 
         //Find direction that lift will act. lift is perpendicular to the drag vector
-      
         //v_lift_vector = (v_drag_vector.cross(&rigidbod.element[i].v_normal)).cross(&v_drag_vector);
         let lift_tmp = v_drag_vector.cross(&rigidbod.element[i].v_normal);
         v_lift_vector = lift_tmp.cross(&v_drag_vector);
         //println!("{}", v_drag_vector);  
-        //println!("{}", v_lift_vector); 
+       // println!("{}", v_lift_vector); 
+
 
         tmp = v_lift_vector.magnitude(); 
-        //tmp = (v_lift_vector.x * v_lift_vector.x + v_lift_vector.y * v_lift_vector.y + v_lift_vector.z * v_lift_vector.z).sqrt();
-        //println!("{}", tmp); //THIS LINE IS VERY BAD (WITHOUT MAGNITUDE IT GETS HUGE)
+       // tmp = (v_lift_vector.x * v_lift_vector.x + v_lift_vector.y * v_lift_vector.y + v_lift_vector.z * v_lift_vector.z).sqrt();
+        //println!("{}", tmp); 
 
-        //v_lift_vector = v_lift_vector.normalize(); //THIS WAS ONE LINE MESSING EVERYTHIGN UP //////////////////////////!!!!!!!!!!!!!!!!!!!!!!
-        //now i have everything becoming nan later
+        v_lift_vector = v_lift_vector.normalize(); //THIS WAS ONE LINE MESSING EVERYTHIGN UP //////////////////////////!!!!!!!!!!!!!!!!!!!!!!
         //println!("{}", v_lift_vector);
   
         //FINDING NORMALIZED VECTOR BY HAND BECAUSE FOR SOME REASON THE ABOVE LINE SPITS OUT NAN
-        let tol:f64 = 0.0001;
-        let mut m: f64 = (v_lift_vector.x * v_lift_vector.x + v_lift_vector.y * v_lift_vector.y + v_lift_vector.z * v_lift_vector.z).sqrt();
-        if m <= tol
-        {
-             m = 1.0;
-        }
-        v_lift_vector.x /= m;
-        v_lift_vector.y /= m;
-        v_lift_vector.z /= m;
-        if v_lift_vector.x.abs() < tol 
-        {
-            v_lift_vector.x = 0.0;
-        }
-        if v_lift_vector.y.abs() < tol
-        { 
-            v_lift_vector.y = 0.0;
-        }
-        if v_lift_vector.z.abs() < tol
-        {
-            v_lift_vector.z = 0.0;
-        }
-        //println!("{}", v_lift_vector);
+        // let tol:f64 = 0.0001;
+        // let mut m: f64 = (v_lift_vector.x * v_lift_vector.x + v_lift_vector.y * v_lift_vector.y + v_lift_vector.z * v_lift_vector.z).sqrt();
+        // if m <= tol
+        // {
+        //      m = 1.0;
+        // }
+        // v_lift_vector.x /= m;
+        // v_lift_vector.y /= m;
+        // v_lift_vector.z /= m;
+        // if v_lift_vector.x.abs() < tol 
+        // {
+        //     v_lift_vector.x = 0.0;
+        // }
+        // if v_lift_vector.y.abs() < tol
+        // { 
+        //     v_lift_vector.y = 0.0;
+        // }
+        // if v_lift_vector.z.abs() < tol
+        // {
+        //     v_lift_vector.z = 0.0;
+        // }
+        // println!("{}", v_lift_vector);
 
         //Find the angle of attack. its the angle between the lift vector and element normal vector 
         tmp = v_drag_vector.dot(&rigidbod.element[i].v_normal);
@@ -462,16 +459,19 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
             tmp = -1.0;
         }
 
+        //ZERO BECAUSE TMP IS ZERO... AND THATS CUZ DRAG VECTOR IS ZERO...
         f_attack_angle = (tmp.sin()).to_radians();
         // println!("{}", f_attack_angle);
 
-
+///////////////////////TMP ACTUALLY IS SOMETHING as of now, but 
         //Determine lift and drag force on the element (rho is 1.225 in the book)
         //println!("{}", f_local_speed); 
         tmp = 0.5 * 1.225 * f_local_speed * f_local_speed * rigidbod.element[i].f_area;
         //println!("{}", tmp); 
         //println!("{}", v_resultant);
         
+
+        //TMP IS SOMETHING RIGHT NOW BUT V DRAG VECTOR AND LIFT VECTOR ARE ZERO SO V RESULTANT WILL ALWAYS BE ZERO
         if i == 6 //tail/ rudder
         {
             v_resultant = (v_lift_vector * rudder_lift_coefficient(f_attack_angle) + v_drag_vector * rudder_drag_coefficient(f_attack_angle)) * tmp;
@@ -480,7 +480,11 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         {
             v_resultant = (v_lift_vector * lift_coefficient(f_attack_angle, rigidbod.element[i].i_flap) + v_drag_vector * drag_coefficient(f_attack_angle, rigidbod.element[i].i_flap)) * tmp;
         }
-        //println!("{}", v_resultant);
+        // println!("lift {}", v_lift_vector);
+        // println!("drag {}", v_drag_vector);
+        // println!("flap {}", rigidbod.element[i].i_flap);
+        // println!("atk angle {}", f_attack_angle);
+       // println!("resultant {}", v_resultant);
 
         //Check for stall. if the coefficient of lift is 0, stall is occuring.
         if lift_coefficient(f_attack_angle, rigidbod.element[i].i_flap) == 0.0
@@ -489,6 +493,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         }
 
         //Keep running total of resultant forces (total force)
+        //ALWAYS ZERO BECAUSE V LIFT VECTOR AND DRAG ARRE ALWAYS ZERO AND V RESULTANT IS BASED ON THAT AND SO ON FOR VTMP AND MB
         fb = fb + v_resultant;
 
         //println!("{}", fb);
@@ -502,7 +507,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         mb = mb + vtmp;
         //println!("{}", mb);
 
-    }
+     }
 
     //Add thrust
     fb = fb + thrust;
@@ -510,11 +515,12 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
 
     //DID THIS FIRST
     //Convert forces from model space to earth space. rotates the vector by the unit quaternion (QVRotate function)
+    //(the first try and next try have similar results in flightgear floatign around)
     //rigidbod.v_forces = rigidbod.q_orientation_unit.transform_vector(&fb); 
     //println!("{}", rigidbod.q_orientation_unit);
     //println!("{}", rigidbod.v_forces);
 
-    //THEN TRIED THIS
+    //THEN TRIED THIS SECOND
     //Doing QVRotate by hand w/o using unit quaternion. I cannot multiply fb by the quaternion so i will put fb into a quaternion first and then multiply
     //Doing all this because we arent doing stuff with unit quaternion yet
     //THIS WOULD BE JUST USING REGULAR QUAT UNTIL I HAVE TO USE UNIT
@@ -542,13 +548,19 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
 
 
 
-    //apply gravity (g is -32.174 ft/s^2)
-   // rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
-    //println!("{}", rigidbod.v_forces);
+    //apply gravity (g is -32.174 ft/s^2), ONLY APPLY WHEN ALTITUDE IS GREATER THAN ZERO
+
+    //rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
+    
+   // println!("{}", rigidbod.v_forces.z);
 
     rigidbod.v_moments = rigidbod.v_moments + mb;
     //println!("{}", rigidbod.v_moments);
 
+
+    //  println!("drag {}" ,v_drag_vector);
+    //  println!("lift {}", v_lift_vector);
+    // println!("{}", f_local_speed);
 
 
 }
@@ -575,6 +587,18 @@ impl<'a> System<'a> for EquationsOfMotion
             let max_thrust = 3000.0; //max thrustforce value
             let d_thrust = 100.0;   //change in thrust per keypress
 
+
+            //reset/zero the elevators, rudders, and ailerons
+            //rudder
+            rigidbod.element[6].f_incidence = 0.0;
+            //ailerons
+            rigidbod.element[0].i_flap = 0;
+            rigidbod.element[3].i_flap = 0;
+            //elevators
+            rigidbod.element[4].i_flap = 0;
+            rigidbod.element[5].i_flap = 0;
+
+
             //Handle the input states
             //Thrust states
             if rigidbod.thrustforce < max_thrust && keystate.thrust_up == true
@@ -597,10 +621,10 @@ impl<'a> System<'a> for EquationsOfMotion
             { 
                 rigidbod.element[6].f_incidence = -16.0;
             } 
-            else //if keystate.zero_rudder == true
-            { 
-                rigidbod.element[6].f_incidence = 0.0;
-            }
+            // else //if keystate.zero_rudder == true
+            // { 
+            //     rigidbod.element[6].f_incidence = 0.0;
+            // }
 
             //Roll States
             if keystate.roll_left == true
@@ -613,28 +637,30 @@ impl<'a> System<'a> for EquationsOfMotion
                 rigidbod.element[0].i_flap = -1;
                 rigidbod.element[3].i_flap = 1;
             } 
-            else //if keystate.zero_ailerons == true
-            { 
-                rigidbod.element[0].i_flap = 0;
-                rigidbod.element[3].i_flap = 0;
-            }
+            // else //if keystate.zero_ailerons == true
+            // { 
+            //     rigidbod.element[0].i_flap = 0;
+            //     rigidbod.element[3].i_flap = 0;
+            // }
 
             //Pitch States
             if keystate.pitch_up == true
             { 
                 rigidbod.element[4].i_flap = 1;
                 rigidbod.element[5].i_flap = 1;
+                //println!("{}", "PITCHING UP");
             } 
             else if keystate.pitch_down == true
             { 
                 rigidbod.element[4].i_flap = -1;
                 rigidbod.element[5].i_flap = -1;
+
             } 
-            else //if keystate.zero_elevators == true
-            { 
-                rigidbod.element[4].i_flap = 0;
-                rigidbod.element[5].i_flap = 0;
-            }
+            // else //if keystate.zero_elevators == true
+            // { 
+            //     rigidbod.element[4].i_flap = 0;
+            //     rigidbod.element[5].i_flap = 0;
+            //}
 
             //Flap States
             if keystate.flaps_down == true
@@ -643,50 +669,64 @@ impl<'a> System<'a> for EquationsOfMotion
                 rigidbod.element[2].i_flap = -1;
                 rigidbod.flaps = true;
             } 
-            else //if keystate.zero_flaps == true
+            else if keystate.zero_flaps == true //this is not the same as the zeroing done in the beggining each loop
             { 
                 rigidbod.element[1].i_flap = 0;
                 rigidbod.element[2].i_flap = 0;
-                rigidbod.flaps = false;
             } 
 
 
 
     
-            //Calculate all of the forces and moments on the airplane
+            //--------------------Calculate all of the forces and moments on the airplane
             calc_airplane_loads(&mut rigidbod);
 
             //println!("{:#?}", rigidbod);
 
 
-            //Calculate acceleration of airplane in earth coordinates
+            //--------------------Calculate acceleration of airplane in earth space
             let ae: Vector3<f64> = rigidbod.v_forces / rigidbod.mass;
             //println!("{}", rigidbod.v_forces);
            // println!("{}", ae);
             //println!("{}", rigidbod.mass);
 
-            //Calculate velocity of airplane in earth coordinates
-            rigidbod.v_velocity = rigidbod.v_velocity + ae * DT; //this doesnt seem correct...
+
+
+            //----------------Calculate velocity of airplane in earth space
+            rigidbod.v_velocity = rigidbod.v_velocity + ae * DT; 
             //println!("{}", rigidbod.v_velocity); 
     
-            //Calculate position of airplane in earth coordinates
+            //---------------Calculate position of airplane in earth space
             rigidbod.v_position = rigidbod.v_position + rigidbod.v_velocity * DT;
-            //gravity was automatically acting on the plane on the ground
-            if rigidbod.v_position.z < 3038225.36497236 //starting altitude in geodetic...
-            {
-                rigidbod.v_position.z = 3038225.36497236; //set it back to start altitude
-            }
+            //so that airplane does not fall below the ground...
+            // if rigidbod.v_position.z < 3038233.4//3038233.40847236
+            // {
+            //     println!("{}", "FALLING");
+            //     rigidbod.v_position.z = 3038233.40847236;
+            // }
+            //rigidbod.v_position.z = rigidbod.v_position.z - rigidbod.delta_x_pos;  
+            //GRAVITY, HEADING, ALTITUDE issues. always find ecef based on 0 altitude so take the new ecef with that new x val or y val
+            //need to find where altitude is calculated and could just use that like how 2d does it
+            //heading - where airplane positioned vs actually going
+
            // println!("{}", rigidbod.v_position);
     
-            //Now handle rotations
-            let mut mag: f64 = 0.0;
+            //Now handle rotations:
+            //let mut mag: f64 = 0.0;
     
-            //Calculate angular velocity of airplane in body coordinates
+            //Calculate angular velocity of airplane in body space
+            //TEST
+            //rigidbod.v_angular_velocity = Vector3::new(10.0, 10.0, 10.0);
             rigidbod.v_angular_velocity = rigidbod.v_angular_velocity + rigidbod.m_inertia_inverse * ( rigidbod.v_moments - ( rigidbod.v_angular_velocity.cross(&(rigidbod.m_inertia * rigidbod.v_angular_velocity)))) * DT;
             //println!("{}", rigidbod.v_angular_velocity); 
-            //println!("{}", rigidbod.v_moments);
+            // println!("{}", rigidbod.v_moments);
+            // println!("{}", rigidbod.m_inertia_inverse);
+            // println!("{}", rigidbod.m_inertia);
+
     
-            //Calculate the new rotation quaternion
+
+
+            //-----------------Calculate the new rotation quaternion
             //we need angular velocity to be in a quaternion form for the multiplication.... ( i think this gives an accurate result...) because 
             //nalgebra wont let me multiply the vector3 of angular velocity with the unit quaternion ( or a regular quaternion)
             //so im going to create Quaternion based on the angular velocity ( i hope this math works out properly given the work around with nalgbra...) if not ill have to do it by hand
@@ -702,18 +742,37 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //TRY THIS SECOND
             //make quaternion from the unit quaternion
-           ///////let unitq_to_q = UnitQuaternion::quaternion(&rigidbod.q_orientation_unit);
+           ////////////let unitq_to_q = UnitQuaternion::quaternion(&rigidbod.q_orientation_unit);
             //make a quaternion based on angular velocity (scalar is 0)
-            //////////let ang_q_tmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
+           /////////// let ang_q_tmp =  Quaternion::new(0.0, rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z);                    
             //do the operations for new rotation quaternion based on angular velocity
-           /////////let new_unitq_to_q = unitq_to_q + (unitq_to_q * ang_q_tmp) * (0.5 * DT); 
+           ////////////let new_unitq_to_q = unitq_to_q + (unitq_to_q * ang_q_tmp) * (0.5 * DT); 
             //println!("{}", unitq_to_q); 
             //println!("{}", ang_q_tmp);
             //println!("{}", new_unitq_to_q);
 
-            //Now normalize the orientation quaternion (make into unit quaternion)
+
+            //TRY THIS THIRD OCT 8TH
+            //make current quaternion into vector to multiply with angular veloocity
+            // let q_as_vec0 = rigidbod.q_orientation.vector();
+            // let mut q_as_vec = Vector3::new(q_as_vec0[0], q_as_vec0[1], q_as_vec0[2]);
+            // //now we have quaternion as a vector, so multiply it with angular velocity
+            // q_as_vec = q_as_vec + (q_as_vec.cross( &rigidbod.v_angular_velocity)) * (0.5 * DT);
+            // rigidbod.q_orientation =  Quaternion::new(1.0, q_as_vec.x, q_as_vec.y, q_as_vec.z);                  
+            
+            //TRY FOURTH OCT 8
+            //multiply unit vec based on angular velocity by the unit vec (THIS DOESNT WANT TO WORK CUZ CANT MULTIPLY UNIT VEC BY F64)
+            // let q_unit_tmp =  UnitQuaternion::new(Vector3::new(rigidbod.v_angular_velocity.x, rigidbod.v_angular_velocity.y, rigidbod.v_angular_velocity.z));                    
+            // rigidbod.q_orientation_unit = rigidbod.q_orientation_unit + (rigidbod.q_orientation_unit * q_unit_tmp) * (0.5 * DT); 
+
+
+
+            //----------------Now normalize the orientation quaternion (make into unit quaternion)
+            //problem is that after we normalize (make unit q)m we have to go strtaight into calculating
+            //the velocity in body sdpace which requires qvrotate which multiplies quaternions and 
+            
             //TRIED THIS FIRST
-           // rigidbod.q_orientation_unit = UnitQuaternion::new_normalize(rigidbod.q_orientation);
+            rigidbod.q_orientation_unit = UnitQuaternion::new_normalize(rigidbod.q_orientation);
             // println!("{}", rigidbod.q_orientation_unit);
 
             //TRYING THIS SECOND
@@ -721,30 +780,52 @@ impl<'a> System<'a> for EquationsOfMotion
             /////////////rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(new_unitq_to_q);
             //println!("{}", rigidbod.q_orientation_unit);
 
-            //TRYING THIS THIRD
-            //take the quaternion that we track and make it into unit. this will update each loop
-            rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(rigidbod.q_orientation);
+            //TRYING THIS THIRD (basially same as first)
+            //take the quaternion that we track and make it into unit. 
+            ///////rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(rigidbod.q_orientation);
             
             //TRYING THIS FOURTH
             //dont actually make a unit quaternion... just normalize the regular one
             //rigidbod.q_orientation = rigidbod.q_orientation.normalize();
 
-            //Calculate the velocity in body coordinates
+            //ORRRR SKIP THIS PART BECAUSE WE ONLY WORK WITH UNIT QUATERNIONS ANYWAY
+
+
+
+            //---------------------Calculate the velocity in body space
             //TRYING FIRST TO USE THE VECTOR TRANSFORM
-            rigidbod.v_velocity_body = (rigidbod.q_orientation_unit.conjugate()).transform_vector(&rigidbod.v_velocity);
+            //rigidbod.v_velocity_body = (rigidbod.q_orientation_unit.conjugate()).transform_vector(&rigidbod.v_velocity);
             //println!("{}", rigidbod.v_velocity_body); 
             //GOT RID OF GRAVITY ADDITION IN CAL LOADS FOR NOW
 
-            //SECOND TRYING TO DO QVROTATE BY HAND (MAYBE DONT MAKE UNIT VECTOR UNTIL AFTER QVROTATE BY HAND, OR NORMALIZE REGULAR QUATERNINO AND DO QVR ROTATE BY HAND)
+            //SECOND TRYING TO DO QVROTATE BY HAND WITH REGULAR QUATERNION
             // let veltmp =  Quaternion::new(0.0, rigidbod.v_velocity.x, rigidbod.v_velocity.y, rigidbod.v_velocity.z);   
-            // let quatmp = rigidbod.q_orientation * veltmp * rigidbod.q_orientation.conjugate();
+            // let conjtemp = rigidbod.q_orientation.conjugate();
+            // let quatmp = conjtemp * veltmp * conjtemp.conjugate();
             // let vectmp = quatmp.vector();
             // rigidbod.v_velocity_body = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);
+
+            //THRID CREATE QUATERNION FROM NORMALIZED UNIT AND THEN DO QVR BY HAND
+            //  let unitq_to_q = UnitQuaternion::quaternion(&rigidbod.q_orientation_unit); //create regular quaternion
+            //  let veltmp =  Quaternion::new(0.0, rigidbod.v_velocity.x, rigidbod.v_velocity.y, rigidbod.v_velocity.z);   
+            // let conjtemp = unitq_to_q.conjugate();
+            //  let quatmp = conjtemp * veltmp * conjtemp.conjugate();
+            // let vectmp = quatmp.vector();
+            //  rigidbod.v_velocity_body = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);
+
+            //FOURTH.... use the unit q to do qvrotate by hand
+            let vel_unit_tmp =  UnitQuaternion::new(Vector3::new(rigidbod.v_velocity.x, rigidbod.v_velocity.y, rigidbod.v_velocity.z));
+            let conjtemp = rigidbod.q_orientation_unit.conjugate();
+            let quatmp = conjtemp * vel_unit_tmp * rigidbod.q_orientation_unit.conjugate();
+            let vectmp = quatmp.vector();
+            rigidbod.v_velocity_body = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);
+
+
 
 
 
     
-            //calculate air speed
+            //---------------calculate air speed
             rigidbod.f_speed = rigidbod.v_velocity.magnitude(); 
             // rigidbod.f_speed = (rigidbod.v_velocity.x * rigidbod.v_velocity.x + rigidbod.v_velocity.y * rigidbod.v_velocity.y + rigidbod.v_velocity.z * rigidbod.v_velocity.z).sqrt();
             // println!("{}", rigidbod.f_speed); 
@@ -756,6 +837,7 @@ impl<'a> System<'a> for EquationsOfMotion
             rigidbod.v_euler_angles.z = euler.2; //yaw
             //println!("{:?}", euler); 
     
+            
 
         }//end for
     }//end run
@@ -784,24 +866,31 @@ impl<'a> System<'a> for SendPacket
 
             //Create fdm instance
             let mut fdm: FGNetFDM = Default::default();
-
+            
             //Set Roll, Pitch, Yaw
             let roll: f32 = rigidbod.v_euler_angles.x as f32;
             let pitch: f32 =  rigidbod.v_euler_angles.y as f32; 
-            let yaw: f32 = rigidbod.v_euler_angles.z as f32;  
+            let yaw: f32 =  90.0 + (rigidbod.v_euler_angles.z as f32).to_degrees();  //start facing east... thrust always pushes the same way what the heck
+
+            //Velocity in body frame
+            // fdm.v_body_u = f32::from_be_bytes((rigidbod.v_velocity_body.x as f32).to_ne_bytes());
+            // fdm.v_body_v = f32::from_be_bytes((rigidbod.v_velocity_body.y as f32).to_ne_bytes());
+            // fdm.v_body_w = f32::from_be_bytes((rigidbod.v_velocity_body.z as f32).to_ne_bytes());
+
+            
 
             //Coordinate conversion: cartesian to geodetic
             let lla = geo::ecef2lla(&rigidbod.v_position, &ELLIPSOID); 
 
             //Set lat, long, alt
             fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
-            fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
-            fdm.altitude = f64::from_be_bytes(lla.z.to_ne_bytes()); //lla.z seems to increase altitude artificially...
-           // println!("{}", lla.z);
+            fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); 
+            fdm.altitude = f64::from_be_bytes((lla.z).to_ne_bytes()); //lla.z seems to increase altitude artificially...
+
             //Roll, Pitch, Yaw
-            fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
-            fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
-            fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
+            fdm.phi = f32::from_be_bytes(roll.to_ne_bytes());
+            fdm.theta = f32::from_be_bytes(pitch.to_ne_bytes()); //will use angle of attack because its "easier"
+            fdm.psi = f32::from_be_bytes(yaw.to_radians().to_ne_bytes());
 
             //Other airplane data
             let fg_net_fdm_version = 24_u32;
@@ -839,6 +928,7 @@ impl<'a> System<'a> for SendPacket
             println!("quaternion: {:?}", rigidbod.q_orientation);
             println!("forces: {:?}", rigidbod.v_forces);
             println!("moments: {:?}", rigidbod.v_moments);
+            
             //println!("time = {}", outdata.s);
             //println!("x traveled (m) = {}", outdata.q[1] / 3.6); //converted to meters
             //println!("{}", rigidbod.v_position);
@@ -881,21 +971,21 @@ async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, left_rudder:
                     //println!("Event::{:?}\r", event);
 
                     //Thrust
-                    if event == Event::Key(KeyCode::Char('t').into()) 
+                    if event == Event::Key(KeyCode::Char('a').into()) 
                     {
                         *thrust_up = true;
                     }
-                    else if event == Event::Key(KeyCode::Char('g').into()) 
+                    else if event == Event::Key(KeyCode::Char('z').into()) 
                     {
                         *thrust_down = true;
                     }
 
                     //Rudders for yaw
-                    else if event == Event::Key(KeyCode::Char('e').into()) 
+                    else if event == Event::Key(KeyCode::Char('n').into()) 
                     {
                         *left_rudder = true;
                     }
-                    else if event == Event::Key(KeyCode::Char('r').into()) 
+                    else if event == Event::Key(KeyCode::Char('m').into()) 
                     {
                         *right_rudder = true;
                     }
@@ -905,11 +995,11 @@ async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, left_rudder:
                     // }
 
                     //Ailerons for roll
-                    else if event == Event::Key(KeyCode::Char('o').into()) 
+                    else if event == Event::Key(KeyCode::Left.into()) 
                     {
                         *roll_left = true;
                     }
-                    else if event == Event::Key(KeyCode::Char('p').into()) 
+                    else if event == Event::Key(KeyCode::Right.into()) 
                     {
                         *roll_right = true;
                     }
@@ -920,11 +1010,11 @@ async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, left_rudder:
 
 
                     //Elevators for Pitch
-                    else if event == Event::Key(KeyCode::Char('y').into()) 
+                    else if event == Event::Key(KeyCode::Down.into()) 
                     {
                         *pitch_up = true;
                     }
-                    else if event == Event::Key(KeyCode::Char('h').into()) 
+                    else if event == Event::Key(KeyCode::Up.into()) 
                     {
                         *pitch_down = true;
                     }
@@ -937,10 +1027,12 @@ async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, left_rudder:
                     else if event == Event::Key(KeyCode::Char('f').into()) 
                     {
                         *flaps_down = true;
+                        *zero_flaps = false;
                     }
-                    else if event == Event::Key(KeyCode::Char('z').into()) 
+                    else if event == Event::Key(KeyCode::Char('g').into()) 
                     {
                         *zero_flaps = true;
+                        *flaps_down = false;
                     }
 
                     //Quit program
@@ -991,8 +1083,10 @@ impl<'a> System<'a> for FlightControl
             keystate.pitch_down = false;
             //keystate.zero_elevators = true,
         
-            keystate.flaps_down = false;
-            keystate.zero_flaps = false;
+            //flaps will be toggled on and off so do not set them false for every iteration
+            // keystate.flaps_down = false;
+            // keystate.zero_flaps = false;
+
 
             //Enter raw mode for terminal input
             enable_raw_mode().unwrap();
@@ -1020,9 +1114,6 @@ impl<'a> System<'a> for FlightControl
 
 
 //Set some global variables:
-
-//Time in between each eom calculation
-//static DT: f64 = 0.5; //0.0167 
 
 //Macro to define other globals
 lazy_static!
@@ -1054,7 +1145,7 @@ fn main()
 
 
 
-    //need its mass, inertia, and intertia inverse
+    //Intialize the airplane
     let mut myairplane = RigidBody{
         mass: 0.0,
         m_inertia: Matrix3::new(0.0, 0.0, 0.0,
@@ -1086,14 +1177,16 @@ fn main()
             PointMass{f_mass: 2.62, v_d_coords: Vector3::new(3.03, -2.5, 3.0), v_local_inertia: Vector3::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
             PointMass{f_mass: 2.93, v_d_coords: Vector3::new(2.25, 0.0, 5.0), v_local_inertia: Vector3::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
             PointMass{f_mass: 31.8, v_d_coords: Vector3::new(15.25, 0.0, 1.5), v_local_inertia: Vector3::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) }
-            ]
+            ],
+        delta_x_pos: 0.0
     };
-    //work on dummyairplane
+
+    //Calculate mass properties on this airplane initialized
     calc_airplane_mass_properties(&mut myairplane);
 
 
 
-    //Create plane entity with components (using dummy airplane created above to take on the calculated mass properties)
+    //Create plane Entity and populate the Component data using the adata from myairplane (had to do this because i could not calculate mass properties from the entity directly)
     let _plane = world.create_entity()
     .with(RigidBody{
         mass: myairplane.mass,
@@ -1113,9 +1206,11 @@ fn main()
         flaps: false,
         q_orientation: myairplane.q_orientation, 
         q_orientation_unit: myairplane.q_orientation_unit,
-        element: myairplane.element
+        element: myairplane.element,
+        delta_x_pos: myairplane.delta_x_pos
     })
     .with(KeyboardState{
+        //may need to delete the zero states...
         thrust_up: false,
         thrust_down: false,
     
@@ -1153,131 +1248,141 @@ fn main()
 
 
 
+//Functions to collect airfoil performance data:
+//lift and drag coefficient data is given for a set of discrete attack angles, 
+//so then linear interpolation is used to determine the coefficients for the 
+//attack angle that falls between the discrete angles.
 
 
-    //given the angle of attack and status of the flaps, return lfit angle coefficient for camabred airfoil with plain trailing-edge (+/- 15 degree inflation)
-    fn lift_coefficient(angle: f64, flaps: i32) -> f64
+//Given the angle of attack and status of the flaps,
+//return lift angle coefficient for camabred airfoil with 
+//plain trailing-edge (+/- 15 degree inflation).
+fn lift_coefficient(angle: f64, flaps: i32) -> f64
+{
+
+
+    let clf0 = vec![(0.54 * -1.0), (0.2 * -1.0), 0.2, 0.57, 0.92, 1.21, 1.43, 1.4, 1.0]; //why cant i just make a number negative with '-'?...weird
+    let clfd = vec![0.0, 0.45, 0.85, 1.02, 1.39, 1.65, 1.75, 1.38, 1.17];
+    let clfu = vec![(0.74 * -1.0), (0.4 * -1.0), 0.0, 0.27, 0.63, 0.92, 1.03, 1.1, 0.78];
+    let a = vec![(8.0 * -1.0), (4.0 * -1.0), 0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
+
+    let mut cl: f64 = 0.0;
+
+    for i in 0..8  
     {
-
- 
-        let clf0 = vec![(0.54 * -1.0), (0.2 * -1.0), 0.2, 0.57, 0.92, 1.21, 1.43, 1.4, 1.0]; //why cant i just make a number negative with '-'?...weird
-        let clfd = vec![0.0, 0.45, 0.85, 1.02, 1.39, 1.65, 1.75, 1.38, 1.17];
-        let clfu = vec![(0.74 * -1.0), (0.4 * -1.0), 0.0, 0.27, 0.63, 0.92, 1.03, 1.1, 0.78];
-        let a = vec![(8.0 * -1.0), (4.0 * -1.0), 0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
-
-        let mut cl: f64 = 0.0;
-
-        for i in 0..8  
+        if a[i] <= angle && a[i + 1] > angle
         {
-            if a[i] <= angle && a[i + 1] > angle
+            if flaps == 0 //flaps not deflected
             {
-                if flaps == 0 //flaps not deflected
-                {
-                    cl = clf0[i] - (a[i] - angle) * (clf0[i] - clf0[i + 1]) / (a[i] - a[i + 1]);
-                    break;
-                }
-                else if flaps == -1 //flaps down
-                {
-                    cl = clfd[i] - (a[i] - angle) * (clfd[i] - clfd[i + 1]) / (a[i] - a[i + 1]);
-                    break;
-                }
-                else if flaps == 1 //flaps up
-                {
-                    cl = clfu[i] - (a[i] - angle) * ( clfu[i] - clfu[i + 1]) / (a[i] - a[i + 1]);
-                    break;
-                }
+                cl = clf0[i] - (a[i] - angle) * (clf0[i] - clf0[i + 1]) / (a[i] - a[i + 1]);
+                break;
             }
-
-        }
-
-        return cl;
-    }
-
-
-    //functions to collect airfoil performance data
-    //lift and drag coefficient data is given for a set of discrete attack angles, so then linear interpolation is used to determine the coefficients for the attack angle that falls between the discrete angles
-    //given angle of attack and flap status, return drag coefficient for cambered airfoil with plain trailing-edge flap (+/- 15 degree deflection)
-    fn drag_coefficient(angle: f64, flaps: i32) -> f64
-    {
-        let cdf0 = vec![0.01, 0.0074, 0.004, 0.009, 0.013, 0.023, 0.05, 0.12, 0.21];
-        let cdfd = vec![0.0065, 0.0043, 0.0055, 0.0153, 0.0221, 0.0391, 0.1, 0.195, 0.3];
-        let cdfu = vec![0.005, 0.0043, 0.0055, 0.02601, 0.03757, 0.06647, 0.13, 0.1, 0.25];
-        let a = vec![(8.0 * -1.0), (4.0 * -1.0), 0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
-
-        let mut cd: f64 = 0.5;
-
-        for i in 0..8  
-        {
-            if a[i] <= angle && a[i + 1] > angle
+            else if flaps == -1 //flaps down
             {
-                if flaps == 0 //flaps not deflected
-                {
-                    cd = cdf0[i] - (a[i] - angle) * (cdf0[i] - cdf0[i + 1]) / (a[i] - a[i + 1]);
-                    break;
-                }
-                else if flaps == -1 //flaps down
-                {
-                    cd = cdfd[i] - (a[i] - angle) * (cdfd[i] - cdfd[i + 1]) / (a[i] - a[i + 1]);
-                    break;
-                }
-                else if flaps == 1 //flaps up
-                {
-                    cd = cdfu[i] - (a[i] - angle) * ( cdfu[i] - cdfu[i + 1]) / (a[i] - a[i + 1]);
-                    break;
-                }
+                cl = clfd[i] - (a[i] - angle) * (clfd[i] - clfd[i + 1]) / (a[i] - a[i + 1]);
+                break;
             }
-
-        }
-
-        return cd;
-    }
-
-
-    //Rudder lift and drag coefficients are similar to that of the wing but the coefficients themselves are different and the tail rudder does not include flaps
-    //given attack angle, return lift coefficient for a symmetric (no camber) airfoil without flaps
-    fn rudder_lift_coefficient(angle: f64) -> f64
-    {
-        let clf0 = vec![0.16, 0.456, 0.736, 0.968, 1.144, 1.12, 0.8];
-        let a = vec![0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
-
-        let mut cl: f64 = 0.0;
-        let aa: f64 = angle.abs();
-
-        for i in 0..8  
-        {
-            if a[i] <= aa && a[i + 1] > aa
+            else if flaps == 1 //flaps up
             {
-                cl = clf0[i] - (a[i] - aa) * (clf0[i] - clf0[i + 1]) / (a[i] - a[i + 1]);
-
-                if angle < 0.0
-                {
-                    cl = -cl;
-                }
+                cl = clfu[i] - (a[i] - angle) * ( clfu[i] - clfu[i + 1]) / (a[i] - a[i + 1]);
                 break;
             }
         }
-        return cl;
+
     }
-  
-     //given attack angle, return drag coefficient for a symmetric (no camber) airfoil without flaps
-     fn rudder_drag_coefficient(angle: f64) -> f64
-     {
-         let cdf0 = vec![0.0032, 0.0072, 0.0104, 0.0184, 0.04, 0.096, 0.168];
-         let a = vec![0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
- 
-         let mut cd: f64 = 0.5;
-         let aa: f64 = angle.abs();
- 
-         for i in 0..8  
-         {
-             if a[i] <= aa && a[i + 1] > aa
-             {
-                 cd = cdf0[i] - (a[i] - aa) * (cdf0[i] - cdf0[i + 1]) / (a[i] - a[i + 1]);
- 
-                 break;
-             }
-         }
-         return cd;
-     }
+
+    return cl;
+}
+
+
+//given angle of attack and flap status, 
+//return drag coefficient for cambered airfoil with 
+//plain trailing-edge flap (+/- 15 degree deflection).
+fn drag_coefficient(angle: f64, flaps: i32) -> f64
+{
+    let cdf0 = vec![0.01, 0.0074, 0.004, 0.009, 0.013, 0.023, 0.05, 0.12, 0.21];
+    let cdfd = vec![0.0065, 0.0043, 0.0055, 0.0153, 0.0221, 0.0391, 0.1, 0.195, 0.3];
+    let cdfu = vec![0.005, 0.0043, 0.0055, 0.02601, 0.03757, 0.06647, 0.13, 0.1, 0.25];
+    let a = vec![(8.0 * -1.0), (4.0 * -1.0), 0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
+
+    let mut cd: f64 = 0.5;
+
+    for i in 0..8  
+    {
+        if a[i] <= angle && a[i + 1] > angle
+        {
+            if flaps == 0 //flaps not deflected
+            {
+                cd = cdf0[i] - (a[i] - angle) * (cdf0[i] - cdf0[i + 1]) / (a[i] - a[i + 1]);
+                break;
+            }
+            else if flaps == -1 //flaps down
+            {
+                cd = cdfd[i] - (a[i] - angle) * (cdfd[i] - cdfd[i + 1]) / (a[i] - a[i + 1]);
+                break;
+            }
+            else if flaps == 1 //flaps up
+            {
+                cd = cdfu[i] - (a[i] - angle) * ( cdfu[i] - cdfu[i + 1]) / (a[i] - a[i + 1]);
+                break;
+            }
+        }
+
+    }
+
+    return cd;
+}
+
+
+//Rudder lift and drag coefficients are similar to that of the wing 
+//but the coefficients themselves are different and the tail rudder 
+//does not include flaps.
+//Given attack angle, return lift coefficient for a symmetric (no camber) 
+//airfoil without flaps.
+fn rudder_lift_coefficient(angle: f64) -> f64
+{
+    let clf0 = vec![0.16, 0.456, 0.736, 0.968, 1.144, 1.12, 0.8];
+    let a = vec![0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
+
+    let mut cl: f64 = 0.0;
+    let aa: f64 = angle.abs();
+
+    for i in 0..8  
+    {
+        if a[i] <= aa && a[i + 1] > aa
+        {
+            cl = clf0[i] - (a[i] - aa) * (clf0[i] - clf0[i + 1]) / (a[i] - a[i + 1]);
+
+            if angle < 0.0
+            {
+                cl = -cl;
+            }
+            break;
+        }
+    }
+    return cl;
+}
+
+//Given attack angle, return drag coefficient for a symmetric (no camber) 
+//airfoil without flaps.
+fn rudder_drag_coefficient(angle: f64) -> f64
+{
+    let cdf0 = vec![0.0032, 0.0072, 0.0104, 0.0184, 0.04, 0.096, 0.168];
+    let a = vec![0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
+
+    let mut cd: f64 = 0.5;
+    let aa: f64 = angle.abs();
+
+    for i in 0..8  
+    {
+        if a[i] <= aa && a[i + 1] > aa
+        {
+            cd = cdf0[i] - (a[i] - aa) * (cdf0[i] - cdf0[i + 1]) / (a[i] - a[i + 1]);
+
+            break;
+        }
+    }
+    return cd;
+}
 
 
