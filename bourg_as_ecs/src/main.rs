@@ -3,12 +3,15 @@
 //fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,30,,5500,udp
 //fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,60,,5500,udp
 
+
+
+
 //Imports for flight control function
-extern crate crossterm;
 //Async std crossterm
 use std::{
     io::{stdout, Write},
     time::Duration,
+    time::Instant,
 };
 use futures::{future::FutureExt, select, StreamExt};
 use futures_timer::Delay;
@@ -40,8 +43,11 @@ use std::process;
 
 //quaternion and vector matrix operations
 extern crate nalgebra as na;
-use na::{Matrix3, Vector3, UnitQuaternion, Unit, Quaternion}; 
+use na::{Matrix3, Vector3, UnitQuaternion, Quaternion}; 
 
+//game loop
+use std::thread;
+use time::NumericalDuration;
 
 // //////Component Position
 // #[derive(Debug)]
@@ -111,7 +117,7 @@ struct RigidBody
     v_velocity: Vector3<f64>,           // velocity in earth coordinates
     v_velocity_body: Vector3<f64>,      // velocity in body coordinates
     v_angular_velocity: Vector3<f64>,   // angular velocity in body coordinates
-    v_euler_angles: Vector3<f64>,       // Euler angles in body coordinates
+    v_euler_angles: Vector3<f64>,   
     f_speed: f64,                       // speed (magnitude of the velocity)
     stalling: bool,
     flaps: bool,
@@ -123,7 +129,9 @@ struct RigidBody
 
     element: Vec<PointMass>,                     //vector of point mass elements
 
-    delta_x_pos: f64
+    v_position_lla: Vector3<f64>,
+    alt: f64,
+    frame_count: f64 
 }
 impl Component for RigidBody
 {
@@ -133,7 +141,7 @@ impl Component for RigidBody
 
 //////Component FGNetFDM for networking
 #[derive(Debug, Default)]
-#[repr(C)] //fix padding issue
+#[repr(C)] 
 struct FGNetFDM
 {
     version: u32, // increment when data values change
@@ -350,7 +358,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     rigidbod.v_forces = Vector3::new(0.0, 0.0, 0.0);
     rigidbod.v_moments = Vector3::new(0.0, 0.0, 0.0);
 
-    //Define thrust vector, which acts throguh the plane's center of gravity
+    //Define thrust vector, which acts through the plane's center of gravity
     let mut thrust = Vector3::new(1.0, 0.0, 0.0);
     thrust = thrust * rigidbod.thrustforce; 
     //println!("{}", thrust);
@@ -374,7 +382,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
             let inn: f64 = (rigidbod.element[i].f_incidence).to_radians();
             let di: f64 = (rigidbod.element[i].f_dihedral).to_radians();
             rigidbod.element[i].v_normal = Vector3::new(inn.sin(), inn.cos() * di.sin(), inn.cos() * di.cos());
-            rigidbod.element[i].v_normal = rigidbod.element[i].v_normal.normalize(); //normalize not an issue here..
+            rigidbod.element[i].v_normal = rigidbod.element[i].v_normal.normalize(); 
             //println!("{}", inn);
             //println!("{}", di);
         }
@@ -390,7 +398,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         //println!("{}", rigidbod.element[i].v_cg_coords); 
 
         v_local_velocity = rigidbod.v_velocity_body + vtmp;
-       // println!("{}", v_local_velocity);
+        //println!("{}", v_local_velocity);
         //println!("{}", f_local_speed);
        // println!("{}", rigidbod.v_velocity_body); 
 
@@ -459,11 +467,9 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
             tmp = -1.0;
         }
 
-        //ZERO BECAUSE TMP IS ZERO... AND THATS CUZ DRAG VECTOR IS ZERO...
         f_attack_angle = (tmp.sin()).to_radians();
-        // println!("{}", f_attack_angle);
+         //println!("{}", f_attack_angle);
 
-///////////////////////TMP ACTUALLY IS SOMETHING as of now, but 
         //Determine lift and drag force on the element (rho is 1.225 in the book)
         //println!("{}", f_local_speed); 
         tmp = 0.5 * 1.225 * f_local_speed * f_local_speed * rigidbod.element[i].f_area;
@@ -471,7 +477,6 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         //println!("{}", v_resultant);
         
 
-        //TMP IS SOMETHING RIGHT NOW BUT V DRAG VECTOR AND LIFT VECTOR ARE ZERO SO V RESULTANT WILL ALWAYS BE ZERO
         if i == 6 //tail/ rudder
         {
             v_resultant = (v_lift_vector * rudder_lift_coefficient(f_attack_angle) + v_drag_vector * rudder_drag_coefficient(f_attack_angle)) * tmp;
@@ -493,7 +498,6 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         }
 
         //Keep running total of resultant forces (total force)
-        //ALWAYS ZERO BECAUSE V LIFT VECTOR AND DRAG ARRE ALWAYS ZERO AND V RESULTANT IS BASED ON THAT AND SO ON FOR VTMP AND MB
         fb = fb + v_resultant;
 
         //println!("{}", fb);
@@ -523,14 +527,13 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     //THEN TRIED THIS SECOND
     //Doing QVRotate by hand w/o using unit quaternion. I cannot multiply fb by the quaternion so i will put fb into a quaternion first and then multiply
     //Doing all this because we arent doing stuff with unit quaternion yet
-    //THIS WOULD BE JUST USING REGULAR QUAT UNTIL I HAVE TO USE UNIT
     //quat*quat
     let fbtmp =  Quaternion::new(0.0, fb.x, fb.y, fb.z);   //make a quaternion with scalar 0
     let quatmp = rigidbod.q_orientation * fbtmp * rigidbod.q_orientation.conjugate();
     let vectmp = quatmp.vector();
     rigidbod.v_forces = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);  // Recall that the quaternion is stored internally as (i, j, k, w)
                                                                         // while the crate::new constructor takes the arguments as (w, i, j, k).
-    //OR vec*vec (doesnt work "as well" as above)
+    //OR vec*vec ..works like above...
     // let qvec = rigidbod.q_orientation.vector(); //make vec out of quaternion (dont need scalar)
     // let qvec3 = Vector3::new(qvec[0], qvec[1], qvec[2]); //populate nalgebra vec with the values
     // let qvec3_conj = Vector3::new(-qvec[0], -qvec[1], -qvec[2]);
@@ -548,9 +551,12 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
 
 
 
-    //apply gravity (g is -32.174 ft/s^2), ONLY APPLY WHEN ALTITUDE IS GREATER THAN ZERO
+    //apply gravity (g is -32.174 ft/s^2), ONLY APPLY WHEN ALTITUDE IS GREATER THAN ZERO.... how to fidn altitude????
 
-    //rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
+    //if rigidbod.alt > 0.0
+    //{
+        rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
+    //}
     
    // println!("{}", rigidbod.v_forces.z);
 
@@ -584,8 +590,9 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //println!("{}", rigidbod.q_orientation_unit);
            // println!("{}", "inside eom");
-            let max_thrust = 3000.0; //max thrustforce value
-            let d_thrust = 100.0;   //change in thrust per keypress
+            let max_thrust = 3000.0; //max thrustforce value //was 3000
+            let d_thrust = 100.0;   //change in thrust per keypress //was 100
+
 
 
             //reset/zero the elevators, rudders, and ailerons
@@ -687,27 +694,46 @@ impl<'a> System<'a> for EquationsOfMotion
             //--------------------Calculate acceleration of airplane in earth space
             let ae: Vector3<f64> = rigidbod.v_forces / rigidbod.mass;
             //println!("{}", rigidbod.v_forces);
-           // println!("{}", ae);
+
+         //println!("{}", ae);
+  
             //println!("{}", rigidbod.mass);
 
 
 
             //----------------Calculate velocity of airplane in earth space
-            rigidbod.v_velocity = rigidbod.v_velocity + ae * DT; 
-            //println!("{}", rigidbod.v_velocity); 
+           rigidbod.v_velocity = rigidbod.v_velocity + ae * DT; 
+          // rigidbod.v_velocity = rigidbod.v_velocity + Vector3::new(0.0, 0.0, 50.0);
+            //println!("{}", rigidbod.v_velocity.y); 
+
+           // println!("{}", rigidbod.v_velocity.normalize()); 
     
+
             //---------------Calculate position of airplane in earth space
             rigidbod.v_position = rigidbod.v_position + rigidbod.v_velocity * DT;
-            //so that airplane does not fall below the ground...
-            // if rigidbod.v_position.z < 3038233.4//3038233.40847236
-            // {
-            //     println!("{}", "FALLING");
-            //     rigidbod.v_position.z = 3038233.40847236;
-            // }
-            //rigidbod.v_position.z = rigidbod.v_position.z - rigidbod.delta_x_pos;  
+
+            //rigidbod.v_position_lla = rigidbod.v_velocity.normalize(); //trying to see a normalized velocity vector for direction...
+            //println!("{}", rigidbod.v_velocity);
+        //     rigidbod.v_position_lla = geo::ecef2lla(&rigidbod.v_position, &ELLIPSOID); //immediately convert to lla
+
+        //     if rigidbod.v_position_lla.z < 0.0
+        //     {
+        //         rigidbod.v_position_lla.z = 0.0;
+        //     }
+
+        //    // rigidbod.alt = rigidbod.alt + (rigidbod.v_position_lla.z - 0.0); //find altitude by finding difference in ecef (try dif in lla if dont work)
+        //     //println!("{}", rigidbod.alt);
+
+        //     //let lla_temp_vec = Vector3::new(rigidbod.v_position_lla.x, rigidbod.v_position_lla.y, lla.z); //make vector with lla values to convert back to ecef
+
+        //     rigidbod.v_position = geo::lla2ecef(&rigidbod.v_position_lla, &ELLIPSOID);
+
+
+
+
+
             //GRAVITY, HEADING, ALTITUDE issues. always find ecef based on 0 altitude so take the new ecef with that new x val or y val
             //need to find where altitude is calculated and could just use that like how 2d does it
-            //heading - where airplane positioned vs actually going
 
            // println!("{}", rigidbod.v_position);
     
@@ -716,7 +742,7 @@ impl<'a> System<'a> for EquationsOfMotion
     
             //Calculate angular velocity of airplane in body space
             //TEST
-            //rigidbod.v_angular_velocity = Vector3::new(10.0, 10.0, 10.0);
+
             rigidbod.v_angular_velocity = rigidbod.v_angular_velocity + rigidbod.m_inertia_inverse * ( rigidbod.v_moments - ( rigidbod.v_angular_velocity.cross(&(rigidbod.m_inertia * rigidbod.v_angular_velocity)))) * DT;
             //println!("{}", rigidbod.v_angular_velocity); 
             // println!("{}", rigidbod.v_moments);
@@ -772,7 +798,7 @@ impl<'a> System<'a> for EquationsOfMotion
             //the velocity in body sdpace which requires qvrotate which multiplies quaternions and 
             
             //TRIED THIS FIRST
-            rigidbod.q_orientation_unit = UnitQuaternion::new_normalize(rigidbod.q_orientation);
+            //rigidbod.q_orientation_unit = UnitQuaternion::new_normalize(rigidbod.q_orientation);
             // println!("{}", rigidbod.q_orientation_unit);
 
             //TRYING THIS SECOND
@@ -782,7 +808,7 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //TRYING THIS THIRD (basially same as first)
             //take the quaternion that we track and make it into unit. 
-            ///////rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(rigidbod.q_orientation);
+            rigidbod.q_orientation_unit = UnitQuaternion::from_quaternion(rigidbod.q_orientation);
             
             //TRYING THIS FOURTH
             //dont actually make a unit quaternion... just normalize the regular one
@@ -820,15 +846,11 @@ impl<'a> System<'a> for EquationsOfMotion
             let vectmp = quatmp.vector();
             rigidbod.v_velocity_body = Vector3::new(vectmp[0], vectmp[1], vectmp[2]);
 
-
-
-
-
     
             //---------------calculate air speed
             rigidbod.f_speed = rigidbod.v_velocity.magnitude(); 
             // rigidbod.f_speed = (rigidbod.v_velocity.x * rigidbod.v_velocity.x + rigidbod.v_velocity.y * rigidbod.v_velocity.y + rigidbod.v_velocity.z * rigidbod.v_velocity.z).sqrt();
-            // println!("{}", rigidbod.f_speed); 
+             //println!("{}", rigidbod.f_speed); 
     
             //get euler angles for our info
             let euler = rigidbod.q_orientation_unit.euler_angles();
@@ -838,11 +860,11 @@ impl<'a> System<'a> for EquationsOfMotion
             //println!("{:?}", euler); 
     
             
+            rigidbod.frame_count = rigidbod.frame_count + 1.0;
 
         }//end for
     }//end run
 }//end system
-
 
 
 //System to send packets
@@ -858,6 +880,8 @@ impl<'a> System<'a> for SendPacket
     {
         for (rigidbod, _netfdm,) in (&rigidbody, &fgnetfdm).join() 
         {
+                                    //lat, lon
+            //ktts airport location: 28.5971, -80.6827, 609.6 meters = 2000 ft
 
             //println!("{}", "inside send packet");
 
@@ -868,28 +892,39 @@ impl<'a> System<'a> for SendPacket
             let mut fdm: FGNetFDM = Default::default();
             
             //Set Roll, Pitch, Yaw
-            let roll: f32 = rigidbod.v_euler_angles.x as f32;
-            let pitch: f32 =  rigidbod.v_euler_angles.y as f32; 
-            let yaw: f32 =  90.0 + (rigidbod.v_euler_angles.z as f32).to_degrees();  //start facing east... thrust always pushes the same way what the heck
+           let roll: f32 = rigidbod.v_euler_angles.x as f32;
+           let pitch: f32 =  rigidbod.v_euler_angles.y as f32; 
+           let yaw: f32 =  (rigidbod.v_euler_angles.z as f32).to_degrees(); 
 
             //Velocity in body frame
             // fdm.v_body_u = f32::from_be_bytes((rigidbod.v_velocity_body.x as f32).to_ne_bytes());
             // fdm.v_body_v = f32::from_be_bytes((rigidbod.v_velocity_body.y as f32).to_ne_bytes());
             // fdm.v_body_w = f32::from_be_bytes((rigidbod.v_velocity_body.z as f32).to_ne_bytes());
 
-            
+            // fdm.v_body_u = f32::from_be_bytes((rigidbod.v_angular_velocity.x as f32).to_ne_bytes());
+            // fdm.v_body_v = f32::from_be_bytes((rigidbod.v_angular_velocity.y as f32).to_ne_bytes());
+            // fdm.v_body_w = f32::from_be_bytes((rigidbod.v_angular_velocity.z as f32).to_ne_bytes());
+
+            //fdm.a_x_pilot= f32::from_be_bytes((rigidbod.v_velocity_body.x as f32).to_ne_bytes());
+            //fdm.a_y_pilot =f32::from_be_bytes((rigidbod.v_velocity_body.y as f32).to_ne_bytes());
+            //fdm.a_z_pilot = f32::from_be_bytes((500_f32).to_ne_bytes());
 
             //Coordinate conversion: cartesian to geodetic
             let lla = geo::ecef2lla(&rigidbod.v_position, &ELLIPSOID); 
 
+
+
+            
+
             //Set lat, long, alt
+           // println!("{}", lla * 0.3048);
             fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
             fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); 
-            fdm.altitude = f64::from_be_bytes((lla.z).to_ne_bytes()); //lla.z seems to increase altitude artificially...
-
+            fdm.altitude = f64::from_be_bytes(lla.z.to_ne_bytes()); //lla.z seems to increase altitude artificially... //rigidbod.alt
+           
             //Roll, Pitch, Yaw
             fdm.phi = f32::from_be_bytes(roll.to_ne_bytes());
-            fdm.theta = f32::from_be_bytes(pitch.to_ne_bytes()); //will use angle of attack because its "easier"
+            fdm.theta = f32::from_be_bytes(pitch.to_ne_bytes()); 
             fdm.psi = f32::from_be_bytes(yaw.to_radians().to_ne_bytes());
 
             //Other airplane data
@@ -917,17 +952,25 @@ impl<'a> System<'a> for SendPacket
             //Print some relevant data
             disable_raw_mode().unwrap(); //Get out of raw mode to print clearly
             //println!("{:#?}", rigidbod);
-
-            println!("position: {:?}", rigidbod.v_position);
+            println!("{}", "--------------------------------------------------");
+            println!("position ecef: {:?}", rigidbod.v_position);
+            println!("position lla: {:?}", lla);
+            //println!("position delta {:?}", rigidbod.v_position_lla);
             println!("velocity: {:?}", rigidbod.v_velocity);
             println!("velocity body: {:?}", rigidbod.v_velocity_body);
             println!("angular velocity: {:?}", rigidbod.v_angular_velocity);
-            println!("euler angles: {:?}", rigidbod.v_euler_angles);
-            println!("speed: {:?}", rigidbod.f_speed);
+            //println!("euler angles: {:?}", rigidbod.v_euler_angles);
+           println!("euler anglesx: {:?}", rigidbod.v_euler_angles.x.to_degrees());
+           println!("euler anglesy: {:?}", rigidbod.v_euler_angles.y.to_degrees());
+           println!("euler anglesz: {:?}", rigidbod.v_euler_angles.z.to_degrees());
+            println!("speed (knots): {:?}", rigidbod.f_speed/1.688 );
             println!("unit quaternion: {:?}", rigidbod.q_orientation_unit);
             println!("quaternion: {:?}", rigidbod.q_orientation);
             println!("forces: {:?}", rigidbod.v_forces);
             println!("moments: {:?}", rigidbod.v_moments);
+            println!("altitude {}", lla.z);// rigidbod.alt);
+            println!("time: {}", rigidbod.frame_count * DT);// rigidbod.alt);
+           // println!("lla.z{}", lla.z );
             
             //println!("time = {}", outdata.s);
             //println!("x traveled (m) = {}", outdata.q[1] / 3.6); //converted to meters
@@ -951,7 +994,7 @@ impl<'a> System<'a> for SendPacket
 async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, left_rudder: &mut bool, right_rudder: &mut bool, roll_left: &mut bool, roll_right: &mut bool, pitch_up: &mut bool, pitch_down: &mut bool, flaps_down: &mut bool, zero_flaps: &mut bool) 
 {
     let mut reader = EventStream::new();
-    let mut delay = Delay::new(Duration::from_millis(50)).fuse(); //Delay time (this greatly affects the speed of the simulation...)
+    let mut delay = Delay::new(Duration::from_millis(1)).fuse(); 
     let mut event = reader.next().fuse();
 
     //Either the time delay or keyboard event happens and then this function will be called again in the system
@@ -1010,11 +1053,11 @@ async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, left_rudder:
 
 
                     //Elevators for Pitch
-                    else if event == Event::Key(KeyCode::Down.into()) 
+                    else if event == Event::Key(KeyCode::Up.into()) 
                     {
                         *pitch_up = true;
                     }
-                    else if event == Event::Key(KeyCode::Up.into()) 
+                    else if event == Event::Key(KeyCode::Down.into()) 
                     {
                         *pitch_down = true;
                     }
@@ -1064,7 +1107,7 @@ impl<'a> System<'a> for FlightControl
 
     fn run(&mut self, (rigidbody, mut keyboardstate): Self::SystemData) 
     {
-        for (rigidbod, keystate) in (&rigidbody, &mut keyboardstate).join() 
+        for (_rigidbod, keystate) in (&rigidbody, &mut keyboardstate).join() 
         {
             //println!("{}", "inside flight control");
             //Set all states false before we know if they are being activated
@@ -1122,10 +1165,12 @@ lazy_static!
     static ref ELLIPSOID: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
     //create socket
     static ref SOCKET: std::net::UdpSocket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
+
 }
 
 //Time in between each eom calculation
-static DT: f64 = 0.0167;
+static DT: f64 = 0.033;//0.016;
+
 fn main()
 {
     //Create world
@@ -1154,13 +1199,17 @@ fn main()
         m_inertia_inverse: Matrix3::new(0.0, 0.0, 0.0,
                                         0.0, 0.0, 0.0,
                                         0.0, 0.0, 0.0),
-        v_position: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236),        //set initial position
-        v_velocity: Vector3::new(0.0, 0.0, 0.0),        //set initial velocity //was 60 in x...
+        v_position: Vector3::new(907440.867577218, -5530938.88177552, 3035061.57686847),                
+         // ktts flat (907354.212367197, -5530410.70998214, 3034769.79340209)
+         // ktts at 100m above ground (907368.427460705,-5530497.3523367, 3034817.65814395 ),
+        //c++ start position (believe distances are in feet)... (-5000.0, 0.0, 2000.0), 
+        // ktts at 2000 ft above (609.6 meters) 907440.867577218, -5530938.88177552, 3035061.57686847
+        v_velocity: Vector3::new(60.0, 0.0, 0.0),        //set initial velocity //was 60 in x...
         v_euler_angles: Vector3::new(0.0, 0.0, 0.0), //not defined in book here
-        f_speed: 0.0, //was 60..
+        f_speed: 60.0, //was 60..
         v_angular_velocity: Vector3::new(0.0, 0.0, 0.0),        //set angular velocity
-        v_forces: Vector3::new(0.0, 0.0, 0.0),        //set initial thrust, forces, and moments //was 500 in x
-        thrustforce: 0.0,   //this isnt written in the rigid body intiialization for some reason...
+        v_forces: Vector3::new(500.0, 0.0, 0.0),        //set initial thrust, forces, and moments //was 500 in x
+        thrustforce: 500.0,   //this isnt written in the rigid body intiialization for some reason...
         v_moments: Vector3::new(0.0, 0.0, 0.0),
         v_velocity_body: Vector3::new(0.0, 0.0, 0.0),        //zero the velocity in body space coordinates
         //set these to false at first, will control later with keyboard... these are not defined in the structure
@@ -1178,7 +1227,9 @@ fn main()
             PointMass{f_mass: 2.93, v_d_coords: Vector3::new(2.25, 0.0, 5.0), v_local_inertia: Vector3::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
             PointMass{f_mass: 31.8, v_d_coords: Vector3::new(15.25, 0.0, 1.5), v_local_inertia: Vector3::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) }
             ],
-        delta_x_pos: 0.0
+        v_position_lla: Vector3::new(0.0, 0.0, 0.0),
+        frame_count: 0.0,
+        alt: 0.0
     };
 
     //Calculate mass properties on this airplane initialized
@@ -1207,7 +1258,9 @@ fn main()
         q_orientation: myairplane.q_orientation, 
         q_orientation_unit: myairplane.q_orientation_unit,
         element: myairplane.element,
-        delta_x_pos: myairplane.delta_x_pos
+        v_position_lla: myairplane.v_position_lla,
+        alt: myairplane.alt,
+        frame_count: myairplane.frame_count
     })
     .with(KeyboardState{
         //may need to delete the zero states...
@@ -1235,11 +1288,46 @@ fn main()
     .build();
 
 
-    //Loop simulation
+  
+
+
+    let steptime = 33.milliseconds(); //30 fps
     loop 
     {
+
+        let start = Instant::now();
+
         dispatcher.dispatch(&world);
         world.maintain();
+
+
+             //Create frame_rate loop
+            let calc_time = start.elapsed(); //how long this calculation took
+
+            if calc_time < steptime //if calc time takes less than 33 ms
+            {
+
+                //this was much more complicated than it should have been....
+                let calc_time2 = calc_time.as_secs_f64() * 1000.0; //get the value in ms of how long the calculation ran 
+                let sleep_time = steptime - calc_time2.milliseconds(); //subtract step time and the calculation time
+                //steptime.checked_sub(sleep_time1.milliseconds()); //step time - sleep time
+                //thread::sleep(runtime - sleep_time); //sleep for the extra time
+                let sleep_time2 = sleep_time.as_seconds_f64() * 1000.0; //get value in ms 
+
+                let sleep_duration = Duration::from_millis(sleep_time2 as u64);
+
+                thread::sleep(sleep_duration); //sleep for the extra time
+
+                //println!("calc time {:?}", calc_time);
+                //println!("calc time 2 {:?}", calc_time2);
+               // println!("sleep time {:?}", sleep_time);
+                //println!("sleep time 2 {:?}", sleep_time2);
+                //println!("sleep duration {:?}", sleep_duration);
+
+            }
+           // println!("{:?}", );
+
+
 
 
     }
@@ -1290,7 +1378,7 @@ fn lift_coefficient(angle: f64, flaps: i32) -> f64
         }
 
     }
-
+   // println!("{}", cl);
     return cl;
 }
 
@@ -1329,7 +1417,7 @@ fn drag_coefficient(angle: f64, flaps: i32) -> f64
         }
 
     }
-
+  //  println!("{}", cd);
     return cd;
 }
 
@@ -1360,6 +1448,7 @@ fn rudder_lift_coefficient(angle: f64) -> f64
             break;
         }
     }
+   // println!("{}", cl);
     return cl;
 }
 
@@ -1382,7 +1471,6 @@ fn rudder_drag_coefficient(angle: f64) -> f64
             break;
         }
     }
+   // println!("{}", cd);
     return cd;
 }
-
-
