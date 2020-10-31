@@ -47,6 +47,8 @@ use na::{Matrix3, Vector3, UnitQuaternion, Quaternion};
 use std::thread;
 use time::NumericalDuration;
 
+
+mod common;
 // //////Component Position
 // #[derive(Debug)]
 // struct Position
@@ -482,10 +484,10 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
             v_resultant = (v_lift_vector * rudder_lift_coefficient(f_attack_angle) + v_drag_vector * rudder_drag_coefficient(f_attack_angle)) * tmp;
         }
         //this is not in the book code but its in the actual code...
-        else if i == 7
-        {
-            v_resultant = v_drag_vector * 0.5 * tmp;
-        }
+        // else if i == 7
+        // {
+        //     v_resultant = v_drag_vector * 0.5 * tmp;
+        // }
         else
         {
             v_resultant = (v_lift_vector * lift_coefficient(f_attack_angle, rigidbod.element[i].i_flap) + v_drag_vector * drag_coefficient(f_attack_angle, rigidbod.element[i].i_flap)) * tmp;
@@ -602,6 +604,7 @@ impl<'a> System<'a> for EquationsOfMotion
     {
         for (mut rigidbod, keystate) in (&mut rigidbody, &keyboardstate).join() 
         {
+
             //println!("{}", rigidbod.q_orientation_unit);
            // println!("{}", "inside eom");
             let max_thrust = 3000.0; //max thrustforce value //was 3000
@@ -1193,7 +1196,7 @@ fn main()
     let mut dispatcher = DispatcherBuilder::new()
     .with(FlightControl, "flightcontrol", &[])
     .with(EquationsOfMotion, "EOM", &[])
-    .with(SendPacket, "sendpacket", &[])
+    .with(SendPacket, "sendpacket", &["EOM"])
     .build();
     dispatcher.setup(&mut world);
 
