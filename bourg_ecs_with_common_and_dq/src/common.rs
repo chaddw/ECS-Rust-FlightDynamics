@@ -30,7 +30,7 @@
         pub fn normalize(&mut self)
         {
             let tol: f64 = 0.000000000000001; //float type tolerance
-            let mut m: f64 = self.magnitude();
+            let mut m: f64 = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
             if m <= tol
             {
                m = 1.0;
@@ -76,9 +76,7 @@
             };
     
             return vec;
-            // v.x += u.x;
-            // v.y += u.y;
-            // v.z += u.z;
+
         }
     
     
@@ -91,9 +89,7 @@
             };
     
             return vec;
-            // v.x += u.x;
-            // v.y += u.y;
-            // v.z += u.z;
+
         }
     
         pub fn multiplyscalar(v: &Myvec, scalar: f64) -> Myvec
@@ -138,7 +134,8 @@
         }
     
     
-        //how it set up if we want to use dot operator
+        //how we would set up if we want to use dot operator on the instance
+        //could also set up to operator overload but not worried about that now
         // pub fn subtract(&mut self, u: Myvec)
         // {
         //     self.x -= u.x;
@@ -211,12 +208,12 @@
         pub fn addquat(q1: &Myquaternion, q2: &Myquaternion) -> Myquaternion 
         {
             let quat = Myquaternion { 
-                n: q1.n   + q2.n,
+                n: q1.n + q2.n,
                 
                 v:  Myvec {
                     x: q1.v.x + q2.v.x,
-                    y:  q1.v.y + q2.v.y,
-                    z:  q1.v.z + q2.v.z,
+                    y: q1.v.y + q2.v.y,
+                    z: q1.v.z + q2.v.z,
                 }
     
             };
@@ -227,12 +224,12 @@
         pub fn subtractquat(q1: &Myquaternion, q2: &Myquaternion) -> Myquaternion 
         {
             let quat = Myquaternion { 
-                n: q1.n   - q2.n,
+                n: q1.n - q2.n,
                 
                 v:  Myvec {
                     x: q1.v.x - q2.v.x,
-                    y:  q1.v.y - q2.v.y,
-                    z:  q1.v.z - q2.v.z,
+                    y: q1.v.y - q2.v.y,
+                    z: q1.v.z - q2.v.z,
                 }
     
             };
@@ -247,8 +244,8 @@
                 
                 v:  Myvec {
                     x: q.v.x * scalar,
-                    y:  q.v.y * scalar,
-                    z:  q.v.z * scalar,
+                    y: q.v.y * scalar,
+                    z: q.v.z * scalar,
                 }
     
             };
@@ -262,8 +259,8 @@
                 
                 v:  Myvec {
                     x: q.v.x / scalar,
-                    y:  q.v.y / scalar,
-                    z:  q.v.z / scalar,
+                    y: q.v.y / scalar,
+                    z: q.v.z / scalar,
                 }
     
             };
@@ -278,8 +275,8 @@
                 
                 v:  Myvec {
                     x: q1.n*q2.v.x + q1.v.x*q2.n + q1.v.y*q2.v.z - q1.v.z*q2.v.y,
-                    y:  q1.n*q2.v.y + q1.v.y*q2.n + q1.v.z*q2.v.x - q1.v.x*q2.v.z,
-                    z:  q1.n*q2.v.z + q1.v.z*q2.n + q1.v.x*q2.v.y - q1.v.y*q2.v.x,
+                    y: q1.n*q2.v.y + q1.v.y*q2.n + q1.v.z*q2.v.x - q1.v.x*q2.v.z,
+                    z: q1.n*q2.v.z + q1.v.z*q2.n + q1.v.x*q2.v.y - q1.v.y*q2.v.x,
                 }
     
             };   
@@ -293,9 +290,9 @@
                 n:  -(q.v.x*v.x + q.v.y*v.y + q.v.z*v.z),
                 
                 v:  Myvec {
-                    x:  q.n*v.x + q.v.y*v.z - q.v.z*v.y,
-                    y:  q.n*v.y + q.v.z*v.x - q.v.x*v.z,
-                    z:  q.n*v.z + q.v.x*v.y - q.v.y*v.x,
+                    x: q.n*v.x + q.v.y*v.z - q.v.z*v.y,
+                    y: q.n*v.y + q.v.z*v.x - q.v.x*v.z,
+                    z: q.n*v.z + q.v.x*v.y - q.v.y*v.x,
                 }
     
             };   
@@ -349,7 +346,7 @@
             }
          
             u.x = (r32.atan2(r33)).to_degrees(); // roll
-            u.y = (-r31.asin()).to_degrees();      // pitch
+            u.y = (-r31.asin()).to_degrees();    // pitch
             u.z = (r21.atan2(r11)).to_degrees(); // yaw
             return u;
     

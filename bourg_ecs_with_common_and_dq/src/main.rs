@@ -6,7 +6,7 @@
 
 //Imports for flight control
 extern crate device_query;
-use device_query::{DeviceQuery, DeviceState, MouseState, Keycode};
+use device_query::{DeviceQuery, DeviceState, Keycode};
 
 //Specs
 use specs::prelude::*;
@@ -26,8 +26,9 @@ extern crate lazy_static;
 use std::process;
 
 //Nalgebra vector
-extern crate nalgebra as na;
-use na::{ Vector3}; 
+//not being used right now
+//extern crate nalgebra as na;
+//use na::{ Vector3}; 
 
 //game loop
 use std::thread;
@@ -216,6 +217,8 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
 fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
 {
 
+    //element pieces are initialized when the airplane entity is initialized in main
+
     let mut inn: f64;
     let mut di: f64;
 
@@ -237,28 +240,20 @@ fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
 
 
     //Calculate combined center of gravity location
-    let mut first_moment_x: f64 = 0.0;
-    let mut first_moment_y: f64 = 0.0;
-    let mut first_moment_z: f64 = 0.0;
+    let mut v_moment = common::Myvec::new(0.0,0.0,0.0);
     for i in rigidbod.element.iter()
     {
-        //X coord
-        first_moment_x = first_moment_x + i.f_mass * i.v_d_coords.x;
-        //y coord
-        first_moment_y = first_moment_y + i.f_mass * i.v_d_coords.y;
-        //z coord
-        first_moment_z = first_moment_z + i.f_mass * i.v_d_coords.z;
+        let tmp = common::Myvec::multiplyscalar(&i.v_d_coords, i.f_mass);
+        
+        v_moment = common::Myvec::addvec(&v_moment, &tmp);
     }
-    let v_moment = common::Myvec::new(first_moment_x, first_moment_y, first_moment_z); //remember there is a v_moments in rigid body.. we'll see how this plays out
+
     let cg = common::Myvec::dividescalar(&v_moment, total_mass); 
 
     //Calculate coordinates of each element with respect to the combined CG, relative position
     for i in rigidbod.element.iter_mut()
     {
-        i.v_cg_coords.x = i.v_d_coords.x - cg.x;
-        i.v_cg_coords.y = i.v_d_coords.y - cg.y;
-        i.v_cg_coords.z = i.v_d_coords.z - cg.z;
-
+        i.v_cg_coords = common::Myvec::subtractvec(&i.v_d_coords, &cg);
     }
 
 
@@ -296,15 +291,15 @@ fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
 
     //Finally, set up airplanes mass and inertia matrix
     rigidbod.mass = total_mass;
-
-    rigidbod.m_inertia = common::Mymatrix::new(ixx, -ixy, -ixz,
-                                                -ixy, iyy, -iyz,
-                                                -ixz, -iyz, izz);
-
+    rigidbod.m_inertia = common::Mymatrix::new(ixx.floor(), -ixy.floor(), -ixz.floor(),
+                                                -ixy.floor(), iyy.floor(), -iyz.floor(),
+                                                -ixz.floor(), -iyz.floor(), izz.floor());
+                                                //testing with floor to match 6 decimakl place percision like in c++ version
+                                                //it didnt help fix anything...
     //Get inverse of matrix
     rigidbod.m_inertia_inverse = common::Mymatrix::inverse(&rigidbod.m_inertia);
 
-    
+
 }
 
 
@@ -315,8 +310,8 @@ fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
 fn calc_airplane_loads(rigidbod: &mut RigidBody)
 {
 
-    let mut fb = common::Myvec::new(0.0, 0.0, 0.0);
-    let mut mb = common::Myvec::new(0.0, 0.0, 0.0);
+    let mut fb = common::Myvec::new(0.0, 0.0, 0.0); //total force
+    let mut mb = common::Myvec::new(0.0, 0.0, 0.0); //total moment
 
     //---------------Reset forces and moments
     rigidbod.v_forces = common::Myvec::new(0.0, 0.0, 0.0);
@@ -327,9 +322,9 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     thrust = common::Myvec::multiplyscalar(&thrust, rigidbod.thrustforce);
 
     //------------------Calculate forces and moments in body space
-    let mut v_drag_vector = common::Myvec::new(1.0, 1.0, 1.0); //VERY IMPORTANT THAT THESE WERE SET TO 1.0...
+    let mut v_drag_vector = common::Myvec::new(0.0, 0.0, 0.0); //VERY IMPORTANT THAT THESE WERE SET TO 1.0... 11/15 not anymore..
     let mut v_resultant= common::Myvec::new(0.0, 0.0, 0.0);
-    let mut vtmp = common::Myvec::new(0.0, 0.0, 0.0);
+
     rigidbod.stalling = false;
 
     //---------------Loop through the 7 lifting elements, skipping the fuselage
@@ -339,17 +334,18 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         {
             let inn: f64 = (rigidbod.element[i].f_incidence).to_radians();
             let di: f64 = (rigidbod.element[i].f_dihedral).to_radians();
-            rigidbod.element[i].v_normal = common::Myvec::new(inn.sin(), inn.cos() * di.sin(), inn.cos() * di.cos());
+            rigidbod.element[i].v_normal = common::Myvec::new(inn.sin(),
+                                                              inn.cos() * di.sin(), 
+                                                              inn.cos() * di.cos());
             rigidbod.element[i].v_normal.normalize();
-
         }
        
         //--------------Calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
        
         //---------------Rotation part
         //vtmp = rigidbod.v_angular_velocity.cross(&rigidbod.element[i].v_cg_coords);
-        vtmp = common::Myvec::crossproduct(&rigidbod.v_angular_velocity, &rigidbod.element[i].v_cg_coords);
-
+        let mut vtmp = common::Myvec::crossproduct(&rigidbod.v_angular_velocity, &rigidbod.element[i].v_cg_coords);
+        //println!("{:?}", vtmp);
 
         let v_local_velocity = common::Myvec::addvec(&rigidbod.v_velocity_body, &vtmp);
 
@@ -359,16 +355,14 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         //-------------------Find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
         if f_local_speed > 1.0
         {
-            let v_local_vel_tmp = common::Myvec::reverse_aka_conjugate(&v_local_velocity);
+            let v_local_vel_tmp = common::Myvec::reverse_aka_conjugate(&v_local_velocity); //-vLocalVelocity
             v_drag_vector = common::Myvec::dividescalar(&v_local_vel_tmp, f_local_speed);
         }
 
         //-------------Find direction that lift will act. lift is perpendicular to the drag vector
         let lift_tmp = common::Myvec::crossproduct(&v_drag_vector, &rigidbod.element[i].v_normal);
         let mut v_lift_vector = common::Myvec::crossproduct(&lift_tmp, &v_drag_vector);
-
         let mut tmp = v_lift_vector.magnitude(); 
-
         v_lift_vector.normalize();
   
         //----------------Find the angle of attack. its the angle between the lift vector and element normal vector 
@@ -383,10 +377,10 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
             tmp = -1.0;
         }
 
-        let f_attack_angle: f64 = tmp.asin(); //asin gives in radians...
-       // println!("atk angle: {}", f_attack_angle);
+        let f_attack_angle: f64 = tmp.asin().to_degrees();
+
         //------------------Determine lift and drag force on the element (rho is 1.225 in the book)  BUT IN THE COMMON HEADER FILE IT IS 0.0023769
-        tmp = 0.5 * 0.00237 * f_local_speed * f_local_speed * rigidbod.element[i].f_area;   
+        tmp = 0.5 * 0.002376900055 * f_local_speed * f_local_speed * rigidbod.element[i].f_area;   
 
         if i == 6 //tail/ rudder
         {
@@ -398,7 +392,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         //this is not in the book code but its in the actual code...
         else if i == 7
         {
-            v_resultant = common::Myvec::multiplyscalar(&v_drag_vector, 0.5 * tmp);
+            v_resultant = common::Myvec::multiplyscalar(&v_drag_vector, 0.5 * tmp); //simulate fuseulage
 
         }
         else
@@ -435,16 +429,11 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
      rigidbod.v_forces = common::Myquaternion::qvrotate(&rigidbod.q_orientation, &fb);
 
     //------------------apply gravity (g is -32.174 ft/s^2), ONLY APPLY WHEN ALTITUDE IS GREATER THAN ZERO.... how to fidn altitude????
-    //if rigidbod.alt > 0.0
-    //{
-        rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.174) * rigidbod.mass;
-   // }
+    rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.17399979) * rigidbod.mass;
 
     rigidbod.v_moments = common::Myvec::addvec(&rigidbod.v_moments, &mb);
 
-
 }
-
 
 
 
@@ -462,7 +451,8 @@ impl<'a> System<'a> for EquationsOfMotion
         for (mut rigidbod, keystate) in (&mut rigidbody, &keyboardstate).join() 
         {
 
-            //could put thrust variables as globals
+
+            //could put thrust variables as globals.. its here for now
             let max_thrust = 3000.0; //max thrustforce value //was 3000
             let d_thrust = 100.0;   //change in thrust per keypress //was 100
 
@@ -475,6 +465,10 @@ impl<'a> System<'a> for EquationsOfMotion
             //elevators
             rigidbod.element[4].i_flap = 0;
             rigidbod.element[5].i_flap = 0;
+            //zero flaps
+            rigidbod.element[1].i_flap = 0;
+            rigidbod.element[2].i_flap = 0;
+            rigidbod.flaps = false;
 
 
             //Handle the input states
@@ -533,12 +527,12 @@ impl<'a> System<'a> for EquationsOfMotion
                 rigidbod.element[2].i_flap = -1;
                 rigidbod.flaps = true;
             } 
-            else if keystate.zero_flaps == true //this is not the same as the zeroing done in the beggining each loop
-            { 
-                rigidbod.element[1].i_flap = 0;
-                rigidbod.element[2].i_flap = 0;
-                rigidbod.flaps = false;
-            } 
+            // else if keystate.zero_flaps == true //this is not the same as the zeroing done in the beggining each loop
+            // { 
+            //     rigidbod.element[1].i_flap = 0;
+            //     rigidbod.element[2].i_flap = 0;
+            //     rigidbod.flaps = false;
+            // } 
 
 
             //begin the step simulation part
@@ -550,29 +544,25 @@ impl<'a> System<'a> for EquationsOfMotion
             let ae: common::Myvec = common::Myvec::dividescalar(&rigidbod.v_forces, rigidbod.mass);
 
             //----------------Calculate velocity of airplane in earth space
-            let ae_mult_dt_tmp = common::Myvec::multiplyscalar(&ae, DT);
-            rigidbod.v_velocity = common::Myvec::addvec(&rigidbod.v_velocity, &ae_mult_dt_tmp); 
+           // let ae_mult_dt_tmp = common::Myvec::multiplyscalar(&ae, DT);
+            //rigidbod.v_velocity = common::Myvec::addvec(&rigidbod.v_velocity, &ae_mult_dt_tmp); 
 
             //---------------Calculate position of airplane in earth space
-            let mut vel_mult_dt_tmp = common::Myvec::multiplyscalar(&rigidbod.v_velocity, DT);
+           // let mut vel_mult_dt_tmp = common::Myvec::multiplyscalar(&rigidbod.v_velocity, DT);
 
-
-            //let another_tmp = common::Myvec::multiplyscalar(&vel_mult_dt_tmp, 0.000001); 
-            // let another_tmp2 = common::Myvec::dividescalar(&another_tmp, 364173.0); 
+            //need to convert feet distances to lat/lon distances when using flightgear
             //convert EACH to native measurement... but x and y is in lat lon and z is in meters (model uses feet for all three)
-           //1 deg latitude = 364,000 feet, 1 deg lon = 288200 feet. (at 38 degrees north latitude)
+            //1 deg latitude = 364,000 feet, 1 deg lon = 288200 feet. (at 38 degrees north latitude)
 
-           //handle latitude
-           vel_mult_dt_tmp.x = vel_mult_dt_tmp.x / 364000.0;
-           //lon
-           vel_mult_dt_tmp.y = vel_mult_dt_tmp.y / 288200.0;
-           //alt
-           vel_mult_dt_tmp.z = vel_mult_dt_tmp.z / 3.281; //convert to meters
+            //handle latitude
+            // vel_mult_dt_tmp.x = vel_mult_dt_tmp.x / 364000.0;
+            // //lon
+            // vel_mult_dt_tmp.y = vel_mult_dt_tmp.y / 288200.0;
+            // //alt
+            // vel_mult_dt_tmp.z = vel_mult_dt_tmp.z / 3.281; //convert to meters
 
-           
-           
  
-            rigidbod.v_position = common::Myvec::addvec(&rigidbod.v_position, &vel_mult_dt_tmp); //add the degrees on lat/lon/and meters (model uses feet for this)
+            //rigidbod.v_position = common::Myvec::addvec(&rigidbod.v_position, &vel_mult_dt_tmp); //add the degrees on lat/lon/and meters (model uses feet for this)
 
             //--------------Calculate angular velocity of airplane in body space
             let one = common::Mymatrix::multiply_matrix_by_vec(&rigidbod.m_inertia, &rigidbod.v_angular_velocity);
@@ -607,6 +597,27 @@ impl<'a> System<'a> for EquationsOfMotion
             rigidbod.v_euler_angles.y = euler.y;
             rigidbod.v_euler_angles.z = euler.z;
             
+
+
+            //Print some relevant data
+          
+            println!("time:             {}, frames: {}", rigidbod.frame_count * DT, rigidbod.frame_count);
+            println!("roll:             {:?}", rigidbod.v_euler_angles.x);
+            println!("pitch:            {:?}", -rigidbod.v_euler_angles.y);
+            println!("yaw:              {:?}", rigidbod.v_euler_angles.z);
+            println!("alt:              {}", rigidbod.v_position.z);
+            println!("thrus:            {}", rigidbod.thrustforce);
+            println!("speed:            {:?}", rigidbod.f_speed/1.688 );
+            println!("pos x:            {}", rigidbod.v_position.x);
+            println!("pos y:            {}", rigidbod.v_position.y);
+            println!("pos z:            {}", rigidbod.v_position.z);
+            println!("{}", "====================================================");
+
+            //quit after so many frames
+            //  if rigidbod.frame_count == 1000.0
+            // {
+                //process::exit(1);
+            //  }
             rigidbod.frame_count = rigidbod.frame_count + 1.0;
 
         }//end for
@@ -627,7 +638,7 @@ impl<'a> System<'a> for SendPacket
     {
         for (rigidbod, _netfdm,) in (&rigidbody, &fgnetfdm).join() 
         {
-                                    //lat, lon
+
             //ktts airport location: 28.5971, -80.6827, 609.6 meters = 2000 ft
 
             //All data passed into the FGNetFDM struct is converted to network byte order
@@ -642,21 +653,18 @@ impl<'a> System<'a> for SendPacket
 
             //Coordinate conversion: cartesian to geodetic
             //make nalgebra vector for it
+            //NOT NEEDED ANYMORE
            // let nalgebra_vec = Vector3::new(rigidbod.v_position.x, rigidbod.v_position.y, rigidbod.v_position.z);
            // let lla = geo::ecef2lla(&nalgebra_vec, &ELLIPSOID); 
-
-            //Set lat, long, alt
-
-            
-            fdm.latitude = f64::from_be_bytes(rigidbod.v_position.x.to_ne_bytes());
-            fdm.longitude = f64::from_be_bytes(rigidbod.v_position.y.to_ne_bytes()); 
-            fdm.altitude = f64::from_be_bytes(rigidbod.v_position.z.to_ne_bytes()); //flightgear wants meters here, but on screen it displays feet
-                                                                                    //bourg says the distance unit is feet
-           
             // fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
             // fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); 
             // fdm.altitude = f64::from_be_bytes(lla.z.to_ne_bytes()); //lla.z seems to increase altitude artificially... //rigidbod.alt
            
+            //Set lat, long, alt
+            fdm.latitude = f64::from_be_bytes(rigidbod.v_position.x.to_ne_bytes());
+            fdm.longitude = f64::from_be_bytes(rigidbod.v_position.y.to_ne_bytes()); 
+            fdm.altitude = f64::from_be_bytes(rigidbod.v_position.z.to_ne_bytes()); //flightgear wants meters here, but on screen it displays feet
+                                                                                    //bourg says the distance unit is feet
             //Roll, Pitch, Yaw
             fdm.phi = f32::from_be_bytes(roll.to_ne_bytes());
             fdm.theta = f32::from_be_bytes((pitch).to_ne_bytes()); 
@@ -675,39 +683,8 @@ impl<'a> System<'a> for SendPacket
             //Convert struct array of u8 of bytes
             let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
 
-
-           //Finally send &[u8] of bytes over socket connected on FlightGear
+            //Finally send &[u8] of bytes over socket connected on FlightGear
             SOCKET.send(bytes).expect("couldn't send message");
-
-
-            //Print some relevant data
-            println!("{}", "--------------------------------------------------");
-
-           // println!("position lla: {:?}", lla);
-           // println!("velocity: {:?}", rigidbod.v_velocity);
-           // println!("velocity body: {:?}", rigidbod.v_velocity_body);
-          //  println!("angular velocity: {:?}", rigidbod.v_angular_velocity);
-           println!("roll:  {:?}", rigidbod.v_euler_angles.x);
-           println!("pitch: {:?}", rigidbod.v_euler_angles.y);
-           println!("yaw:  {:?}", rigidbod.v_euler_angles.z);
-           println!("pos x: {}", rigidbod.v_position.x);
-           println!("pos y:{}", rigidbod.v_position.y);
-           println!("altitude: {}", rigidbod.v_position.z);// rigidbod.alt);
-           println!("thrustforce: {}", rigidbod.thrustforce);
-            println!("speed (knots): {:?}", rigidbod.f_speed/1.688 );
-            println!("velocity: {:?}", rigidbod.v_velocity);
-            println!("time: {}", rigidbod.frame_count * DT);
-           // println!("quaternion: {:?}", rigidbod.q_orientation);
-           // println!("forces: {:?}", rigidbod.v_forces);
-           // println!("moments: {:?}", rigidbod.v_moments);
-
-
-
-            //quit program after so much time/ or frames
-            // if rigidbod.frame_count == 1000.0
-            // {
-            //     process::exit(1);
-            // }
 
         }//end for
     }//end run
@@ -746,7 +723,7 @@ impl<'a> System<'a> for FlightControl
             keystate.pitch_down = false;
             //keystate.zero_elevators = true,
         
-            //flaps will be toggled on and off so do not set them false for every iteration
+            //flaps could be toggled on and off so do not set them false for every iteration
             // keystate.flaps_down = false;
             // keystate.zero_flaps = false;
 
@@ -832,7 +809,7 @@ lazy_static!
 }
 
 //Time in between each eom calculation
-static FRAME_RATE: f64 = 1000.0; //0.016; //THE C++ EXAMPLE ALWAYS RUNS AT 1000 FPS CUZ IT LOOPS SO FAST
+static FRAME_RATE: f64 = 30.0; //0.016; //THE C++ EXAMPLE ALWAYS RUNS AT 1000 FPS CUZ IT LOOPS SO FAST
 static DT: f64 = 1.0 / FRAME_RATE;
 
 fn main()
@@ -856,10 +833,17 @@ fn main()
 
     //make default values, and fill in what we need at the start, this will be passed to the entity
     let mut myairplane = RigidBody{..Default::default()};
-    myairplane.v_position.x = 28.5971; // -5000.0; // //907440.867577218;//
-    myairplane.v_position.y =   -80.6827; //0.0;//;//-5530938.88177552;// 
-    myairplane.v_position.z =  609.6; //2000.0; ///3035061.57686847; // 
-   // 28.5971, -80.6827, 609.6
+
+    //start position of c++ program
+    // myairplane.v_position.x = -5000.0;
+    // myairplane.v_position.y =   0.0;
+    // myairplane.v_position.z =  2000.0; 
+
+    //ktts airport in geodetic coord..now it doesnt want to go here...
+    myairplane.v_position.x = 28.5971;
+    myairplane.v_position.y =  -80.6827;
+    myairplane.v_position.z =   609.6; //2000 ft
+
     myairplane.v_velocity.x = 60.0;
     myairplane.f_speed = 60.0;
     myairplane.v_forces.x = 500.0;
@@ -876,11 +860,13 @@ fn main()
         PointMass{f_mass: 31.8, v_d_coords: common::Myvec::new(15.25, 0.0, 1.5), v_local_inertia: common::Myvec::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) }
         ];
     myairplane.q_orientation = common::Myquaternion::make_q_from_euler(0.0, 0.0, 0.0);
-  
+
+
+ 
     //Calculate mass properties on this airplane initialized
     calc_airplane_mass_properties(&mut myairplane);
 
-
+    //in the experiment we can have a for loop creating a # of entities, could be at same location it doesnt matter for performance..? 
     //Create plane Entity and populate the Component data using the adata from myairplane (had to do this because i could not calculate mass properties from the entity directly)
     let _plane = world.create_entity()
     .with(RigidBody{
@@ -930,6 +916,12 @@ fn main()
         })
     .build();
 
+    //experiment will have many of these same entities
+    // for _ in 0..1000 
+    //{
+            //world.create_entity().with(XXXXXXX).build();
+    //}
+
 
     //Simulation loop
 
@@ -939,16 +931,20 @@ fn main()
     //get dt as a Time type
     let milli_calc = DT * 1000.0; //turn dt into milliseconds
     let steptime = milli_calc.milliseconds(); 
+
+
     loop 
     {
 
         let start = Instant::now();
 
-        dispatcher.dispatch(&world);
+        dispatcher.dispatch(&world); 
         world.maintain();
 
-
-             //Create frame_rate loop
+        // Create frame_rate loop
+        //commented out when not using flightgear and running experiment
+//
+         
             let calc_time = start.elapsed(); //how long this calculation took
 
             if calc_time < steptime //if calc time takes less than 33 ms
@@ -957,10 +953,8 @@ fn main()
                 //this was much more complicated than it should have been....
                 let calc_time2 = calc_time.as_secs_f64() * 1000.0; //get the value in ms of how long the calculation ran 
                 let sleep_time = steptime - calc_time2.milliseconds(); //subtract step time and the calculation time
-                //steptime.checked_sub(sleep_time1.milliseconds()); //step time - sleep time
-                //thread::sleep(runtime - sleep_time); //sleep for the extra time
-                let sleep_time2 = sleep_time.as_seconds_f64() * 1000.0; //get value in ms 
 
+                let sleep_time2 = sleep_time.as_seconds_f64() * 1000.0; //get value in ms 
                 let sleep_duration = Duration::from_millis(sleep_time2 as u64);
 
                 thread::sleep(sleep_duration); //sleep for the extra time
@@ -969,6 +963,10 @@ fn main()
                 //   thread::sleep(more_sleep);
 
             }
+
+
+//
+
 
     }
 
@@ -1070,7 +1068,7 @@ fn rudder_lift_coefficient(angle: f64) -> f64
     let mut cl: f64 = 0.0;
     let aa: f64 = angle.abs();
 
-    for i in 0..6  
+    for i in 0..6 
     {
         if a[i] <= aa && a[i + 1] > aa
         {
@@ -1101,7 +1099,6 @@ fn rudder_drag_coefficient(angle: f64) -> f64
         if a[i] <= aa && a[i + 1] > aa
         {
             cd = cdf0[i] - (a[i] - aa) * (cdf0[i] - cdf0[i + 1]) / (a[i] - a[i + 1]);
-
             break;
         }
     }
