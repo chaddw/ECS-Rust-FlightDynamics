@@ -6,7 +6,7 @@
 
 //Imports for flight control
 extern crate device_query;
-use device_query::{DeviceQuery, DeviceState, Keycode};
+use device_query::{DeviceQuery, DeviceState, MouseState, Keycode};
 
 //Specs
 use specs::prelude::*;
@@ -26,9 +26,8 @@ extern crate lazy_static;
 use std::process;
 
 //Nalgebra vector
-//not being used right now
-//extern crate nalgebra as na;
-//use na::{ Vector3}; 
+extern crate nalgebra as na;
+use na::{ Vector3}; 
 
 //game loop
 use std::thread;
@@ -218,6 +217,7 @@ fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
 {
 
     //element pieces are initialized when the airplane entity is initialized in main
+
 
     let mut inn: f64;
     let mut di: f64;
@@ -511,7 +511,6 @@ impl<'a> System<'a> for EquationsOfMotion
             { 
                 rigidbod.element[4].i_flap = 1;
                 rigidbod.element[5].i_flap = 1;
-                //println!("{}", "PITCHING UP");
             } 
             else if keystate.pitch_down == true
             { 
@@ -544,25 +543,26 @@ impl<'a> System<'a> for EquationsOfMotion
             let ae: common::Myvec = common::Myvec::dividescalar(&rigidbod.v_forces, rigidbod.mass);
 
             //----------------Calculate velocity of airplane in earth space
-           // let ae_mult_dt_tmp = common::Myvec::multiplyscalar(&ae, DT);
-            //rigidbod.v_velocity = common::Myvec::addvec(&rigidbod.v_velocity, &ae_mult_dt_tmp); 
+            let ae_mult_dt_tmp = common::Myvec::multiplyscalar(&ae, DT);
+            rigidbod.v_velocity = common::Myvec::addvec(&rigidbod.v_velocity, &ae_mult_dt_tmp); 
 
             //---------------Calculate position of airplane in earth space
-           // let mut vel_mult_dt_tmp = common::Myvec::multiplyscalar(&rigidbod.v_velocity, DT);
+            let mut vel_mult_dt_tmp = common::Myvec::multiplyscalar(&rigidbod.v_velocity, DT);
 
             //need to convert feet distances to lat/lon distances when using flightgear
             //convert EACH to native measurement... but x and y is in lat lon and z is in meters (model uses feet for all three)
             //1 deg latitude = 364,000 feet, 1 deg lon = 288200 feet. (at 38 degrees north latitude)
 
+            //THE SCALES NEED TO BE CHANGED
             //handle latitude
-            // vel_mult_dt_tmp.x = vel_mult_dt_tmp.x / 364000.0;
-            // //lon
-            // vel_mult_dt_tmp.y = vel_mult_dt_tmp.y / 288200.0;
-            // //alt
-            // vel_mult_dt_tmp.z = vel_mult_dt_tmp.z / 3.281; //convert to meters
+            vel_mult_dt_tmp.x = vel_mult_dt_tmp.x / 1364000.0; 
+            //lon
+            vel_mult_dt_tmp.y = vel_mult_dt_tmp.y / 1288200.0;
+            //alt
+            vel_mult_dt_tmp.z = vel_mult_dt_tmp.z / 3.281; //convert to meters
 
  
-            //rigidbod.v_position = common::Myvec::addvec(&rigidbod.v_position, &vel_mult_dt_tmp); //add the degrees on lat/lon/and meters (model uses feet for this)
+            rigidbod.v_position = common::Myvec::addvec(&rigidbod.v_position, &vel_mult_dt_tmp); //add the degrees on lat/lon/and meters (model uses feet for this)
 
             //--------------Calculate angular velocity of airplane in body space
             let one = common::Mymatrix::multiply_matrix_by_vec(&rigidbod.m_inertia, &rigidbod.v_angular_velocity);
@@ -593,9 +593,10 @@ impl<'a> System<'a> for EquationsOfMotion
     
            //--------------Get euler angles for our info
             let euler = common::Myquaternion::make_euler_from_q(&rigidbod.q_orientation);
-            rigidbod.v_euler_angles.x = euler.x;
-            rigidbod.v_euler_angles.y = euler.y;
-            rigidbod.v_euler_angles.z = euler.z;
+            //THESE ARENT SUPPOSED TO BE MADE NEGATIVE BUT IT FIXES ALL THE ISSUES VISUALLY
+            rigidbod.v_euler_angles.x = -euler.x;
+            rigidbod.v_euler_angles.y = -euler.y; 
+            rigidbod.v_euler_angles.z = -euler.z;
             
 
 
@@ -613,11 +614,11 @@ impl<'a> System<'a> for EquationsOfMotion
             println!("pos z:            {}", rigidbod.v_position.z);
             println!("{}", "====================================================");
 
-            //quit after so many frames
-            //  if rigidbod.frame_count == 1000.0
-            // {
+            //quit program after so many frames
+           // if rigidbod.frame_count == 1000.0
+           // {
                 //process::exit(1);
-            //  }
+          //  }
             rigidbod.frame_count = rigidbod.frame_count + 1.0;
 
         }//end for
@@ -647,7 +648,7 @@ impl<'a> System<'a> for SendPacket
             let mut fdm: FGNetFDM = Default::default();
             
             //Set Roll, Pitch, Yaw
-            let roll: f32 = rigidbod.v_euler_angles.x.to_radians() as f32;
+            let roll: f32 = -rigidbod.v_euler_angles.x.to_radians() as f32; //THIS HAD TO BE MADE NEGATIVE
             let pitch: f32 =  rigidbod.v_euler_angles.y.to_radians() as f32; 
             let yaw: f32 =  rigidbod.v_euler_angles.z.to_radians() as f32;
 
@@ -795,8 +796,6 @@ impl<'a> System<'a> for FlightControl
 
 
 
-
-
 //Set some global variables:
 //Macro to define other globals
 lazy_static!
@@ -834,12 +833,12 @@ fn main()
     //make default values, and fill in what we need at the start, this will be passed to the entity
     let mut myairplane = RigidBody{..Default::default()};
 
-    //start position of c++ program
+    //c++ program start position
     // myairplane.v_position.x = -5000.0;
     // myairplane.v_position.y =   0.0;
     // myairplane.v_position.z =  2000.0; 
 
-    //ktts airport in geodetic coord..now it doesnt want to go here...
+    //ktts airport in geodetic coord
     myairplane.v_position.x = 28.5971;
     myairplane.v_position.y =  -80.6827;
     myairplane.v_position.z =   609.6; //2000 ft
