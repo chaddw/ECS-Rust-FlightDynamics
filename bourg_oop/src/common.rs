@@ -4,7 +4,7 @@
 //{
 
 
-    #[derive(Debug, Default)]
+    #[derive(Debug, Default, Clone)]
     pub struct Myvec
     {
         pub x: f64,
@@ -159,7 +159,7 @@
     
     }
     
-    #[derive(Debug, Default)]
+    #[derive(Debug, Default, Clone)]
     pub struct Myquaternion
     {
         pub n: f64, //scalar part
@@ -384,7 +384,7 @@
     }
     
     
-    #[derive(Debug, Default)]
+    #[derive(Debug, Default, Clone)]
     pub struct Mymatrix
     {
        // elements eij: i -> row, j -> column

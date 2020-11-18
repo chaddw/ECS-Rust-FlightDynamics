@@ -2,7 +2,7 @@
 //Vector, Matrix, Quaternion module
 mod common;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PointMass
 {
     f_mass: f64,
@@ -16,7 +16,7 @@ struct PointMass
     v_cg_coords: common::Myvec
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 struct RigidBody
 {
     mass: f64,                                  //total mass
@@ -41,77 +41,6 @@ struct RigidBody
 
 impl RigidBody
 {
-    //quicker way to initialize...
-    // fn new() -> RigidBody 
-    // {
-    //     Self
-    //     {
-
-           
-
-    //         mass: 0.0,  
-
-    //        // mmInertia: [[0.0; 3]; 3], //3x3 matrix... was using this before nalgebra
-
-    //        //nalgebra approach
-    //         m_inertia: Matrix3::new(0.0, 0.0, 0.0,
-    //                                 0.0, 0.0, 0.0,
-    //                                0.0, 0.0, 0.0),
-    //         m_inertia_inverse: Matrix3::new(0.0, 0.0, 0.0,
-    //                                 0.0, 0.0, 0.0,
-    //                                0.0, 0.0, 0.0),
-
-    //         //set initial position
-    //         v_position: Vector3::new(-5000.0, 0.0, 200.0),
-
-    //         //set initial velocity
-    //         v_velocity: Vector3::new(60.0, 0.0, 0.0),
-
-    //         v_euler_angles: Vector3::new(0.0, 0.0,0.0), //not defined in book here
-
-    //         f_speed: 60.0,
-
-    //         //set angular velocity
-    //         v_angular_velocity: Vector3::new(0.0, 0.0, 0.0),
-
-    //         //set initial thrust, forces, and moments
-    //         v_forces: Vector3::new(500.0, 0.0, 0.0),
-    //         thrustforce: 500.0,   //this isnt written in the rigid body intiialization for some reason...
-
-    //         v_moments: Vector3::new(0.0, 0.0, 0.0),
-
-    //         //zero the velocity in body space coordinates
-    //         v_velocity_body: Vector3::new(0.0, 0.0, 0.0),
-
-    //         //set these to false at first, will control later with keyboard... these are not defined in the structure
-    //         stalling: false,
-    //         flaps: false,
-
-    //         //set initial orientation
-    //         //q_orientation: MakeQFromEulerAngles(0.0, 0.0, 0.0),  
-    //         //q_orientation: Quaternion{n: 0.0, v: Vector{x: 0.0, y: 0.0, z: 0.0}}, //default value for now
-
-    //         //nalgebra approach
-    //         q_orientation: Quaternion::new(0.0, 0.0, 0.0, 0.0), //from_euler_angles(0.0, 0.0, 0.0),
-    //        q_orientation_unit: UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
-
-
-    //         //8 elements of the plane taken into account
-    //         element: vec![
-    //             PointMass{f_mass: 6.56, v_d_coords: Vector3::new(14.5, 12.0, 2.5), v_local_inertia: Vector3::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
-    //             PointMass{f_mass: 7.31, v_d_coords: Vector3::new(14.5, 5.5, 2.5), v_local_inertia: Vector3::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
-    //             PointMass{f_mass: 7.31, v_d_coords: Vector3::new(14.5, -5.5, 2.5), v_local_inertia: Vector3::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
-    //             PointMass{f_mass: 6.56, v_d_coords: Vector3::new(14.5, -12.0, 2.5), v_local_inertia: Vector3::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
-    //             PointMass{f_mass: 2.62, v_d_coords: Vector3::new(3.03, 2.5, 3.0), v_local_inertia: Vector3::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
-    //             PointMass{f_mass: 2.62, v_d_coords: Vector3::new(3.03, -2.5, 3.0), v_local_inertia: Vector3::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
-    //             PointMass{f_mass: 2.93, v_d_coords: Vector3::new(2.25, 0.0, 5.0), v_local_inertia: Vector3::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) },
-    //             PointMass{f_mass: 31.8, v_d_coords: Vector3::new(15.25, 0.0, 1.5), v_local_inertia: Vector3::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: Vector3::new(0.0, 0.0, 0.0), v_cg_coords: Vector3::new(0.0, 0.0, 0.0) }
-    //             ]
-
-           
-    //     }
-
-    // }
 
     fn calc_airplane_mass_properties(&mut self)
     {
@@ -121,7 +50,7 @@ impl RigidBody
         let mut di: f64;
 
         //Calculate the normal (perpendicular) vector to each lifting surface. This is needed for relative air velocity to find lift and drag.
-        for  i in self.element.iter_mut()
+        for i in self.element.iter_mut()
         {
             inn = (i.f_incidence).to_radians();
             di = (i.f_dihedral).to_radians();
@@ -447,22 +376,23 @@ impl RigidBody
 } //end impl
 
 //set frame rate, which will set the delta time
-static FRAME_RATE: f64 = 30.0; //0.016; //THE C++ EXAMPLE ALWAYS RUNS AT 1000 FPS CUZ IT LOOPS SO FAST
-
+static FRAME_RATE: f64 = 30.0;
 
 //set thrust parameters
 static D_THRUST: f64 = 100.0;
 static MAX_THRUST: f64 = 3000.0;
 fn main()
 {
+
+    let dt: f64 = 1.0 / FRAME_RATE; //calculates time step based on frame rate
+    let mut current_time: f64 = 0.0; //keeps track of total time elapsed
+
     //Intialize the airplane
-    //make default values, and fill in what we need at the start, this will be passed to the entity
+    //make default values, and then fill in what we need for the calculation of mass properties
     let mut myairplane = RigidBody{..Default::default()};
-    //c++ program start position
     myairplane.v_position.x = -5000.0;
     myairplane.v_position.y =  0.0;
     myairplane.v_position.z =  2000.0; 
-
     myairplane.v_velocity.x = 60.0;
     myairplane.f_speed = 60.0;
     myairplane.v_forces.x = 500.0;
@@ -482,50 +412,47 @@ fn main()
 
     myairplane.calc_airplane_mass_properties(); 
     
-    //create objects to be processed
-    // let mut objects: Vec<&RigidBody> = Vec::new();
-    // for _ in 0..1000 //loop
-    // {
-    //     objects.push(&myairplane);
-    // }
+    //create a vector containing all the identical airplane objects to be processed
+    let mut objects = vec![myairplane.clone() ; 1000]; 
 
+    //how many frames will be processed for each of the airplanes in the object vector
+    let frames_to_process = 10; 
 
-    for _ in 0..1000 //loop
+    //begin iteration of the frames
+    for _ in 0..frames_to_process 
     {
+        //loop for how many objects are being processed
+        for i in objects.iter_mut() 
+        {
+            //zero everything for this iteration (this isnt actually needed if we only press 1 key consistently for each frame. this certaintly needed for flightgear simulation)
+            i.zero_ailerons();
+            i.zero_elevators();
+            i.zero_rudder();
+            i.zero_flaps(); 
 
-        let dt: f64 = 1.0 / FRAME_RATE;
-        //zero everything (this isnt actually needed if we only press 1 key consistently for each frame. this certaintly needed for flightgear simulation)
-        myairplane.zero_ailerons();
-        myairplane.zero_elevators();
-        myairplane.zero_rudder();
-        myairplane.zero_flaps(); 
+            //flight meanuever goes here
+            //i.inc_thrust();
 
-        //flight meanuever goes here
-        //myairplane.inc_thrust();
+            //update
+            i.step_simulation(dt);
 
-        //update
-        myairplane.step_simulation(dt);
-
-        //Print some relevant data
-        println!("time:             {}, frames: {}", myairplane.frame_count * dt, myairplane.frame_count);
-        println!("roll:             {}", myairplane.v_euler_angles.x);
-        println!("pitch:            {}", myairplane.v_euler_angles.y); //c++ has this as negative to make pitching down (negative) to make more sense, but i believe flightgear wants to see this as negative anyway
-        println!("yaw:              {}", myairplane.v_euler_angles.z);
-        println!("alt:              {}", myairplane.v_position.z);
-        println!("thrus:            {}", myairplane.thrustforce);
-        println!("speed:            {}", myairplane.f_speed/1.688 );
-        println!("pos x:            {}", myairplane.v_position.x);
-        println!("pos y:            {}", myairplane.v_position.y);
-        println!("pos z:            {}", myairplane.v_position.z);
-        println!("{}", "====================================================");
-
-        myairplane.frame_count = myairplane.frame_count + 1.0;
-
+            //Print some relevant data
+            println!("time:             {}", current_time);
+            println!("roll:             {}", i.v_euler_angles.x);
+            println!("pitch:            {}", i.v_euler_angles.y); //c++ has this as negative to make pitching down (negative) to make more sense, but i believe flightgear wants to see this as negative anyway
+            println!("yaw:              {}", i.v_euler_angles.z);
+            println!("alt:              {}", i.v_position.z);
+            println!("thrus:            {}", i.thrustforce);
+            println!("speed:            {}", i.f_speed/1.688 );
+            println!("pos x:            {}", i.v_position.x);
+            println!("pos y:            {}", i.v_position.y);
+            println!("pos z:            {}", i.v_position.z);
+            println!("{}", "====================================================");
+        }
+        
+        current_time = current_time + dt;
     }
-
-    //println!("{:?}", &objects[69]);
 }
-
 
 //Functions to collect airfoil performance data:
 //lift and drag coefficient data is given for a set of discrete attack angles, 
