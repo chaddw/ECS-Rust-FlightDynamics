@@ -23,6 +23,10 @@ use std::process;
 //Main loop
 use std::{thread, time};
 
+//Coordinate transform
+extern crate coord_transforms;
+use coord_transforms::prelude::*;
+
 //Vector, Matrix, Quaternion module
 mod common;
 
@@ -185,6 +189,101 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
     ::std::slice::from_raw_parts((p as *const T) as *const u8,::std::mem::size_of::<T>(),)
 }
 
+
+//System to handle user input
+struct FlightControl;
+impl<'a> System<'a> for FlightControl
+{
+    type SystemData = ( 
+        ReadStorage<'a, RigidBody>, 
+        WriteStorage<'a, KeyboardState>,
+    );
+    //i do not need to read in rigid body but it does not let me only take in 1 component...
+    fn run(&mut self, (rigidbody, mut keyboardstate): Self::SystemData) 
+    {
+        for (_rigidbod, keystate) in (&rigidbody, &mut keyboardstate).join() 
+        {
+            //Set all states false before we know if they are being activated
+            //rudder, ailerons, and elevators will be zerod in EOM system
+            keystate.thrust_up = false; 
+            keystate.thrust_down = false;
+
+            keystate.left_rudder = false;
+            keystate.right_rudder = false;
+        
+            keystate.roll_left = false;
+            keystate.roll_right = false;
+ 
+        
+            keystate.pitch_up = false;
+            keystate.pitch_down = false;
+
+            //flaps are toggled on and off, so they dont need to be set to false each time
+
+            //Setup device query states
+            let device_state = DeviceState::new();
+            let keys: Vec<Keycode> = device_state.get_keys();
+
+            if keys.contains(&Keycode::A)
+            {
+                keystate.thrust_up = true;
+            }
+            else if keys.contains(&Keycode::Z)
+            {
+                keystate.thrust_down = true;
+            }
+
+            //Rudders for yaw
+            else if keys.contains(&Keycode::N)
+            {
+                keystate.left_rudder = true;
+            }
+            else if keys.contains(&Keycode::M)
+            {
+                keystate.right_rudder = true;
+            }
+
+            //Ailerons for roll
+            else if keys.contains(&Keycode::Left)
+            {
+                keystate.roll_left = true;
+            }
+            else if keys.contains(&Keycode::Right)
+            {
+                keystate.roll_right = true;
+            }
+
+            //Elevators for Pitch
+            else if keys.contains(&Keycode::Up)
+            {
+                keystate.pitch_up = true;
+            }
+            else if keys.contains(&Keycode::Down)
+            {
+                keystate.pitch_down = true;
+            }
+
+            //Flaps for lift
+            else if keys.contains(&Keycode::F)
+            {
+                keystate.flaps_down = true;
+                keystate.zero_flaps = false;
+            }
+            else if  keys.contains(&Keycode::G)
+            {
+                keystate.zero_flaps = true;
+                keystate.flaps_down = false;
+            }
+
+            //Quit program
+            else if keys.contains(&Keycode::Q)
+            {
+                process::exit(1);
+            }
+
+        }//end for
+    }//end run
+}//end system
 
 //MASS PROPERTIES ONLY CALLED ONCE AT BEGGINING
 fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
@@ -425,7 +524,7 @@ impl<'a> System<'a> for EquationsOfMotion
             else if rigidbod.thrustforce > 0.0 && keystate.thrust_down == true
             {
                 rigidbod.thrustforce = rigidbod.thrustforce - D_THRUST;
-            } 
+            }
 
             //Rudder States
             if keystate.left_rudder == true
@@ -496,13 +595,13 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //need to convert feet distances to lat/lon distances when using flightgear
             //convert EACH to native measurement... but x and y is in lat lon and z is in meters (bourg model uses feet for all three)
-            //1 deg latitude = 364,000 feet, 1 deg lon = 288200 feet. (at 38 degrees north latitude)
+            //1 deg latitude = 364,000 feet, 1 deg lon = 288200 feet (at 38 degrees north latitude)
 
-            //?THE CONVERION NEEDS TO BE FIXED BECAUSE THE PLANE COVERS WAY TOO MUCH DISTANCE. I ADDED An extra 3 TO SLOW THINGS DOWN
+            //?THE CONVERION NEEDS TO BE FIXED BECAUSE THE PLANE COVERS WAY TOO MUCH DISTANCE. I ADDED An extra 9 TO SLOW THINGS DOWN
             //handle latitude
-            vel_mult_dt_tmp.x = vel_mult_dt_tmp.x / 3364000.0; //convert to distance in degrees latitude
+            vel_mult_dt_tmp.x = vel_mult_dt_tmp.x / 9364000.0; //convert to distance in degrees latitude
             //lon
-            vel_mult_dt_tmp.y = vel_mult_dt_tmp.y / 3288200.0; //convert to distance in degrees longitude
+            vel_mult_dt_tmp.y = vel_mult_dt_tmp.y / 9288200.0; //convert to distance in degrees longitude
             //alt
             vel_mult_dt_tmp.z = vel_mult_dt_tmp.z / 3.281; //convert to meters
 
@@ -536,6 +635,7 @@ impl<'a> System<'a> for EquationsOfMotion
     
            //Get euler angles for our info
             let euler = common::Myquaternion::make_euler_from_q(&rigidbod.q_orientation);
+            //yaw is negated or roll depending on position starting, and always pitch
             rigidbod.v_euler_angles.x = -euler.x; //this isnt supposed to be negative in bourgs model...?
             rigidbod.v_euler_angles.y = -euler.y; //this isnt supposed to be negative in bourgs model...
             rigidbod.v_euler_angles.z = euler.z; //this isnt supposed to be negative in bourgs model... (this needed to be negative when using the geodetic coordinates for ktts airport, along with yaw, but not x)
@@ -544,9 +644,9 @@ impl<'a> System<'a> for EquationsOfMotion
             println!("roll:             {}", rigidbod.v_euler_angles.x);
             println!("pitch:            {}", rigidbod.v_euler_angles.y); //c++ has this as negative to make pitching down (negative) to make more sense, but i believe flightgear wants to see this as negative anyway
             println!("yaw:              {}", rigidbod.v_euler_angles.z);
-            println!("alt:              {}", rigidbod.v_position.z);
+            println!("alt:              {}", rigidbod.v_position.z - 248.0); //accounting for starting elevation in this spot
             println!("thrus:            {}", rigidbod.thrustforce);
-            println!("speed:            {}", rigidbod.f_speed/1.688 );
+            println!("speed:            {}", rigidbod.f_speed/1.688);
             println!("pos x:            {}", rigidbod.v_position.x);
             println!("pos y:            {}", rigidbod.v_position.y);
             println!("pos z:            {}", rigidbod.v_position.z);
@@ -575,10 +675,18 @@ impl<'a> System<'a> for SendPacket
             let mut fdm: FGNetFDM = Default::default();
             
             //Set Roll, Pitch, Yaw
-            let roll: f32 = rigidbod.v_euler_angles.x.to_radians() as f32; //THIS HAD TO BE MADE NEGATIVE
-            let pitch: f32 =  rigidbod.v_euler_angles.y.to_radians() as f32; 
-            let yaw: f32 =  rigidbod.v_euler_angles.z.to_radians() as f32;
+            let roll: f32 = rigidbod.v_euler_angles.x.to_radians() as f32;
+            let pitch: f32 = rigidbod.v_euler_angles.y.to_radians() as f32; 
+            let yaw: f32 = rigidbod.v_euler_angles.z.to_radians() as f32;
 
+            //TRYING TO USE ECEF COORDINATES AND CONVERTING TO LLA
+            // let nalgebra_ecef_pos = Vector3::new(rigidbod.v_position.x, rigidbod.v_position.y, rigidbod.v_position.z);
+            // let lla = geo::ecef2lla(&nalgebra_ecef_pos, &ELLIPSOID); 
+            // fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
+            // fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); 
+            // fdm.altitude = f64::from_be_bytes(lla.z.to_ne_bytes()); 
+
+            //USING LLA COORDINATES
             //Set lat, long, alt
             fdm.latitude = f64::from_be_bytes(rigidbod.v_position.x.to_ne_bytes());
             fdm.longitude = f64::from_be_bytes(rigidbod.v_position.y.to_ne_bytes()); 
@@ -610,114 +718,19 @@ impl<'a> System<'a> for SendPacket
 }//end system
 
 
-//System to handle user input
-struct FlightControl;
-impl<'a> System<'a> for FlightControl
-{
-    type SystemData = ( 
-        ReadStorage<'a, RigidBody>, 
-        WriteStorage<'a, KeyboardState>,
-    );
-    //i do not need to read in rigid body but it does not let me only take in 1 component...
-    fn run(&mut self, (rigidbody, mut keyboardstate): Self::SystemData) 
-    {
-        for (_rigidbod, keystate) in (&rigidbody, &mut keyboardstate).join() 
-        {
-            //Set all states false before we know if they are being activated
-            //rudder, ailerons, and elevators will be zerod in EOM system
-            keystate.thrust_up = false; 
-            keystate.thrust_down = false;
-
-            keystate.left_rudder = false;
-            keystate.right_rudder = false;
-        
-            keystate.roll_left = false;
-            keystate.roll_right = false;
- 
-        
-            keystate.pitch_up = false;
-            keystate.pitch_down = false;
-
-            //flaps are toggled on and off, so they dont need to be set to false each time
-
-            //Setup device query states
-            let device_state = DeviceState::new();
-            let keys: Vec<Keycode> = device_state.get_keys();
-
-            if keys.contains(&Keycode::A)
-            {
-                keystate.thrust_up = true;
-            }
-            else if keys.contains(&Keycode::Z)
-            {
-                keystate.thrust_down = true;
-            }
-
-            //Rudders for yaw
-            else if keys.contains(&Keycode::N)
-            {
-                keystate.left_rudder = true;
-            }
-            else if keys.contains(&Keycode::M)
-            {
-                keystate.right_rudder = true;
-            }
-
-            //Ailerons for roll
-            else if keys.contains(&Keycode::Left)
-            {
-                keystate.roll_left = true;
-            }
-            else if keys.contains(&Keycode::Right)
-            {
-                keystate.roll_right = true;
-            }
-
-            //Elevators for Pitch
-            else if keys.contains(&Keycode::Up)
-            {
-                keystate.pitch_up = true;
-            }
-            else if keys.contains(&Keycode::Down)
-            {
-                keystate.pitch_down = true;
-            }
-
-            //Flaps for lift
-            else if keys.contains(&Keycode::F)
-            {
-                keystate.flaps_down = true;
-                keystate.zero_flaps = false;
-            }
-            else if  keys.contains(&Keycode::G)
-            {
-                keystate.zero_flaps = true;
-                keystate.flaps_down = false;
-            }
-
-            //Quit program
-            else if keys.contains(&Keycode::Q)
-            {
-                process::exit(1);
-            }
-
-        }//end for
-    }//end run
-}//end system
-
-
-
-
 //Macro to define special global variables
 lazy_static!
 {
     //create socket
     static ref SOCKET: std::net::UdpSocket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
+    //define earth ellipsoid
+   // static ref ELLIPSOID: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
+
 }
 
 //Thrust
-static MAX_THRUST: f64 = 3000.0; //max thrustforce value //was 3000
-static D_THRUST: f64 = 100.0;   //change in thrust per keypress //was 100
+static MAX_THRUST: f64 = 3000.0; //max thrustforce value
+static D_THRUST: f64 = 100.0;   //change in thrust per keypress
 
 //Time in between each update
 static FRAME_RATE: f64 = 30.0; //THE C++ EXAMPLE ALWAYS RUNS AT 1000 FPS CUZ IT LOOPS SO FAST
@@ -747,16 +760,24 @@ fn main()
     //Setup airplane with default values and then fill in what we need to calculate mass properties
     let mut myairplane = RigidBody{..Default::default()};
 
+    //lat lon coordinates of wright patt (39.826, -84.045, elevation 823 feet)
     //these lat lon positions were generated by converting to ecef and back....and flightgear understands these numbers. idk why
     //would be nice to turn the plane so it is pointed down the runway...
+    //when using these coordinates.. need to covnert degrees of lat/lon to feet in eom system
+    //wright patt location
     myairplane.v_position.x = 0.6951355515021288;
     myairplane.v_position.y = -1.4668619698501122;
     myairplane.v_position.z = 248.0; //elevation is 823 ft... this is taken into account for when gravity is applied
 
-    //ktts airport in geodetic coord (this doesnt put us at ktts, but program does work here if you make yaw euler angle negative... weird)
-    // myairplane.v_position.x = 28.5383;
-    // myairplane.v_position.y =  81.3792;
-    // myairplane.v_position.z =   609.6; //2000 ft
+    //kffo (wright pat) in ecef coords at 248 ft elevation start
+    // myairplane.v_position.x = 508911.187988474;
+    // myairplane.v_position.y =  -4878823.54583204;
+    // myairplane.v_position.z =   4063325.79612493;
+
+    //ecef kffo 9wright pat) at 609 elev start( these values were used to get the working lla)
+    // myairplane.v_position.x =  508939.999272844;
+    //  myairplane.v_position.y =  -4879099.75350027;
+    //  myairplane.v_position.z =    4063557.38583521;
 
     //test start position (same as c++ version)
     // myairplane.v_position.x = -5000.0;
