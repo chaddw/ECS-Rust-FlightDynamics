@@ -1,0 +1,12 @@
+[package]
+name = "flighgear_sim"
+version = "0.1.0"
+authors = ["chaddw <caw14f@my.fsu.edu>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+specs = "0.16.1"
+lazy_static = "1.4.0"
+device_query = "0.2.5"
