@@ -32,9 +32,9 @@ struct RigidBody
     flaps: bool,
     q_orientation: common::Myquaternion,        // orientation in earth coordinates 
     v_forces: common::Myvec,                    // total force on body
-    thrustforce: f64,                           //magnitude of thrust
+    thrustforce: f64,                           // magnitude of thrust
     v_moments: common::Myvec,                   // total moment (torque) on body
-    element: Vec<PointMass>,                    //vector of point mass elements
+    element: Vec<PointMass>,                    // vector of point mass elements
     frame_count: f64 
 }
 
@@ -256,7 +256,7 @@ impl RigidBody
 
         //Calculate position of airplane in earth space
         let vel_mult_dt_tmp = common::Myvec::multiplyscalar(&self.v_velocity, dt);
-        self.v_position = common::Myvec::addvec(&self.v_position, &vel_mult_dt_tmp); //add the degrees on lat/lon/and meters (model uses feet for this)
+        self.v_position = common::Myvec::addvec(&self.v_position, &vel_mult_dt_tmp);
 
         //Calculate angular velocity of airplane in body space
         let one = common::Mymatrix::multiply_matrix_by_vec(&self.m_inertia, &self.v_angular_velocity);
@@ -381,6 +381,7 @@ static FRAME_RATE: f64 = 30.0;
 //set thrust parameters
 static D_THRUST: f64 = 100.0;
 static MAX_THRUST: f64 = 3000.0;
+
 fn main()
 {
 
