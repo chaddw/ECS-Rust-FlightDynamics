@@ -27,6 +27,9 @@ use std::{thread, time};
 //extern crate coord_transforms;
 //use coord_transforms::prelude::*;
 
+//Converting FGNetFDM struct to bytes to be sent as a packet
+use serde::{Deserialize, Serialize};
+
 //Vector, Matrix, Quaternion module
 mod common;
 
@@ -92,8 +95,8 @@ impl Component for RigidBody
 }
 
 
-//Component for networking with FlightGear
-#[derive(Debug, Default)]
+//Component for making a network packet to be sent to FlightGear
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[repr(C)] 
 struct FGNetFDM
 {
@@ -174,15 +177,27 @@ struct FGNetFDM
     speedbrake: f32,
     spoilers: f32,
 }
-impl Component for FGNetFDM
+// impl Component for FGNetFDM
+// {
+//     type Storage = VecStorage<Self>;
+// }
+
+//Component containg the packet created
+#[derive(Debug, Default)]
+struct Packet
+{
+    bytes: Vec<u8>,//&[u8; 600], //slice of u8 bytes containing all of the FGNetFDM struct data
+}
+impl Component for Packet
 {
     type Storage = VecStorage<Self>;
 }
-//for converting to slice of u8 
-unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
-{
-    ::std::slice::from_raw_parts((p as *const T) as *const u8,::std::mem::size_of::<T>(),)
-}
+
+//for converting a the fgnetfdm component structure into to slice of u8 to be sent to Flightgear
+// unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
+// {
+//     ::std::slice::from_raw_parts((p as *const T) as *const u8,::std::mem::size_of::<T>(),)
+// }
 
 
 //System to handle user input
@@ -474,10 +489,10 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
      rigidbod.v_forces = common::Myquaternion::qvrotate(&rigidbod.q_orientation, &fb);
 
     //Apply gravity (g is -32.174 ft/s^2), only apply when the airplane is off the ground
-   // if rigidbod.v_position.z > 248.0
-   // {
+    //if rigidbod.v_position.z > 248.0
+    //{
         rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.17399979) * rigidbod.mass;
-   // }
+    //}
 
     rigidbod.v_moments = common::Myvec::addvec(&rigidbod.v_moments, &mb);
 }
@@ -520,6 +535,9 @@ impl<'a> System<'a> for EquationsOfMotion
             }
 
             //Rudder States
+            //?NOTE: the functionality was flipped between the two states to work with flightgear... 
+            //not sure why this was needed at the moment (it wasnt needed with different start coordinates, i'm guessing because if on a different hemisphere (south vs north) right and left are inverted
+            //these need to be flipped back to normal when comparing to the c++ console version
             if keystate.left_rudder == true
             { 
                 rigidbod.element[6].f_incidence = 16.0;
@@ -532,15 +550,16 @@ impl<'a> System<'a> for EquationsOfMotion
             //Roll States
             //?NOTE: the functionality was flipped between the two states to work with flightgear... 
             //not sure why this was needed at the moment (it wasnt needed with different start coordinates)
+            //these need to be flipped back to normal when comparing to the c++ console version
             if keystate.roll_left == true
-            { 
-                rigidbod.element[0].i_flap = -1;
-                rigidbod.element[3].i_flap = 1;
-            } 
-            else if keystate.roll_right == true
             { 
                 rigidbod.element[0].i_flap = 1;
                 rigidbod.element[3].i_flap = -1;
+            } 
+           else if keystate.roll_right == true
+            { 
+                rigidbod.element[0].i_flap = -1;
+                rigidbod.element[3].i_flap = 1;
             } 
 
             //Pitch States
@@ -626,8 +645,9 @@ impl<'a> System<'a> for EquationsOfMotion
     
             //Get euler angles for our info
             let euler = common::Myquaternion::make_euler_from_q(&rigidbod.q_orientation);
-            //yaw is negated or roll depending on position starting, and always pitch
-            rigidbod.v_euler_angles.x = -euler.x; //this isnt supposed to be negative in bourgs model...?
+            //FOR FLIGHTGEAR SIMULATION: yaw OR roll is negated odepending on position starting, pitch is always negated
+            //FOR FDM EQUIVALENCE TESTING: we stay true to the bourg model and do not negative either roll or yaw, pitch is negated only on the print statement in bourgs fdm, which we can just do here
+            rigidbod.v_euler_angles.x = euler.x; //negate when in ohio
             rigidbod.v_euler_angles.y = -euler.y;
             rigidbod.v_euler_angles.z = euler.z; //this isnt supposed to be negative in bourgs model... (this needed to be negative when using the geodetic coordinates for ktts airport)
             
@@ -646,19 +666,18 @@ impl<'a> System<'a> for EquationsOfMotion
     }//end run
 }//end system
 
-
-//System to send packets
-struct SendPacket;
-impl<'a> System<'a> for SendPacket
+//System to make a packet (based on fgnetfdm structure required by flightgear) with the calculated eom data
+struct MakePacket;
+impl<'a> System<'a> for MakePacket
 {
     type SystemData = (
             ReadStorage<'a, RigidBody>,
-            WriteStorage<'a, FGNetFDM>,
+            WriteStorage<'a, Packet>,
     );
 
-    fn run(&mut self, (rigidbody, mut fgnetfdm): Self::SystemData) 
+    fn run(&mut self, (rigidbody, mut packet): Self::SystemData) 
     {
-        for (rigidbod, mut netfdm,) in (&rigidbody, &mut fgnetfdm).join() 
+        for (rigidbod, mut pckt,) in (&rigidbody, &mut packet).join() 
         {
             //All data passed into the FGNetFDM struct is converted to network byte order
 
@@ -690,19 +709,41 @@ impl<'a> System<'a> for SendPacket
 
             //Other airplane data
             let fg_net_fdm_version = 24_u32;
-            let visibility: f32 = 5000.0;
+           // let visibility: f32 = 5000.0;
             fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
-            fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());
-            fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());
-            fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
-            fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
-            fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
+           // fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());
+           // fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());
+           // fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
+           // fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
+           // fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
 
-            //Convert struct array of u8 of bytes
-            let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
+            //Convert struct to array of u8 bytes
+            //let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
+            pckt.bytes = bincode::serialize(&fdm).unwrap();
 
             //Finally send &[u8] of bytes over socket connected on FlightGear
-            SOCKET.send(bytes).expect("couldn't send packet");
+           // SOCKET.send(bytes).expect("couldn't send packet");
+
+        }//end for
+    }//end run
+}//end system
+
+
+//System to send packets after they are made
+struct SendPacket;
+impl<'a> System<'a> for SendPacket
+{
+    type SystemData = (
+            ReadStorage<'a, RigidBody>,
+            ReadStorage<'a, Packet>,
+    );
+    //i do not need to read in rigid body but it does not let me only take in 1 component...
+    fn run(&mut self, (rigidbody, packet): Self::SystemData) 
+    {
+        for (_rigidbod, pckt,) in (&rigidbody, &packet).join() 
+        {
+            //Finally send &[u8] of bytes over socket connected on FlightGear
+            SOCKET.send(&pckt.bytes).expect("couldn't send packet");
 
         }//end for
     }//end run
@@ -736,13 +777,15 @@ fn main()
     //Create world
     let mut world = World::new();
     world.register::<RigidBody>();
-    world.register::<FGNetFDM>();
+   // world.register::<FGNetFDM>();
     world.register::<KeyboardState>();
+    world.register::<Packet>();
 
     //Create dispatcher to manage system execution
     let mut dispatcher = DispatcherBuilder::new()
     .with(FlightControl, "flightcontrol", &[])
     .with(EquationsOfMotion, "EOM", &[])
+    .with(MakePacket, "makepacket", &[])
     .with(SendPacket, "sendpacket", &[])
     .build();
     dispatcher.setup(&mut world);
@@ -833,9 +876,12 @@ fn main()
         flaps_down: false,
         zero_flaps: false,
     })
-    .with(FGNetFDM{
+    //.with(FGNetFDM{
+    //    ..Default::default()
+    //})
+    .with(Packet{
         ..Default::default()
-        })
+    })
     .build();
 
 
@@ -852,11 +898,12 @@ fn main()
         //get current time
         let start = time::Instant::now();
 
+        
         //process this frame
         dispatcher.dispatch(&world); 
         world.maintain();
 
-        // //find difference in time elapsed this loop versus the timestep
+        //find difference in time elapsed this loop versus the timestep
         // let sleep_time = timestep.checked_sub(time::Instant::now().duration_since(start));
         
         // //sleep for extra time if calculation took less time than the DT time step
