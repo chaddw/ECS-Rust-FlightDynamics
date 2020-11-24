@@ -53,7 +53,7 @@ impl Component for KeyboardState
     type Storage = VecStorage<Self>;
 }
 
-//elements/components making up the bodystructure. this is part of the RigidBody component
+//elements making up the bodystructure. this is part of the RigidBody component
 #[derive(Debug)]
 struct PointMass
 {
@@ -72,22 +72,22 @@ struct PointMass
 #[derive(Debug, Default)]
 struct RigidBody
 {
-    mass: f64,                          //total mass
+    mass: f64,                                  //total mass
     m_inertia: common::Mymatrix,
     m_inertia_inverse: common::Mymatrix,
-    v_position: common::Myvec,                  // position in earth coordinates
-    v_velocity: common::Myvec,                  // velocity in earth coordinates
-    v_velocity_body: common::Myvec,             // velocity in body coordinates
-    v_angular_velocity: common::Myvec,          // angular velocity in body coordinates
+    v_position: common::Myvec, // position in earth coordinates
+    v_velocity: common::Myvec, // velocity in earth coordinates
+    v_velocity_body: common::Myvec, // velocity in body coordinates
+    v_angular_velocity: common::Myvec, // angular velocity in body coordinates
     v_euler_angles: common::Myvec,   
-    f_speed: f64,                               // speed (magnitude of the velocity)
+    f_speed: f64, // speed (magnitude of the velocity)
     stalling: bool,
     flaps: bool,
-    q_orientation: common::Myquaternion,        // orientation in earth coordinates 
-    v_forces: common::Myvec,                    // total force on body
-    thrustforce: f64,                           // magnitude of thrust
-    v_moments: common::Myvec,                   // total moment (torque) on body
-    element: Vec<PointMass>,                    // vector of point mass elements
+    q_orientation: common::Myquaternion, // orientation in earth coordinates 
+    v_forces: common::Myvec, // total force on body
+    thrustforce: f64, // magnitude of thrust
+    v_moments: common::Myvec, // total moment (torque) on body
+    element: Vec<PointMass>, // vector of point mass elements
 }
 impl Component for RigidBody
 {
@@ -186,7 +186,7 @@ struct FGNetFDM
 #[derive(Debug, Default)]
 struct Packet
 {
-    bytes: Vec<u8>,//&[u8; 600], //slice of u8 bytes containing all of the FGNetFDM struct data
+    bytes: Vec<u8>,
 }
 impl Component for Packet
 {
@@ -772,7 +772,6 @@ fn main()
 {
     //Create variable to keep track of time elapsed
     let mut current_time: f64 = 0.0;
-    let mut frame_count: usize = 0;
 
     //Create world
     let mut world = World::new();
@@ -834,7 +833,6 @@ fn main()
         PointMass{f_mass: 2.93, v_d_coords: common::Myvec::new(2.25, 0.0, 5.0), v_local_inertia: common::Myvec::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
         PointMass{f_mass: 31.8, v_d_coords: common::Myvec::new(15.25, 0.0, 1.5), v_local_inertia: common::Myvec::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) }
         ];
-    myairplane.q_orientation = common::Myquaternion::make_q_from_euler(0.0, 0.0, 0.0);
 
 
     //Calculate mass properties on this airplane initialized
@@ -893,12 +891,19 @@ fn main()
 
     //Main simulation loop
     //loop 
-    for _ in 0..1000
+    for i in 0..900
     {
         //get current time
         let start = time::Instant::now();
 
-        
+        //increment time count
+        current_time = current_time + DT;
+
+        println!("{}", "====================================================");
+        println!("time:             {}", current_time);
+        println!("frames:           {}", i + 1);
+
+
         //process this frame
         dispatcher.dispatch(&world); 
         world.maintain();
@@ -912,13 +917,6 @@ fn main()
         //     thread::sleep(sleep_time.unwrap());
         // }
     
-        println!("time:             {}", current_time);
-        println!("frames:           {}", frame_count);
-        println!("{}", "====================================================");
-
-        current_time = current_time + DT;
-        frame_count = frame_count + 1;
-
     }
 
 }
