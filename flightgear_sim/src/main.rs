@@ -53,7 +53,7 @@ impl Component for KeyboardState
     type Storage = VecStorage<Self>;
 }
 
-//elements/components making up the bodystructure. this is part of the RigidBody component
+//elements making up the bodystructure. this is part of the RigidBody component
 #[derive(Debug)]
 struct PointMass
 {
@@ -72,22 +72,23 @@ struct PointMass
 #[derive(Debug, Default)]
 struct RigidBody
 {
-    mass: f64,                          //total mass
+    mass: f64,                                  //total mass
     m_inertia: common::Mymatrix,
     m_inertia_inverse: common::Mymatrix,
-    v_position: common::Myvec,                  // position in earth coordinates
-    v_velocity: common::Myvec,                  // velocity in earth coordinates
-    v_velocity_body: common::Myvec,             // velocity in body coordinates
-    v_angular_velocity: common::Myvec,          // angular velocity in body coordinates
+    v_position: common::Myvec, // position in earth coordinates
+    v_velocity: common::Myvec, // velocity in earth coordinates
+    v_velocity_body: common::Myvec, // velocity in body coordinates
+    v_angular_velocity: common::Myvec, // angular velocity in body coordinates
     v_euler_angles: common::Myvec,   
-    f_speed: f64,                               // speed (magnitude of the velocity)
+    f_speed: f64, // speed (magnitude of the velocity)
     stalling: bool,
     flaps: bool,
-    q_orientation: common::Myquaternion,        // orientation in earth coordinates 
-    v_forces: common::Myvec,                    // total force on body
-    thrustforce: f64,                           // magnitude of thrust
-    v_moments: common::Myvec,                   // total moment (torque) on body
-    element: Vec<PointMass>,                    // vector of point mass elements
+    q_orientation: common::Myquaternion, // orientation in earth coordinates 
+    v_forces: common::Myvec, // total force on body
+    thrustforce: f64, // magnitude of thrust
+    v_moments: common::Myvec, // total moment (torque) on body
+    element: Vec<PointMass>, // vector of point mass elements
+    current_frame: usize,
 }
 impl Component for RigidBody
 {
@@ -186,7 +187,7 @@ struct FGNetFDM
 #[derive(Debug, Default)]
 struct Packet
 {
-    bytes: Vec<u8>,//&[u8; 600], //slice of u8 bytes containing all of the FGNetFDM struct data
+    bytes: Vec<u8>,
 }
 impl Component for Packet
 {
@@ -489,10 +490,10 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
      rigidbod.v_forces = common::Myquaternion::qvrotate(&rigidbod.q_orientation, &fb);
 
     //Apply gravity (g is -32.174 ft/s^2), only apply when the airplane is off the ground
-    if rigidbod.v_position.z > 248.0
-    {
+    //if rigidbod.v_position.z > 248.0
+    //{
         rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.17399979) * rigidbod.mass;
-    }
+    //}
 
     rigidbod.v_moments = common::Myvec::addvec(&rigidbod.v_moments, &mb);
 }
@@ -504,13 +505,16 @@ impl<'a> System<'a> for EquationsOfMotion
 {
     type SystemData = (
         WriteStorage<'a, RigidBody>,
-        ReadStorage<'a, KeyboardState>
+        ReadStorage<'a, KeyboardState> //Write needed for equivalency test
     );
 
     fn run(&mut self, (mut rigidbody, keyboardstate): Self::SystemData) 
     {
         for (mut rigidbod, keystate) in (&mut rigidbody, &keyboardstate).join() 
         {
+            //FOR EQUIVALENCY TESTS: increment current frame tracker
+            rigidbod.current_frame = rigidbod.current_frame + 1;
+
             //reset/zero the elevators, rudders, and ailerons every loo
             //rudder
             rigidbod.element[6].f_incidence = 0.0;
@@ -522,6 +526,128 @@ impl<'a> System<'a> for EquationsOfMotion
             rigidbod.element[5].i_flap = 0;
             //flaps will be toggled on and off so flaps does not need to be zerod each time
 
+            //FOR EQUIVALENCY TESTS: set flight controls artificially based on current frame
+           
+            //TEST 1 (its just the default with no functionality )
+
+            //TEST 2 Pitch Up 900 frames
+            //increase thrust by 500
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
+            // {
+            //    //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+            // else if rigidbod.current_frame % 2 == 0 //even frames only
+            // {
+            //     //pitch up
+            //     rigidbod.element[4].i_flap = 1;
+            //     rigidbod.element[5].i_flap = 1;
+            // }
+
+            // //TEST 3 Roll Right 900 frames
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
+            // {
+            //    //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+            // else if rigidbod.current_frame % 15 == 0 //frame divisible by 15
+            // {
+            //     //roll right
+            //     rigidbod.element[0].i_flap = -1;
+            //     rigidbod.element[3].i_flap = 1;
+            // }
+
+            //TEST 4 Yaw Right 900 frames
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
+            // {
+            //    //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+            // else if rigidbod.current_frame % 2 == 0
+            // {
+            //     //yaw/rudder right
+            //     rigidbod.element[6].f_incidence = -16.0;
+            // }
+           
+           
+            //TEST x
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 30
+            // {
+            //     //roll right
+            //     rigidbod.element[0].i_flap = -1;
+            //     rigidbod.element[3].i_flap = 1;
+            // }
+            // else if rigidbod.current_frame >= 901 && rigidbod.current_frame <= 930
+            // {
+            //     //roll left
+            //     rigidbod.element[0].i_flap = 1;
+            //     rigidbod.element[3].i_flap = -1;
+            // }
+            // else if rigidbod.current_frame >= 931 && rigidbod.current_frame <= 935
+            // {
+            //     //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+
+            // else if rigidbod.current_frame >= 936 && rigidbod.current_frame <= 1800
+            // {
+            //     //pitch up
+            //     rigidbod.element[4].i_flap = 1;
+            //     rigidbod.element[5].i_flap = 1;
+            // }
+
+
+            //TEST y
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 10
+            // {
+            //     //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+            // else if rigidbod.current_frame >= 11 && rigidbod.current_frame <= 600
+            // {
+            //     //pitch up
+            //     rigidbod.element[4].i_flap = 1;
+            //     rigidbod.element[5].i_flap = 1;
+            // }
+            // else if rigidbod.current_frame >= 601 && rigidbod.current_frame <= 900
+            // {
+            //     //yaw left
+            //     rigidbod.element[6].f_incidence = 16.0;
+            // }
+
+            // else if rigidbod.current_frame >= 901 && rigidbod.current_frame <= 910
+            // {
+            //     //pitch down
+            //     rigidbod.element[4].i_flap = -1;
+            //     rigidbod.element[5].i_flap = -1;
+            // }
+
+            // else if rigidbod.current_frame >= 911 && rigidbod.current_frame <= 1200
+            // {
+            //    //pitch up
+            //    rigidbod.element[4].i_flap = 1;
+            //    rigidbod.element[5].i_flap = 1;
+            // }
+            // else if rigidbod.current_frame >= 1201 && rigidbod.current_frame <= 1500
+            // {
+            //    //yaw right
+            //    rigidbod.element[6].f_incidence = -16.0;
+            // }
+
+            // else if rigidbod.current_frame >= 1501 && rigidbod.current_frame <= 1510
+            // {
+            //     //thrust down
+            //     rigidbod.thrustforce = rigidbod.thrustforce - D_THRUST;
+            // }
+            // //none 1511 -2100
+
+            // else if rigidbod.current_frame >= 2101 && rigidbod.current_frame <= 2700
+            // {
+            //     //flaps down
+            //     rigidbod.element[1].i_flap = -1;
+            //     rigidbod.element[2].i_flap = -1;
+            //     rigidbod.flaps = true;
+            // }
 
             //Handle the input states
             //Thrust states
@@ -537,6 +663,7 @@ impl<'a> System<'a> for EquationsOfMotion
             //Rudder States
             //?NOTE: the functionality was flipped between the two states to work with flightgear... 
             //not sure why this was needed at the moment (it wasnt needed with different start coordinates, i'm guessing because if on a different hemisphere (south vs north) right and left are inverted
+            //these need to be flipped back to normal when comparing to the c++ console version
             if keystate.left_rudder == true
             { 
                 rigidbod.element[6].f_incidence = -16.0;
@@ -549,12 +676,13 @@ impl<'a> System<'a> for EquationsOfMotion
             //Roll States
             //?NOTE: the functionality was flipped between the two states to work with flightgear... 
             //not sure why this was needed at the moment (it wasnt needed with different start coordinates)
+            //these need to be flipped back to normal when comparing to the c++ console version
             if keystate.roll_left == true
             { 
                 rigidbod.element[0].i_flap = -1;
                 rigidbod.element[3].i_flap = 1;
             } 
-            else if keystate.roll_right == true
+           else if keystate.roll_right == true
             { 
                 rigidbod.element[0].i_flap = 1;
                 rigidbod.element[3].i_flap = -1;
@@ -654,7 +782,7 @@ impl<'a> System<'a> for EquationsOfMotion
             println!("pitch:            {}", rigidbod.v_euler_angles.y); //we made this negative in the euler angles in eom
             println!("yaw:              {}", rigidbod.v_euler_angles.z);
             println!("alt:              {}", rigidbod.v_position.z);
-            println!("thrus:            {}", rigidbod.thrustforce);
+            println!("thrust:           {}", rigidbod.thrustforce);
             println!("speed:            {}", rigidbod.f_speed/1.688);
             println!("pos x:            {}", rigidbod.v_position.x);
             println!("pos y:            {}", rigidbod.v_position.y);
@@ -770,7 +898,7 @@ fn main()
 {
     //Create variable to keep track of time elapsed
     let mut current_time: f64 = 0.0;
-    let mut frame_count: usize = 0;
+    let mut current_frame_main: usize = 0;
 
     //Create world
     let mut world = World::new();
@@ -798,29 +926,33 @@ fn main()
     //would be nice to turn the plane so it is pointed down the runway...
     //when using these coordinates.. need to covnert degrees of lat/lon to feet in eom system
     //wright patt location
+    // myairplane.v_position.x = 0.6951355515021288;
+    // myairplane.v_position.y = -1.4668619698501122;
+    // myairplane.v_position.z = 248.0; //elevation is 823 ft... this is taken into account for when gravity is applied
+    //wright patt working coordinates at 2000 ft (609 meters)
     myairplane.v_position.x = 0.6951355515021288;
     myairplane.v_position.y = -1.4668619698501122;
-    myairplane.v_position.z = 248.0; //elevation is 823 ft... this is taken into account for when gravity is applied
+    myairplane.v_position.z = 857.0; //elevation is 823 ft... this is taken into account for when gravity is applied
 
     //kffo (wright pat) in ecef coords at 248 ft elevation start
     // myairplane.v_position.x = 508911.187988474;
     // myairplane.v_position.y =  -4878823.54583204;
     // myairplane.v_position.z =   4063325.79612493;
 
-    //ecef kffo 9wright pat) at 609 elev start( these values were used to get the working lla)
+    //ecef kffo wright pat) at 609 elev start( these values were used to get the working lla)
     // myairplane.v_position.x =  508939.999272844;
-    //  myairplane.v_position.y =  -4879099.75350027;
-    //  myairplane.v_position.z =    4063557.38583521;
+    // myairplane.v_position.y =  -4879099.75350027;
+    // myairplane.v_position.z =    4063557.38583521;
 
     //test start position (same as c++ version)
     // myairplane.v_position.x = -5000.0;
     // myairplane.v_position.y = 0.0;
     // myairplane.v_position.z = 2000.0; 
 
-    myairplane.v_velocity.x = 0.0;
-    myairplane.f_speed = 0.0;
-    myairplane.v_forces.x = 0.0;
-    myairplane.thrustforce = 0.0;
+    myairplane.v_velocity.x = 60.0;
+    myairplane.f_speed = 60.0;
+    myairplane.v_forces.x = 500.0;
+    myairplane.thrustforce = 500.0;
     myairplane.q_orientation = common::Myquaternion::make_q_from_euler(0.0, 0.0, 0.0);
     myairplane.element = vec![
         PointMass{f_mass: 6.56, v_d_coords: common::Myvec::new(14.5, 12.0, 2.5), v_local_inertia: common::Myvec::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
@@ -832,7 +964,6 @@ fn main()
         PointMass{f_mass: 2.93, v_d_coords: common::Myvec::new(2.25, 0.0, 5.0), v_local_inertia: common::Myvec::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
         PointMass{f_mass: 31.8, v_d_coords: common::Myvec::new(15.25, 0.0, 1.5), v_local_inertia: common::Myvec::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) }
         ];
-    myairplane.q_orientation = common::Myquaternion::make_q_from_euler(0.0, 0.0, 0.0);
 
 
     //Calculate mass properties on this airplane initialized
@@ -857,6 +988,7 @@ fn main()
         flaps: false,
         q_orientation: myairplane.q_orientation, 
         element: myairplane.element,
+        current_frame: 0,
     })
     .with(KeyboardState{
         thrust_up: false,
@@ -891,12 +1023,19 @@ fn main()
 
     //Main simulation loop
     loop 
-   // for _ in 0..1000
+    //for i in 0..900
     {
         //get current time
         let start = time::Instant::now();
 
-        
+        //increment time count
+        current_time = current_time + DT;
+        current_frame_main = current_frame_main + 1;
+        println!("{}", "====================================================");
+        println!("time:             {}", current_time);
+        println!("frames:           {}", current_frame_main);
+
+
         //process this frame
         dispatcher.dispatch(&world); 
         world.maintain();
@@ -910,13 +1049,6 @@ fn main()
             thread::sleep(sleep_time.unwrap());
         }
     
-        println!("time:             {}", current_time);
-        println!("frames:           {}", frame_count);
-        println!("{}", "====================================================");
-
-        current_time = current_time + DT;
-        frame_count = frame_count + 1;
-
     }
 
 }
