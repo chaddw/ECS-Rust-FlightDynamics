@@ -57,12 +57,12 @@ impl Component for KeyboardState
 #[derive(Debug)]
 struct PointMass
 {
-    f_mass: f64,
+    f_mass: f32,
     v_d_coords: common::Myvec, //"design position"
     v_local_inertia: common::Myvec,
-    f_incidence: f64,
-    f_dihedral: f64,
-    f_area: f64,
+    f_incidence: f32,
+    f_dihedral: f32,
+    f_area: f32,
     i_flap: i32,
     v_normal: common::Myvec,
     v_cg_coords: common::Myvec //"corrected position"
@@ -72,7 +72,7 @@ struct PointMass
 #[derive(Debug, Default)]
 struct RigidBody
 {
-    mass: f64,                                  //total mass
+    mass: f32,                                  //total mass
     m_inertia: common::Mymatrix,
     m_inertia_inverse: common::Mymatrix,
     v_position: common::Myvec, // position in earth coordinates
@@ -80,14 +80,15 @@ struct RigidBody
     v_velocity_body: common::Myvec, // velocity in body coordinates
     v_angular_velocity: common::Myvec, // angular velocity in body coordinates
     v_euler_angles: common::Myvec,   
-    f_speed: f64, // speed (magnitude of the velocity)
+    f_speed: f32, // speed (magnitude of the velocity)
     stalling: bool,
     flaps: bool,
     q_orientation: common::Myquaternion, // orientation in earth coordinates 
     v_forces: common::Myvec, // total force on body
-    thrustforce: f64, // magnitude of thrust
+    thrustforce: f32, // magnitude of thrust
     v_moments: common::Myvec, // total moment (torque) on body
     element: Vec<PointMass>, // vector of point mass elements
+    current_frame: usize,
 }
 impl Component for RigidBody
 {
@@ -297,8 +298,8 @@ impl<'a> System<'a> for FlightControl
 //Calculate mass properties based on the airplane's different body pieces
 fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
 {
-    let mut inn: f64;
-    let mut di: f64;
+    let mut inn: f32;
+    let mut di: f32;
 
     //Calculate the normal (perpendicular) vector to each lifting surface. This is needed for relative air velocity to find lift and drag.
     for  i in rigidbod.element.iter_mut()
@@ -310,7 +311,7 @@ fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
     }
 
     //Calculate total mass
-    let mut total_mass: f64 = 0.0;
+    let mut total_mass: f32 = 0.0;
     for i in rigidbod.element.iter()
     {
         total_mass = total_mass + i.f_mass;
@@ -332,12 +333,12 @@ fn calc_airplane_mass_properties(rigidbod: &mut RigidBody)
     }
 
     //Calculate the moments and products of intertia for the combined elements
-    let mut ixx: f64 = 0.0;
-    let mut iyy: f64 = 0.0;
-    let mut izz: f64 = 0.0;
-    let mut ixy: f64 = 0.0;
-    let mut ixz: f64 = 0.0;
-    let mut iyz: f64 = 0.0;
+    let mut ixx: f32 = 0.0;
+    let mut iyy: f32 = 0.0;
+    let mut izz: f32 = 0.0;
+    let mut ixy: f32 = 0.0;
+    let mut ixz: f32 = 0.0;
+    let mut iyz: f32 = 0.0;
 
     for i in rigidbod.element.iter()
     {
@@ -400,8 +401,8 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     {
         if i == 6 //Tail rudder. its a special case because it can rotate, so the normal vector is recalculated
         {
-            let inn: f64 = (rigidbod.element[i].f_incidence).to_radians();
-            let di: f64 = (rigidbod.element[i].f_dihedral).to_radians();
+            let inn: f32 = (rigidbod.element[i].f_incidence).to_radians();
+            let di: f32 = (rigidbod.element[i].f_dihedral).to_radians();
             rigidbod.element[i].v_normal = common::Myvec::new(inn.sin(),
                                                               inn.cos() * di.sin(), 
                                                               inn.cos() * di.cos());
@@ -413,7 +414,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
         let v_local_velocity = common::Myvec::addvec(&rigidbod.v_velocity_body, &vtmp);
 
         //Calculate local air speed
-        let f_local_speed: f64 = rigidbod.v_velocity_body.magnitude(); 
+        let f_local_speed: f32 = rigidbod.v_velocity_body.magnitude(); 
 
         //Find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
         if f_local_speed > 1.0
@@ -440,7 +441,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
             tmp = -1.0;
         }
 
-        let f_attack_angle: f64 = tmp.asin().to_degrees();
+        let f_attack_angle: f32 = tmp.asin().to_degrees();
 
         //Determine lift and drag force on the element rho is defined as 0.0023769
         tmp = 0.5 * 0.002376900055 * f_local_speed * f_local_speed * rigidbod.element[i].f_area;   
@@ -504,13 +505,16 @@ impl<'a> System<'a> for EquationsOfMotion
 {
     type SystemData = (
         WriteStorage<'a, RigidBody>,
-        ReadStorage<'a, KeyboardState>
+        WriteStorage<'a, KeyboardState> //Write needed for equivalency test
     );
 
     fn run(&mut self, (mut rigidbody, keyboardstate): Self::SystemData) 
     {
         for (mut rigidbod, keystate) in (&mut rigidbody, &keyboardstate).join() 
         {
+            //FOR EQUIVALENCY TESTS: increment current frame tracker
+            rigidbod.current_frame = rigidbod.current_frame + 1;
+
             //reset/zero the elevators, rudders, and ailerons every loo
             //rudder
             rigidbod.element[6].f_incidence = 0.0;
@@ -522,6 +526,128 @@ impl<'a> System<'a> for EquationsOfMotion
             rigidbod.element[5].i_flap = 0;
             //flaps will be toggled on and off so flaps does not need to be zerod each time
 
+            //FOR EQUIVALENCY TESTS: set flight controls artificially based on current frame
+           
+            //TEST 1 (its just the default with no functionality )
+
+            //TEST 2 Pitch Up 900 frames
+            //increase thrust by 500
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
+            // {
+            //    //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+            // else if rigidbod.current_frame % 2 == 0 //even frames only
+            // {
+            //     //pitch up
+            //     rigidbod.element[4].i_flap = 1;
+            //     rigidbod.element[5].i_flap = 1;
+            // }
+
+            // //TEST 3 Roll Right 900 frames
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
+            // {
+            //    //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+            // else if rigidbod.current_frame % 15 == 0 //frame divisible by 15
+            // {
+            //     //roll right
+            //     rigidbod.element[0].i_flap = -1;
+            //     rigidbod.element[3].i_flap = 1;
+            // }
+
+            //TEST 4 Yaw Right 900 frames
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
+            // {
+            //    //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+            // else if rigidbod.current_frame % 2 == 0
+            // {
+            //     //yaw/rudder right
+            //     rigidbod.element[6].f_incidence = -16.0;
+            // }
+           
+           
+            //TEST x
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 30
+            // {
+            //     //roll right
+            //     rigidbod.element[0].i_flap = -1;
+            //     rigidbod.element[3].i_flap = 1;
+            // }
+            // else if rigidbod.current_frame >= 901 && rigidbod.current_frame <= 930
+            // {
+            //     //roll left
+            //     rigidbod.element[0].i_flap = 1;
+            //     rigidbod.element[3].i_flap = -1;
+            // }
+            // else if rigidbod.current_frame >= 931 && rigidbod.current_frame <= 935
+            // {
+            //     //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+
+            // else if rigidbod.current_frame >= 936 && rigidbod.current_frame <= 1800
+            // {
+            //     //pitch up
+            //     rigidbod.element[4].i_flap = 1;
+            //     rigidbod.element[5].i_flap = 1;
+            // }
+
+
+            //TEST y
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 10
+            // {
+            //     //thrust up
+            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            // }
+            // else if rigidbod.current_frame >= 11 && rigidbod.current_frame <= 600
+            // {
+            //     //pitch up
+            //     rigidbod.element[4].i_flap = 1;
+            //     rigidbod.element[5].i_flap = 1;
+            // }
+            // else if rigidbod.current_frame >= 601 && rigidbod.current_frame <= 900
+            // {
+            //     //yaw left
+            //     rigidbod.element[6].f_incidence = 16.0;
+            // }
+
+            // else if rigidbod.current_frame >= 901 && rigidbod.current_frame <= 910
+            // {
+            //     //pitch down
+            //     rigidbod.element[4].i_flap = -1;
+            //     rigidbod.element[5].i_flap = -1;
+            // }
+
+            // else if rigidbod.current_frame >= 911 && rigidbod.current_frame <= 1200
+            // {
+            //    //pitch up
+            //    rigidbod.element[4].i_flap = 1;
+            //    rigidbod.element[5].i_flap = 1;
+            // }
+            // else if rigidbod.current_frame >= 1201 && rigidbod.current_frame <= 1500
+            // {
+            //    //yaw right
+            //    rigidbod.element[6].f_incidence = -16.0;
+            // }
+
+            // else if rigidbod.current_frame >= 1501 && rigidbod.current_frame <= 1510
+            // {
+            //     //thrust down
+            //     rigidbod.thrustforce = rigidbod.thrustforce - D_THRUST;
+            // }
+            // //none 1511 -2100
+
+            // else if rigidbod.current_frame >= 2101 && rigidbod.current_frame <= 2700
+            // {
+            //     //flaps down
+            //     rigidbod.element[1].i_flap = -1;
+            //     rigidbod.element[2].i_flap = -1;
+            //     rigidbod.flaps = true;
+            // }
 
             //Handle the input states
             //Thrust states
@@ -656,7 +782,7 @@ impl<'a> System<'a> for EquationsOfMotion
             println!("pitch:            {}", rigidbod.v_euler_angles.y); //we made this negative in the euler angles in eom
             println!("yaw:              {}", rigidbod.v_euler_angles.z);
             println!("alt:              {}", rigidbod.v_position.z);
-            println!("thrus:            {}", rigidbod.thrustforce);
+            println!("thrust:           {}", rigidbod.thrustforce);
             println!("speed:            {}", rigidbod.f_speed/1.688);
             println!("pos x:            {}", rigidbod.v_position.x);
             println!("pos y:            {}", rigidbod.v_position.y);
@@ -685,9 +811,9 @@ impl<'a> System<'a> for MakePacket
             let mut fdm: FGNetFDM = Default::default();
             
             //Set Roll, Pitch, Yaw
-            let roll: f32 = rigidbod.v_euler_angles.x.to_radians() as f32;
-            let pitch: f32 = rigidbod.v_euler_angles.y.to_radians() as f32; 
-            let yaw: f32 = rigidbod.v_euler_angles.z.to_radians() as f32;
+            let roll: f32 = rigidbod.v_euler_angles.x.to_radians();
+            let pitch: f32 = rigidbod.v_euler_angles.y.to_radians(); 
+            let yaw: f32 = rigidbod.v_euler_angles.z.to_radians();
 
             //TRYING TO USE ECEF COORDINATES AND CONVERTING TO LLA
             // let nalgebra_ecef_pos = Vector3::new(rigidbod.v_position.x, rigidbod.v_position.y, rigidbod.v_position.z);
@@ -698,9 +824,9 @@ impl<'a> System<'a> for MakePacket
 
             //USING LLA COORDINATES
             //Set lat, long, alt
-            fdm.latitude = f64::from_be_bytes(rigidbod.v_position.x.to_ne_bytes());
-            fdm.longitude = f64::from_be_bytes(rigidbod.v_position.y.to_ne_bytes()); 
-            fdm.altitude = f64::from_be_bytes(rigidbod.v_position.z.to_ne_bytes()); //flightgear wants meters here, but on screen it displays feet
+            fdm.latitude = f32::from_be_bytes(rigidbod.v_position.x.to_ne_bytes()).into();
+            fdm.longitude = f32::from_be_bytes(rigidbod.v_position.y.to_ne_bytes()).into(); 
+            fdm.altitude = f32::from_be_bytes(rigidbod.v_position.z.to_ne_bytes()).into(); //flightgear wants meters here, but on screen it displays feet
                                                                                     
             //Roll, Pitch, Yaw
             fdm.phi = f32::from_be_bytes(roll.to_ne_bytes());
@@ -761,17 +887,17 @@ lazy_static!
 }
 
 //Thrust
-static MAX_THRUST: f64 = 3000.0; //max thrustforce value
-static D_THRUST: f64 = 100.0;   //change in thrust per keypress
+static MAX_THRUST: f32 = 3000.0; //max thrustforce value
+static D_THRUST: f32 = 100.0;   //change in thrust per keypress
 
 //Time in between each update
-static FRAME_RATE: f64 = 30.0;
-static DT: f64 = 1.0 / FRAME_RATE;
+static FRAME_RATE: f32 = 30.0;
+static DT: f32 = 1.0 / FRAME_RATE;
 
 fn main()
 {
     //Create variable to keep track of time elapsed
-    let mut current_time: f64 = 0.0;
+    let mut current_time: f32 = 0.0;
 
     //Create world
     let mut world = World::new();
@@ -857,6 +983,7 @@ fn main()
         flaps: false,
         q_orientation: myairplane.q_orientation, 
         element: myairplane.element,
+        current_frame: 0,
     })
     .with(KeyboardState{
         thrust_up: false,
@@ -930,14 +1057,14 @@ fn main()
 //Given the angle of attack and status of the flaps,
 //return lift angle coefficient for camabred airfoil with 
 //plain trailing-edge (+/- 15 degree inflation).
-fn lift_coefficient(angle: f64, flaps: i32) -> f64
+fn lift_coefficient(angle: f32, flaps: i32) -> f32
 {
     let clf0 = vec![-0.54, -0.2, 0.2, 0.57, 0.92, 1.21, 1.43, 1.4, 1.0];
     let clfd = vec![0.0, 0.45, 0.85, 1.02, 1.39, 1.65, 1.75, 1.38, 1.17];
     let clfu = vec![-0.74, -0.4, 0.0, 0.27, 0.63, 0.92, 1.03, 1.1, 0.78];
     let a = vec![-8.0, -4.0, 0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
 
-    let mut cl: f64 = 0.0;
+    let mut cl: f32 = 0.0;
 
     for i in 0..8  
     {
@@ -968,14 +1095,14 @@ fn lift_coefficient(angle: f64, flaps: i32) -> f64
 //given angle of attack and flap status, 
 //return drag coefficient for cambered airfoil with 
 //plain trailing-edge flap (+/- 15 degree deflection).
-fn drag_coefficient(angle: f64, flaps: i32) -> f64
+fn drag_coefficient(angle: f32, flaps: i32) -> f32
 {
     let cdf0 = vec![0.01, 0.0074, 0.004, 0.009, 0.013, 0.023, 0.05, 0.12, 0.21];
     let cdfd = vec![0.0065, 0.0043, 0.0055, 0.0153, 0.0221, 0.0391, 0.1, 0.195, 0.3];
     let cdfu = vec![0.005, 0.0043, 0.0055, 0.02601, 0.03757, 0.06647, 0.13, 0.1, 0.25];
     let a = vec![-8.0, -4.0, 0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
 
-    let mut cd: f64 = 0.75; //0.5 in book but 0.75 in actual code
+    let mut cd: f32 = 0.75; //0.5 in book but 0.75 in actual code
 
     for i in 0..8  
     {
@@ -1008,13 +1135,13 @@ fn drag_coefficient(angle: f64, flaps: i32) -> f64
 //does not include flaps.
 //Given attack angle, return lift coefficient for a symmetric (no camber) 
 //airfoil without flaps.
-fn rudder_lift_coefficient(angle: f64) -> f64
+fn rudder_lift_coefficient(angle: f32) -> f32
 {
     let clf0 = vec![0.16, 0.456, 0.736, 0.968, 1.144, 1.12, 0.8];
     let a = vec![0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
 
-    let mut cl: f64 = 0.0;
-    let aa: f64 = angle.abs();
+    let mut cl: f32 = 0.0;
+    let aa: f32 = angle.abs();
 
     for i in 0..6 
     {
@@ -1034,13 +1161,13 @@ fn rudder_lift_coefficient(angle: f64) -> f64
 
 //Given attack angle, return drag coefficient for a symmetric (no camber) 
 //airfoil without flaps.
-fn rudder_drag_coefficient(angle: f64) -> f64
+fn rudder_drag_coefficient(angle: f32) -> f32
 {
     let cdf0 = vec![0.0032, 0.0072, 0.0104, 0.0184, 0.04, 0.096, 0.168];
     let a = vec![0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0];
 
-    let mut cd: f64 = 0.75; //0.5 in book
-    let aa: f64 = angle.abs();
+    let mut cd: f32 = 0.75; //0.5 in book
+    let aa: f32 = angle.abs();
 
     for i in 0..6  
     {
