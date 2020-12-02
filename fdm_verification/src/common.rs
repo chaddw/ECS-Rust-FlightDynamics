@@ -7,21 +7,21 @@
     #[derive(Debug, Default)]
     pub struct Myvec
     {
-        pub x: f32,
-        pub y: f32,
-        pub z: f32,
+        pub x: f64,
+        pub y: f64,
+        pub z: f64,
     
     }
     
     impl Myvec
     {
         //like a constructor, static method
-        pub fn new(x: f32, y: f32, z: f32) -> Myvec
+        pub fn new(x: f64, y: f64, z: f64) -> Myvec
         {
             Myvec { x: x, y: y, z: z}
         }
 
-        pub fn magnitude(&self) -> f32
+        pub fn magnitude(&self) -> f64
         {
             return (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
         }
@@ -29,8 +29,8 @@
         //mutates in place
         pub fn normalize(&mut self)
         {
-            let tol: f32 = 0.000000000000001; //float type tolerance
-            let mut m: f32 = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
+            let tol: f64 = 0.000000000000001; //float type tolerance
+            let mut m: f64 = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
             if m <= tol
             {
                m = 1.0;
@@ -92,7 +92,7 @@
 
         }
     
-        pub fn multiplyscalar(v: &Myvec, scalar: f32) -> Myvec
+        pub fn multiplyscalar(v: &Myvec, scalar: f64) -> Myvec
         {
             let vec = Myvec { 
                 x: v.x * scalar, 
@@ -102,7 +102,7 @@
     
             return vec;
         }
-        pub fn dividescalar(v: &Myvec, scalar: f32) -> Myvec
+        pub fn dividescalar(v: &Myvec, scalar: f64) -> Myvec
         {
             let vec = Myvec { 
                 x: v.x / scalar, 
@@ -126,7 +126,7 @@
     
         }
     
-        pub fn dotproduct(u: &Myvec, v: &Myvec) -> f32 //like multiplying vec
+        pub fn dotproduct(u: &Myvec, v: &Myvec) -> f64 //like multiplying vec
         {
     
             return u.x*v.x + u.y*v.y + u.z*v.z;
@@ -162,7 +162,7 @@
     #[derive(Debug, Default)]
     pub struct Myquaternion
     {
-        pub n: f32, //scalar part
+        pub n: f64, //scalar part
         pub v: Myvec, //vector part  v.x, v.y, v.z
     }
     
@@ -171,7 +171,7 @@
     impl Myquaternion
     {
         #[allow(dead_code)]
-        pub fn new(n: f32, x: f32, y: f32, z: f32) -> Myquaternion
+        pub fn new(n: f64, x: f64, y: f64, z: f64) -> Myquaternion
         {
             Myquaternion { 
                 
@@ -184,7 +184,7 @@
                 } }
         }
 
-        pub fn magnitude(&self) -> f32
+        pub fn magnitude(&self) -> f64
         {
             return (self.n * self.n + self.v.x * self.v.x + self.v.y * self.v.y + self.v.z * self.v.z).sqrt();
         }
@@ -238,7 +238,7 @@
             return quat;
         }
     
-        pub fn multiplyscalar(q: &Myquaternion, scalar: f32) -> Myquaternion 
+        pub fn multiplyscalar(q: &Myquaternion, scalar: f64) -> Myquaternion 
         {
             let quat = Myquaternion { 
                 n: q.n * scalar,
@@ -253,7 +253,7 @@
     
             return quat;
         }
-        pub fn dividescalar(q: &Myquaternion, scalar: f32) -> Myquaternion 
+        pub fn dividescalar(q: &Myquaternion, scalar: f64) -> Myquaternion 
         {
             let quat = Myquaternion { 
                 n: q.n / scalar,
@@ -340,7 +340,7 @@
                let r12 = 2.0 * (q.v.x*q.v.y - q.n*q.v.z);
                let r13 = 2.0 * (q.v.x*q.v.z + q.n*q.v.y);
          
-               u.x = 0.0_f32.to_degrees();                                           // roll
+               u.x = 0.0_f64.to_degrees();                                           // roll
                u.y = (-(pi/2.0) * r31/tmp).to_degrees();  // pitch
                u.z = (-r12.atan2(-r31*r13)).to_degrees(); // yaw
                return u;
@@ -353,25 +353,25 @@
     
         }
 
-        pub fn make_q_from_euler(x: f32, y: f32, z: f32) -> Myquaternion
+        pub fn make_q_from_euler(x: f64, y: f64, z: f64) -> Myquaternion
         {
             let mut q: Myquaternion = Default::default();
-            let roll: f32 = x.to_radians();
-            let pitch: f32 = y.to_radians();
-            let yaw: f32 = z.to_radians();
+            let roll: f64 = x.to_radians();
+            let pitch: f64 = y.to_radians();
+            let yaw: f64 = z.to_radians();
 
-            let cyaw: f32 = (0.5 * yaw).cos();
-            let cpitch: f32 = (0.5 * pitch).cos();
-            let croll: f32 = (0.5 * roll).cos();
+            let cyaw: f64 = (0.5 * yaw).cos();
+            let cpitch: f64 = (0.5 * pitch).cos();
+            let croll: f64 = (0.5 * roll).cos();
 
-            let syaw: f32 = (0.5 * yaw).sin();
-            let spitch: f32 = (0.5 * pitch).sin();
-            let sroll: f32 = (0.5 * roll).sin();
+            let syaw: f64 = (0.5 * yaw).sin();
+            let spitch: f64 = (0.5 * pitch).sin();
+            let sroll: f64 = (0.5 * roll).sin();
         
-            let cyawcpitch: f32 = cyaw * cpitch;
-            let syawspitch: f32 = syaw * spitch;
-            let cyawspitch: f32 = cyaw * spitch;
-            let syawcpitch: f32 = syaw * cpitch;
+            let cyawcpitch: f64 = cyaw * cpitch;
+            let syawspitch: f64 = syaw * spitch;
+            let cyawspitch: f64 = cyaw * spitch;
+            let syawcpitch: f64 = syaw * cpitch;
         
         
             q.n = cyawcpitch * croll + syawspitch * sroll;
@@ -392,18 +392,18 @@
     pub struct Mymatrix
     {
        // elements eij: i -> row, j -> column
-        pub e11: f32, pub e12: f32, pub e13: f32,
-        pub e21: f32, pub e22: f32, pub e23: f32,
-        pub e31: f32, pub e32: f32, pub e33: f32,
+        pub e11: f64, pub e12: f64, pub e13: f64,
+        pub e21: f64, pub e22: f64, pub e23: f64,
+        pub e31: f64, pub e32: f64, pub e33: f64,
     }
     
     
     impl Mymatrix
     {
     
-        pub fn new( r1c1: f32,  r1c2: f32,  r1c3: f32, 
-                    r2c1: f32,  r2c2: f32,  r2c3: f32, 
-                    r3c1: f32,  r3c2: f32,  r3c3: f32) -> Mymatrix
+        pub fn new( r1c1: f64,  r1c2: f64,  r1c3: f64, 
+                    r2c1: f64,  r2c2: f64,  r2c3: f64, 
+                    r3c1: f64,  r3c2: f64,  r3c3: f64) -> Mymatrix
         {
             Mymatrix { 
                 e11: r1c1,
@@ -421,7 +421,7 @@
 
         pub fn inverse(&self) -> Mymatrix
         {
-            let mut d: f32 = self.e11*self.e22*self.e33 -
+            let mut d: f64 = self.e11*self.e22*self.e33 -
                         self.e11*self.e32*self.e23 +
                         self.e21*self.e32*self.e13 -
                         self.e21*self.e12*self.e33 +
