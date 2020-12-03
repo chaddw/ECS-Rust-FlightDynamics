@@ -8,5 +8,3 @@ edition = "2018"
 
 [dependencies]
 specs = "0.16.1"
-lazy_static = "1.4.0"
-device_query = "0.2.5"
