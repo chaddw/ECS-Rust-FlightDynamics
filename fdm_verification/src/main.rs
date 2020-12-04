@@ -1,4 +1,3 @@
-
 //ECS(SPECS)
 use specs::prelude::*;
 
@@ -266,10 +265,7 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
      rigidbod.v_forces = common::Myquaternion::qvrotate(&rigidbod.q_orientation, &fb);
 
     //Apply gravity (g is -32.174 ft/s^2)
-    //if rigidbod.v_position.z > 248.0 //could only apply when the airplane is off the ground, 248 meters is ground level for wpafb
-    //{
-        rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.17399979) * rigidbod.mass;
-    //}
+    rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.17399979) * rigidbod.mass;
 
     rigidbod.v_moments = common::Myvec::addvec(&rigidbod.v_moments, &mb);
 }
@@ -284,9 +280,9 @@ impl<'a> System<'a> for EquationsOfMotion
         WriteStorage<'a, KeyboardState> //Write needed for equivalency test because we will use flight controls artificially
     );
 
-    fn run(&mut self, (mut rigidbody, keyboardstate): Self::SystemData) 
+    fn run(&mut self, (mut rigidbody, mut keyboardstate): Self::SystemData) 
     {
-        for (mut rigidbod, keystate) in (&mut rigidbody, &keyboardstate).join() 
+        for (mut rigidbod, mut keystate) in (&mut rigidbody, &mut keyboardstate).join() 
         {
             //FOR EQUIVALENCY TESTS: increment current frame tracker
             rigidbod.current_frame = rigidbod.current_frame + 1;
@@ -302,141 +298,60 @@ impl<'a> System<'a> for EquationsOfMotion
             rigidbod.element[5].i_flap = 0;
             //flaps will be toggled on and off so flaps does not need to be zerod each time
 
+            //Set all states false before we know if they are being activated in the test
+            keystate.thrust_up = false; 
+            keystate.thrust_down = false;
+
+            keystate.left_rudder = false;
+            keystate.right_rudder = false;
+        
+            keystate.roll_left = false;
+            keystate.roll_right = false;
+ 
+            keystate.pitch_up = false;
+            keystate.pitch_down = false;
+            //flaps are toggled on and off, so they dont need to be set to false each time
+
+
             //FOR EQUIVALENCY TESTS: set flight controls artificially based on current frame
-           
+            //all that is needed is to just set that keystate to true to activate that functionality
+
             //TEST 1 (its just the default with no functionality )
 
             //TEST 2 Pitch Up 900 frames
             //increase thrust by 500
             // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
             // {
-            //    //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            //     keystate.thrust_up = true;
             // }
             // else if rigidbod.current_frame % 2 == 0 //even frames only
             // {
-            //     //pitch up
-            //     rigidbod.element[4].i_flap = 1;
-            //     rigidbod.element[5].i_flap = 1;
+            //     keystate.pitch_up = true;;
             // }
 
-            // //TEST 3 Roll Right 900 frames
+            //TEST 3 Roll Right 900 frames
             // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
             // {
-            //    //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            //     keystate.thrust_up = true;
             // }
             // else if rigidbod.current_frame % 15 == 0 //frame divisible by 15
             // {
-            //     //roll right
-            //     rigidbod.element[0].i_flap = -1;
-            //     rigidbod.element[3].i_flap = 1;
+            //     keystate.roll_right = true;
             // }
 
-            // //TEST 4 Yaw Right 900 frames
+            //TEST 4 Yaw Right 900 frames
             // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
             // {
-            //    //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
+            //     keystate.thrust_up = true;
             // }
             // else if rigidbod.current_frame % 2 == 0
             // {
-            //     //yaw/rudder right
-            //     rigidbod.element[6].f_incidence = -16.0;
+            //     keystate.right_rudder = true;
             // }
 
-            // //TEST 5 Flaps Down 900 frames
-            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
-            // {
-            //    //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
-            // }
-            //  if rigidbod.current_frame % 2 == 0
-            // {
-            //     element[1].flap = -1;
-            //     element[2].flap = -1;
-            //     flaps = true;
-            // }
-           
-           
-            //TEST x
-            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 30
-            // {
-            //     //roll right
-            //     rigidbod.element[0].i_flap = -1;
-            //     rigidbod.element[3].i_flap = 1;
-            // }
-            // else if rigidbod.current_frame >= 901 && rigidbod.current_frame <= 930
-            // {
-            //     //roll left
-            //     rigidbod.element[0].i_flap = 1;
-            //     rigidbod.element[3].i_flap = -1;
-            // }
-            // else if rigidbod.current_frame >= 931 && rigidbod.current_frame <= 935
-            // {
-            //     //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
-            // }
+            //TEST 5 Flaps Down 900 frames
+            //keystate.flaps_down = true;
 
-            // else if rigidbod.current_frame >= 936 && rigidbod.current_frame <= 1800
-            // {
-            //     //pitch up
-            //     rigidbod.element[4].i_flap = 1;
-            //     rigidbod.element[5].i_flap = 1;
-            // }
-
-
-            //TEST y
-            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 10
-            // {
-            //     //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
-            // }
-            // else if rigidbod.current_frame >= 11 && rigidbod.current_frame <= 600
-            // {
-            //     //pitch up
-            //     rigidbod.element[4].i_flap = 1;
-            //     rigidbod.element[5].i_flap = 1;
-            // }
-            // else if rigidbod.current_frame >= 601 && rigidbod.current_frame <= 900
-            // {
-            //     //yaw left
-            //     rigidbod.element[6].f_incidence = 16.0;
-            // }
-
-            // else if rigidbod.current_frame >= 901 && rigidbod.current_frame <= 910
-            // {
-            //     //pitch down
-            //     rigidbod.element[4].i_flap = -1;
-            //     rigidbod.element[5].i_flap = -1;
-            // }
-
-            // else if rigidbod.current_frame >= 911 && rigidbod.current_frame <= 1200
-            // {
-            //    //pitch up
-            //    rigidbod.element[4].i_flap = 1;
-            //    rigidbod.element[5].i_flap = 1;
-            // }
-            // else if rigidbod.current_frame >= 1201 && rigidbod.current_frame <= 1500
-            // {
-            //    //yaw right
-            //    rigidbod.element[6].f_incidence = -16.0;
-            // }
-
-            // else if rigidbod.current_frame >= 1501 && rigidbod.current_frame <= 1510
-            // {
-            //     //thrust down
-            //     rigidbod.thrustforce = rigidbod.thrustforce - D_THRUST;
-            // }
-            // //none 1511 -2100
-
-            // else if rigidbod.current_frame >= 2101 && rigidbod.current_frame <= 2700
-            // {
-            //     //flaps down
-            //     rigidbod.element[1].i_flap = -1;
-            //     rigidbod.element[2].i_flap = -1;
-            //     rigidbod.flaps = true;
-            // }
 
             //Handle the input states
             //Thrust states
@@ -548,7 +463,7 @@ impl<'a> System<'a> for EquationsOfMotion
             
             //Print some relevant data
             println!("roll:             {}", rigidbod.v_euler_angles.x);
-            println!("pitch:            {}", rigidbod.v_euler_angles.y); //pitch is negated only on the print statement in bourgs fdm
+            println!("pitch:            {}", -rigidbod.v_euler_angles.y); //pitch is negated only on the print statement in bourgs fdm
             println!("yaw:              {}", rigidbod.v_euler_angles.z);
             println!("alt:              {}", rigidbod.v_position.z);
             println!("thrust:           {}", rigidbod.thrustforce);
