@@ -1,7 +1,5 @@
-#![recursion_limit="512"]
 //FlightGear is ran with this line of command argumments on the fgfs executable:
-//fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,30,,5500,udp
-//fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,60,,5500,udp
+//fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --timeofday=noon --native-fdm=socket,in,30,,5500,udp
 
 //Flight control
 extern crate device_query;
@@ -13,7 +11,7 @@ use specs::prelude::*;
 //Networking
 use std::net::UdpSocket;
 
-//Special lobal variables
+//Special global variables
 #[macro_use]
 extern crate lazy_static;
 
@@ -33,7 +31,7 @@ use serde::{Deserialize, Serialize};
 //Vector, Matrix, Quaternion module
 mod common;
 
-//Component State Machine for keyboard
+//Component State Machine for keyboard presses
 #[derive(Debug)]
 struct KeyboardState
 {
@@ -72,7 +70,7 @@ struct PointMass
 #[derive(Debug, Default)]
 struct RigidBody
 {
-    mass: f64,                                  //total mass
+    mass: f64, //total mass
     m_inertia: common::Mymatrix,
     m_inertia_inverse: common::Mymatrix,
     v_position: common::Myvec, // position in earth coordinates
@@ -178,10 +176,6 @@ struct FGNetFDM
     speedbrake: f32,
     spoilers: f32,
 }
-// impl Component for FGNetFDM
-// {
-//     type Storage = VecStorage<Self>;
-// }
 
 //Component containg the packet created
 #[derive(Debug, Default)]
@@ -193,13 +187,6 @@ impl Component for Packet
 {
     type Storage = VecStorage<Self>;
 }
-
-//for converting a the fgnetfdm component structure into to slice of u8 to be sent to Flightgear
-// unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
-// {
-//     ::std::slice::from_raw_parts((p as *const T) as *const u8,::std::mem::size_of::<T>(),)
-// }
-
 
 //System to handle user input
 struct FlightControl;
@@ -489,11 +476,11 @@ fn calc_airplane_loads(rigidbod: &mut RigidBody)
     //Convert forces from model space to earth space. rotates the vector by the unit quaternion (QVRotate function)
      rigidbod.v_forces = common::Myquaternion::qvrotate(&rigidbod.q_orientation, &fb);
 
-    //Apply gravity (g is -32.174 ft/s^2), only apply when the airplane is off the ground
-    //if rigidbod.v_position.z > 248.0
-    //{
+    //Apply gravity (g is -32.174 ft/s^2), 
+    if rigidbod.v_position.z > 248.0 //only apply when the airplane is off the ground, which is 248 meters at wpafb
+    {
         rigidbod.v_forces.z = rigidbod.v_forces.z + (-32.17399979) * rigidbod.mass;
-    //}
+    }
 
     rigidbod.v_moments = common::Myvec::addvec(&rigidbod.v_moments, &mb);
 }
@@ -525,129 +512,6 @@ impl<'a> System<'a> for EquationsOfMotion
             rigidbod.element[4].i_flap = 0;
             rigidbod.element[5].i_flap = 0;
             //flaps will be toggled on and off so flaps does not need to be zerod each time
-
-            //FOR EQUIVALENCY TESTS: set flight controls artificially based on current frame
-           
-            //TEST 1 (its just the default with no functionality )
-
-            //TEST 2 Pitch Up 900 frames
-            //increase thrust by 500
-            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
-            // {
-            //    //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
-            // }
-            // else if rigidbod.current_frame % 2 == 0 //even frames only
-            // {
-            //     //pitch up
-            //     rigidbod.element[4].i_flap = 1;
-            //     rigidbod.element[5].i_flap = 1;
-            // }
-
-            // //TEST 3 Roll Right 900 frames
-            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
-            // {
-            //    //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
-            // }
-            // else if rigidbod.current_frame % 15 == 0 //frame divisible by 15
-            // {
-            //     //roll right
-            //     rigidbod.element[0].i_flap = -1;
-            //     rigidbod.element[3].i_flap = 1;
-            // }
-
-            //TEST 4 Yaw Right 900 frames
-            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
-            // {
-            //    //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
-            // }
-            // else if rigidbod.current_frame % 2 == 0
-            // {
-            //     //yaw/rudder right
-            //     rigidbod.element[6].f_incidence = -16.0;
-            // }
-           
-           
-            //TEST x
-            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 30
-            // {
-            //     //roll right
-            //     rigidbod.element[0].i_flap = -1;
-            //     rigidbod.element[3].i_flap = 1;
-            // }
-            // else if rigidbod.current_frame >= 901 && rigidbod.current_frame <= 930
-            // {
-            //     //roll left
-            //     rigidbod.element[0].i_flap = 1;
-            //     rigidbod.element[3].i_flap = -1;
-            // }
-            // else if rigidbod.current_frame >= 931 && rigidbod.current_frame <= 935
-            // {
-            //     //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
-            // }
-
-            // else if rigidbod.current_frame >= 936 && rigidbod.current_frame <= 1800
-            // {
-            //     //pitch up
-            //     rigidbod.element[4].i_flap = 1;
-            //     rigidbod.element[5].i_flap = 1;
-            // }
-
-
-            //TEST y
-            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 10
-            // {
-            //     //thrust up
-            //     rigidbod.thrustforce = rigidbod.thrustforce + D_THRUST;
-            // }
-            // else if rigidbod.current_frame >= 11 && rigidbod.current_frame <= 600
-            // {
-            //     //pitch up
-            //     rigidbod.element[4].i_flap = 1;
-            //     rigidbod.element[5].i_flap = 1;
-            // }
-            // else if rigidbod.current_frame >= 601 && rigidbod.current_frame <= 900
-            // {
-            //     //yaw left
-            //     rigidbod.element[6].f_incidence = 16.0;
-            // }
-
-            // else if rigidbod.current_frame >= 901 && rigidbod.current_frame <= 910
-            // {
-            //     //pitch down
-            //     rigidbod.element[4].i_flap = -1;
-            //     rigidbod.element[5].i_flap = -1;
-            // }
-
-            // else if rigidbod.current_frame >= 911 && rigidbod.current_frame <= 1200
-            // {
-            //    //pitch up
-            //    rigidbod.element[4].i_flap = 1;
-            //    rigidbod.element[5].i_flap = 1;
-            // }
-            // else if rigidbod.current_frame >= 1201 && rigidbod.current_frame <= 1500
-            // {
-            //    //yaw right
-            //    rigidbod.element[6].f_incidence = -16.0;
-            // }
-
-            // else if rigidbod.current_frame >= 1501 && rigidbod.current_frame <= 1510
-            // {
-            //     //thrust down
-            //     rigidbod.thrustforce = rigidbod.thrustforce - D_THRUST;
-            // }
-            // //none 1511 -2100
-
-            // else if rigidbod.current_frame >= 2101 && rigidbod.current_frame <= 2700
-            // {
-            //     //flaps down
-            //     rigidbod.element[1].i_flap = -1;
-            //     rigidbod.element[2].i_flap = -1;
-            //     rigidbod.flaps = true;
-            // }
 
             //Handle the input states
             //Thrust states
@@ -803,7 +667,7 @@ impl<'a> System<'a> for MakePacket
 
     fn run(&mut self, (rigidbody, mut packet): Self::SystemData) 
     {
-        for (rigidbod, mut pckt,) in (&rigidbody, &mut packet).join() 
+        for (rigidbod, mut pckt) in (&rigidbody, &mut packet).join() 
         {
             //All data passed into the FGNetFDM struct is converted to network byte order
 
@@ -835,20 +699,11 @@ impl<'a> System<'a> for MakePacket
 
             //Other airplane data
             let fg_net_fdm_version = 24_u32;
-           // let visibility: f32 = 5000.0;
             fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
-           // fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());
-           // fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());
-           // fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
-           // fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
-           // fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
 
             //Convert struct to array of u8 bytes
-            //let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
             pckt.bytes = bincode::serialize(&fdm).unwrap();
 
-            //Finally send &[u8] of bytes over socket connected on FlightGear
-           // SOCKET.send(bytes).expect("couldn't send packet");
 
         }//end for
     }//end run
@@ -903,7 +758,6 @@ fn main()
     //Create world
     let mut world = World::new();
     world.register::<RigidBody>();
-   // world.register::<FGNetFDM>();
     world.register::<KeyboardState>();
     world.register::<Packet>();
 
@@ -1006,9 +860,6 @@ fn main()
         flaps_down: false,
         zero_flaps: false,
     })
-    //.with(FGNetFDM{
-    //    ..Default::default()
-    //})
     .with(Packet{
         ..Default::default()
     })
@@ -1023,7 +874,6 @@ fn main()
 
     //Main simulation loop
     loop 
-    //for i in 0..900
     {
         //get current time
         let start = time::Instant::now();
