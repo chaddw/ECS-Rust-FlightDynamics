@@ -1,9 +1,6 @@
 //ECS(SPECS)
 use specs::prelude::*;
 
-//Exit program
-use std::process;
-
 //Vector, Matrix, Quaternion module
 mod common;
 
@@ -318,38 +315,52 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //TEST 1 (its just the default with no functionality )
 
-            //TEST 2 Pitch Up 900 frames
+            //TEST 2 THRUST
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
+            // {
+            //     keystate.thrust_down = true;
+            // }
+
+            //TEST 3 Roll 
+            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
+            // {
+            //     keystate.thrust_up = true;
+            // }
+            // else if rigidbod.current_frame >= 6 && rigidbod.current_frame <= 246 //pitch up 8 seconds
+            // {
+            //     keystate.pitch_up = true;
+            // }
+            // else if rigidbod.current_frame >= 247 && rigidbod.current_frame <= 307 //roll right for a 2 second
+            // {
+            //     keystate.roll_right = true;
+            // }
+
+
+            //TEST 4 Pitch
             //increase thrust by 500
             // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
             // {
             //     keystate.thrust_up = true;
             // }
-            // else if rigidbod.current_frame % 2 == 0 //even frames only
-            // {
-            //     keystate.pitch_up = true;;
-            // }
+  
+            // keystate.pitch_up = true;
 
-            //TEST 3 Roll Right 900 frames
+
+            //TEST 5 Yaw
             // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
             // {
             //     keystate.thrust_up = true;
             // }
-            // else if rigidbod.current_frame % 15 == 0 //frame divisible by 15
+            // else if rigidbod.current_frame >= 6 && rigidbod.current_frame <= 246 //pitch up 8 seconds
             // {
-            //     keystate.roll_right = true;
+            //     keystate.pitch_up = true;
             // }
-
-            //TEST 4 Yaw Right 900 frames
-            // if rigidbod.current_frame >= 1 && rigidbod.current_frame <= 5
-            // {
-            //     keystate.thrust_up = true;
-            // }
-            // else if rigidbod.current_frame % 2 == 0
+            // else if rigidbod.current_frame % 9 == 0
             // {
             //     keystate.right_rudder = true;
             // }
 
-            //TEST 5 Flaps Down 900 frames
+            //TEST 6 Flaps
             //keystate.flaps_down = true;
 
 
@@ -424,7 +435,7 @@ impl<'a> System<'a> for EquationsOfMotion
             rigidbod.v_velocity = common::Myvec::addvec(&rigidbod.v_velocity, &ae_mult_dt_tmp); 
 
             //Calculate position of airplane in earth space
-            let mut vel_mult_dt_tmp = common::Myvec::multiplyscalar(&rigidbod.v_velocity, DT);
+            let vel_mult_dt_tmp = common::Myvec::multiplyscalar(&rigidbod.v_velocity, DT);
             rigidbod.v_position = common::Myvec::addvec(&rigidbod.v_position, &vel_mult_dt_tmp); 
 
             //Calculate angular velocity of airplane in body space
@@ -572,7 +583,7 @@ fn main()
     .build();
 
     //Main simulation loop
-    for i in 0..900
+    for _ in 0..900
     {
         //increment time count
         current_time = current_time + DT;
