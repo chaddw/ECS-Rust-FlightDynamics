@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <cstdio>
 
@@ -27,95 +28,52 @@ int main()
         //FOR EQUIVALENCY TESTS: set flight controls artificially based on current frame
         //TEST 1 DO NOTHING
 
-        //TEST 2 PITCH UP 900 FRAMES (30 SECONDS)
+       //TEST 2 THRUST
         //if (current_frame >= 1 && current_frame <= 5)
-        // {
-        //    fdm.inc_thrust();
-        // }
-        // else if (current_frame % 2 == 0)
-        // {
-        //    fdm.pitch_up();
-        // }
+        //{
+        //    fdm.dec_thrust();
+        //}
 
-        //TEST 3 ROLL RIGHT 900 FRAMES (30 SECONDS)
+        //TEST 3 ROLL 
         //if (current_frame >= 1 && current_frame <= 5)
         //{
         //    fdm.inc_thrust();
         //}
-        //else if (current_frame % 2 == 0)
+        //else if (current_frame >= 6 && current_frame <= 246) //pitch up 8 seconds to stablize airplane
+        //{
+        //    fdm.pitch_up();
+        //}
+        //else if (current_frame >= 247 && current_frame <= 307) //roll right for 2 seconds
         //{
         //    fdm.roll_right();
         //}
 
-       //TEST 4 YAW RIGHT 900 FRAMES (30 SECONDS)
+
+        //TEST 4 PITCH
+         //if (current_frame >= 1 && current_frame <= 5)
+         //{
+         //    fdm.inc_thrust();
+         //}
+
+         //fdm.pitch_up();
+
+
+       //TEST 5 YAW
         //if (current_frame >= 1 && current_frame <= 5)
         //{
         //    fdm.inc_thrust();
         //}
-        //else if (current_frame % 2 == 0)
+        //else if (current_frame >= 6 && current_frame <= 246) //pitch up 8 seconds to stablize airplane
+        //{
+        //    fdm.pitch_up();
+        //}
+        //else if (current_frame % 9 == 0)
         //{
         //    fdm.right_rudder();
         //}
        
-        //TEST 5 FLAPS DOWN 900 FRAMES (30 SECONDS)
-        //fdm.flaps_down()
-
-
-       
-        //MORE COMPLICATED TESTS ARE POSSIBLE
-       //TEST x (old)
-       //if (current_frame >= 1 && current_frame <= 30)
-       //{
-       //    fdm.roll_right();
-       //}
-       //else if (current_frame >= 901 && current_frame <= 930)
-       //{
-       //    fdm.roll_left();
-
-       //}
-       //else if (current_frame >= 931 && i+ 1 <= 935)
-       //{
-       //    fdm.inc_thrust();
-       //}
-       //else if (current_frame >= 936 && current_frame <= 1800)
-       //{
-       //     fdm.pitch_up();
-       //}
-
-       //TEST y (old)
-       //if (current_frame >= 1 && current_frame <= 10)
-       //{
-       //    fdm.inc_thrust();
-       //}
-       //else if (current_frame >= 11 && current_frame <= 600)
-       //{
-       //    fdm.pitch_up();
-       //}
-       //else if (current_frame >= 601 && current_frame <= 900)
-       //{
-       //    fdm.left_rudder();
-       //}
-       //else if (current_frame >= 901 && current_frame <= 910)
-       //{
-       //    fdm.pitch_down();
-       //}
-       //else if (current_frame >= 911 && current_frame <= 1200)
-       //{
-       //    fdm.pitch_up();
-       //}
-       //else if (current_frame >= 1201 && current_frame <= 1500)
-       //{
-       //    fdm.right_rudder();
-       //}
-       //else if (current_frame >= 1501 && current_frame <= 1510)
-       //{
-       //    fdm.dec_thrust();
-       //}
-       // //1511 to 2100 none
-       //else if (current_frame >= 2101 && current_frame <= 2700)
-       //{
-       //    fdm.flaps_down();
-       //}
+        //TEST 6 FLAPS
+       //fdm.flaps_down();
 
 
        current_time += dt;
