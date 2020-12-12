@@ -1,29 +1,10 @@
-#![recursion_limit="256"]
 //FlightGear is ran with this line of command argumments on the fgfs executable:
-//fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,30,,5500,udp
-//fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --vc=0 --timeofday=noon --native-fdm=socket,in,60,,5500,udp
+//fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --timeofday=noon --native-fdm=socket,in,30,,5500,udp
 
-//Imports for flight control function
-extern crate crossterm;
 
-//Async std crossterm
-use std::{
-    io::{stdout, Write},
-    time::Duration,
-};
-
-use futures::{future::FutureExt, select, StreamExt};
-use futures_timer::Delay;
-
-use crossterm::{
-    event::{Event, EventStream, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode},
-};
-//Crossterm output priniting
-use crossterm::cursor;
-use crossterm::terminal::{ Clear, ClearType};
-
+//Flight control
+extern crate device_query;
+use device_query::{DeviceQuery, DeviceState, Keycode};
 
 //Specs
 use specs::prelude::*;
@@ -41,6 +22,9 @@ extern crate lazy_static;
 
 //Exit program
 use std::process;
+
+//Main loop
+use std::{thread, time};
 
 
 //////Component Position
@@ -62,6 +46,10 @@ struct KeyboardState
     thrust_down: bool,
     aoa_up: bool,
     aoa_down: bool,
+    bank_right: bool,
+    bank_left: bool,
+    flaps_down: bool,
+    zero_flaps: bool,
 }
 impl Component for KeyboardState
 {
@@ -99,7 +87,7 @@ impl Component for PerformanceData
 #[derive(Debug)]
 struct OutputData
 {
-    s: f64, //time in seconds
+    current_frame: usize,  
     q: Vec<f64>, //will store ODE results
     airspeed: f64,
     delta_traveled: f64,
@@ -114,10 +102,9 @@ impl Component for OutputData
 struct InputData
 {
     bank: f64, //bank angle
-    alpha: f64,//  angle of attack
+    alpha: f64, //angle of attack
     throttle: f64, //throttle percentage
-    flap: String,  //  flap deflection amount (pointer in c)
-
+    flap: f64, //flap deflection amount
 }
 impl Component for InputData
 {
@@ -218,6 +205,85 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
 }
 
 
+
+//System to handle user input
+struct FlightControl;
+impl<'a> System<'a> for FlightControl
+{
+    type SystemData = ( 
+        ReadStorage<'a, InputData>, 
+        WriteStorage<'a, KeyboardState>,
+    );
+    //we dont need input data!!!! need a way to take this out and read in only keyboardstate
+    fn run(&mut self, (inputdata, mut keyboardstate): Self::SystemData) 
+    {
+        for (_inpdata, keystate) in (&inputdata, &mut keyboardstate).join() 
+        {
+            //Set all states false before we know if they are being activated
+            keystate.thrust_up = false; 
+            keystate.thrust_down = false;
+            keystate.aoa_up = false;
+            keystate.aoa_down = false;
+            keystate.bank_left = false;
+            keystate.bank_right = false;
+            keystate.flaps_down = false;
+            keystate.zero_flaps = false;
+
+            //Setup device query states
+            let device_state = DeviceState::new();
+            let keys: Vec<Keycode> = device_state.get_keys();
+
+            //Thrust
+            if keys.contains(&Keycode::A)
+            {
+                keystate.thrust_up = true;
+            }
+            else if keys.contains(&Keycode::Z)
+            {
+                keystate.thrust_down = true;
+            }
+
+            //angle of attack
+            if keys.contains(&Keycode::Down)
+            {
+                keystate.aoa_up = true;
+            }
+            else if keys.contains(&Keycode::Up)
+            {
+                keystate.aoa_down = true;
+            }
+
+            //bank 
+            if keys.contains(&Keycode::Left)
+            {
+                keystate.bank_left = true;
+            }
+            else if keys.contains(&Keycode::Right)
+            {
+                keystate.bank_right = true;
+            }
+
+            //flaps
+            if keys.contains(&Keycode::F)
+            {
+                keystate.flaps_down = true;
+            }
+            else if keys.contains(&Keycode::G)
+            {
+                keystate.zero_flaps = true;
+            }
+
+            //Quit program
+            if keys.contains(&Keycode::Q)
+            {
+                process::exit(1);
+            }
+
+        }//end for
+    }//end run
+}//end system
+
+
 //System to perform physics calculations
 struct EquationsOfMotion;
 impl<'a> System<'a> for EquationsOfMotion
@@ -267,6 +333,30 @@ impl<'a> System<'a> for EquationsOfMotion
             {
                 inpdata.alpha = inpdata.alpha - 1.0
             }  
+            //Bank states
+            if inpdata.bank < 20.0 && keystate.bank_right == true
+            {
+                inpdata.bank = inpdata.bank + 1.0;
+            
+            }  
+            else if inpdata.bank > -16.0 && keystate.bank_left == true
+            {
+                inpdata.bank = inpdata.bank - 1.0;
+            }  
+
+            //Flap states
+            if inpdata.flap == 0.0 && keystate.flaps_down == true
+            {
+                inpdata.flap = 20.0;
+            }  
+            else if inpdata.flap == 20.0 && keystate.flaps_down == true
+            {
+                inpdata.flap = 40.0;
+            }  
+            else if (inpdata.flap == 20.0 || inpdata.flap == 40.0) && keystate.zero_flaps == true
+            {
+                inpdata.flap = 0.0;
+            }  
         
   
             //note:this closure is what was "planeRightHandSide"... might should make this a function outside the system which is called in the system. could pass in the component structs
@@ -274,8 +364,8 @@ impl<'a> System<'a> for EquationsOfMotion
             {
                 let mut new_q = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; // intermediate dependent variable values 
             
-                let yo = -1.0_f64;
-                let pi = yo.acos();
+                let negativeone = -1.0_f64;
+                let pi = negativeone.acos();
                 let g: f64 = -9.81;
                 let mut cl: f64;
                 let cos_p: f64;   //  climb angle
@@ -334,11 +424,11 @@ impl<'a> System<'a> for EquationsOfMotion
                 //  Include effects of flaps and ground effects.
                 //  Ground effects are present if the plane is
                 //  within 5 meters of the ground.
-                if inpdata.flap == "20"
+                if inpdata.flap == 20.0
                 {
                     cl += 0.25;
                 }
-                if inpdata.flap == "40"
+                if inpdata.flap == 40.0
                 {
                     cl += 0.5;
                 }
@@ -437,7 +527,6 @@ impl<'a> System<'a> for EquationsOfMotion
             //  Update the dependent and independent variable values
             //  at the new dependent variable location and store the
             //  values in the ODE object arrays.
-            outdata.s = outdata.s + ds;
         
             for i in 0..6
             {
@@ -445,9 +534,9 @@ impl<'a> System<'a> for EquationsOfMotion
                 outdata.q[i] = q[i];
             }
     
-            outdata.delta_traveled = (outdata.q[1] / 3.6) - (priorx / 3.6); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
-            pos.ecef_vec.x = pos.ecef_vec.x + outdata.delta_traveled; //add latitude change to the ecef longitude
-            
+            outdata.delta_traveled = (outdata.q[1]) - (priorx); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
+            pos.ecef_vec.x = pos.ecef_vec.x + outdata.delta_traveled; //add latitude change to the ecef
+
             outdata.airspeed = (outdata.q[0] * outdata.q[0] + outdata.q[2] * outdata.q[2] + outdata.q[4] * outdata.q[4]).sqrt();
 
         }//end for
@@ -477,12 +566,20 @@ impl<'a> System<'a> for SendPacket
             let mut fdm: FGNetFDM = Default::default();
 
             //Set Roll, Pitch, Yaw
-            let roll: f32 = 0.0; //No roll in 2D
+            let roll: f32 = inpdata.bank as f32;
             let pitch: f32 = inpdata.alpha as f32; //Will use angle of attack because its "easier"
             let yaw: f32 = 90.0; //Only need to face in one direction
 
             //Coordinate conversion: cartesian to geodetic
             let lla = geo::ecef2lla(&pos.ecef_vec, &ELLIPSOID); 
+
+
+           //try no ecef
+        //    fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
+        //    fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
+        //    fdm.altitude = f64::from_be_bytes(outdata.q[5].to_ne_bytes()); //lla.z seems to increase altitude artificially...
+
+
 
             //Set lat, long, alt
             fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
@@ -516,17 +613,14 @@ impl<'a> System<'a> for SendPacket
 
 
             //Print some relevant data
-            disable_raw_mode().unwrap(); //Get out of raw mode to print clearly
-            println!("time = {}", outdata.s);
             println!("x traveled (m) = {}", outdata.q[1] / 3.6); //converted to meters
             println!("altitude (m) = {}", outdata.q[5]);
             println!("airspeed (km/h) = {}", outdata.airspeed);
             println!("throttle % = {}", inpdata.throttle);
             println!("angle of attack (deg) = {}", inpdata.alpha);
             println!("x travel change (m) since last frame = {}", outdata.delta_traveled);
-            //println!("bank angle (deg) = {}", inpdata.bank);
-            //println!("y = {}", outdata.q[3]);
-            enable_raw_mode().unwrap(); //Return to raw
+            println!("bank angle (deg) = {}", inpdata.bank);
+            println!("flap deflection (deg) = {}", inpdata.flap);
   
 
         }//end for
@@ -534,100 +628,6 @@ impl<'a> System<'a> for SendPacket
 }//end system
 
 
-async fn handle_input(thrust_up: &mut bool, thrust_down: &mut bool, aoa_up: &mut bool, aoa_down: &mut bool) 
-{
-    let mut reader = EventStream::new();
-    let mut delay = Delay::new(Duration::from_millis(50)).fuse(); //Delay time (this greatly affects the speed of the simulation...)
-    let mut event = reader.next().fuse();
-
-    //Either the time delay or keyboard event happens and then this function will be called again in the system
-    select!
-    {
-        _ = delay => 
-        { 
-            return; //Exit if time expires
-        }, 
-
-        maybe_event = event =>
-        {
-            match maybe_event 
-            {
-                Some(Ok(event)) => 
-                {
-                    println!("Event::{:?}\r", event);
-
-                    //Thrust
-                    if event == Event::Key(KeyCode::Char('t').into()) 
-                    {
-                        *thrust_up = true;
-                    }
-                    else if event == Event::Key(KeyCode::Char('g').into()) 
-                    {
-                        *thrust_down = true;
-                    }
-
-                    //Angle of attack
-                    else if event == Event::Key(KeyCode::Char('y').into()) 
-                    {
-                        *aoa_up = true;
-                    }
-                    else if event == Event::Key(KeyCode::Char('h').into()) 
-                    {
-                        *aoa_down = true;
-                    }
-
-                    else if event == Event::Key(KeyCode::Char('q').into()) 
-                    {
-                        //Exit program... maybe a better weay to do this?
-                        disable_raw_mode().unwrap();
-                        process::exit(1);
-                    }
-
-
-                }
-                Some(Err(e)) => println!("Error: {:?}\r", e),
-
-                None => return,
-            }
-        },
-    };
-}
-
-//System to handle user input
-struct FlightControl;
-impl<'a> System<'a> for FlightControl
-{
-    type SystemData = ( 
-        ReadStorage<'a, InputData>, 
-        WriteStorage<'a, KeyboardState>,
-    );
-
-    fn run(&mut self, (inputdata, mut keyboardstate): Self::SystemData) 
-    {
-        for (_inpdata, keystate) in (&inputdata, &mut keyboardstate).join() 
-        {
-            //Set all states false before we know if they are being activated
-            keystate.thrust_up = false; 
-            keystate.thrust_down = false;
-            keystate.aoa_up = false;
-            keystate.aoa_down = false;
-
-            //Enter raw mode for terminal input
-            enable_raw_mode().unwrap();
-
-            let mut stdout = stdout();
-
-            //This will make output not as crazy
-            execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0)) .unwrap();
-           
-            //Handle flight control
-            async_std::task::block_on(handle_input(&mut keystate.thrust_up, &mut keystate.thrust_down,&mut keystate.aoa_up, &mut keystate.aoa_down ));
-        
-            disable_raw_mode().unwrap();
-
-        }//end for
-    }//end run
-}//end system
 
 
 
@@ -635,7 +635,9 @@ impl<'a> System<'a> for FlightControl
 //Set some global variables:
 
 //Time in between each eom calculation
-static DT: f64 = 0.5; //0.0167 
+
+static FRAME_RATE: f64 = 30.0;
+static DT: f64 = 1.0 / FRAME_RATE; //seconds
 
 //Macro to define other globals
 lazy_static!
@@ -649,14 +651,18 @@ lazy_static!
 
 fn main()
 {
+    //Create variable to keep track of time elapsed
+    let mut current_time: f64 = 0.0;
+    let mut current_frame_main: usize = 0;
+
     //Create world
     let mut world = World::new();
-    world.register::<Position>();
-    world.register::<PerformanceData>();
-    world.register::<OutputData>();
-    world.register::<InputData>();
-    world.register::<FGNetFDM>();
-    world.register::<KeyboardState>();
+    // world.register::<Position>();
+    // world.register::<PerformanceData>();
+    // world.register::<OutputData>();
+    // world.register::<InputData>();
+    // world.register::<FGNetFDM>();
+    // world.register::<KeyboardState>();
 
     //Create dispatcher of the systems
     let mut dispatcher = DispatcherBuilder::new()
@@ -669,6 +675,7 @@ fn main()
     //Create plane entity with components
     let _plane = world.create_entity()
     .with(Position{
+       // ecef_vec: Vector3::new( 0.6951355515021288, -1.4668619698501122, 248.0)})
         ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236)}) //location of runway at 0 height
     .with(PerformanceData{
         wing_area: 16.2,             //  wing wetted area, m^2
@@ -689,7 +696,7 @@ fn main()
         b:-1.32,                    //  propeller efficiency curve fit coefficient
         })
     .with(OutputData{
-        s: 0.0, //time in seconds
+        current_frame: 0, //time in seconds
         q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
         airspeed: 0.0,
         delta_traveled: 0.0,
@@ -698,7 +705,7 @@ fn main()
         bank: 0.0, //bank angle
         alpha: 0.0,//  angle of attack
         throttle: 0.0, //throttle percentage
-        flap: String::from("0"),  //  flap deflection amount (pointer in c)
+        flap: 0.0,  //  flap deflection amount
         })
     .with(FGNetFDM{
         ..Default::default()
@@ -706,16 +713,53 @@ fn main()
     .with(KeyboardState{
         thrust_up: false,
         thrust_down: false,
+
         aoa_up: false,
         aoa_down: false,
+
+        bank_right: false,
+        bank_left: false,
+
+        flaps_down: false,
+        zero_flaps: false,
+
     })
     .build();
+
+
+
+    //create time type with the desired DT in milliseconds
+    let timestep = time::Duration::from_millis((DT * 1000.0) as u64);
 
     //Loop simulation
     loop 
     {
+        //get current time
+        let start = time::Instant::now();
+
+        //increment time count
+        current_time = current_time + DT;
+        current_frame_main = current_frame_main + 1;
+        println!("{}", "====================================================");
+        println!("time: {}, frames: {}", current_time, current_frame_main);
+
+        //process this frame
         dispatcher.dispatch(&world);
         world.maintain();
+
+       // let ten_millis = time::Duration::from_millis(10);
+       // thread::sleep(ten_millis);
+        //println!("{:?}", ten_millis);
+
+        
+        //find difference in time elapsed this loop versus the timestep
+        let sleep_time = timestep.checked_sub(time::Instant::now().duration_since(start));
+
+        //sleep for extra time if calculation took less time than the DT time step
+        if sleep_time != None 
+        {
+            thread::sleep(sleep_time.unwrap());
+        }
     }
 
 }
