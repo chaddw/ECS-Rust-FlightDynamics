@@ -9,10 +9,6 @@ use device_query::{DeviceQuery, DeviceState, Keycode};
 //Specs
 use specs::prelude::*;
 
-//Coordinate conversions
-extern crate coord_transforms;
-use coord_transforms::prelude::*;
-
 //Networking
 use std::net::UdpSocket;
 
@@ -26,17 +22,13 @@ use std::process;
 //Main loop
 use std::{thread, time};
 
+//Coordinate conversions
+extern crate coord_transforms;
+use coord_transforms::prelude::*;
 
-//////Component Position
-#[derive(Debug)]
-struct Position
-{
-    ecef_vec: Vector3<f64>
-}
-impl Component for Position 
-{
-    type Storage = VecStorage<Self>;
-}
+//Converting FGNetFDM struct to bytes to be sent as a packet
+use serde::{Deserialize, Serialize};
+
 
 //////Component State Machine for keyboard
 #[derive(Debug)]
@@ -58,7 +50,7 @@ impl Component for KeyboardState
 
 
 //////Component Performance data of the airplane
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct PerformanceData
 {
     wing_area: f64,
@@ -78,42 +70,33 @@ struct PerformanceData
     a: f64,           //  propeller efficiency coefficient
     b: f64,           //  propeller efficiency coefficient
 }
-impl Component for PerformanceData
-{
-    type Storage = VecStorage<Self>;
-}
 
-//////Component output results data
-#[derive(Debug)]
-struct OutputData
+//Component containing data on the airplane
+#[derive(Debug, Default)]
+struct DataFDM
 {
     current_frame: usize,  
     q: Vec<f64>, //will store ODE results
     airspeed: f64,
     delta_traveled: f64,
-}
-impl Component for OutputData
-{
-    type Storage = VecStorage<Self>;
-}
 
-//////Component user input data
-#[derive(Debug)]
-struct InputData
-{
     bank: f64, //bank angle
     alpha: f64, //angle of attack
     throttle: f64, //throttle percentage
     flap: f64, //flap deflection amount
+
+    mass_properties : PerformanceData,
+
+    ecef_vec: Vector3<f64>
+
 }
-impl Component for InputData
+impl Component for DataFDM
 {
     type Storage = VecStorage<Self>;
 }
 
-
 //////Component FGNetFDM for networking
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[repr(C)] //fix padding issue
 struct FGNetFDM
 {
@@ -194,30 +177,31 @@ struct FGNetFDM
     speedbrake: f32,
     spoilers: f32,
 }
-impl Component for FGNetFDM
+
+
+//Component containg the packet created
+#[derive(Debug, Default)]
+struct Packet
+{
+    bytes: Vec<u8>,
+}
+impl Component for Packet
 {
     type Storage = VecStorage<Self>;
 }
-//for converting to slice of u8 
-unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8]
-{
-    ::std::slice::from_raw_parts((p as *const T) as *const u8,::std::mem::size_of::<T>(),)
-}
-
-
 
 //System to handle user input
 struct FlightControl;
 impl<'a> System<'a> for FlightControl
 {
     type SystemData = ( 
-        ReadStorage<'a, InputData>, 
+        ReadStorage<'a, DataFDM>, 
         WriteStorage<'a, KeyboardState>,
     );
     //we dont need input data!!!! need a way to take this out and read in only keyboardstate
-    fn run(&mut self, (inputdata, mut keyboardstate): Self::SystemData) 
+    fn run(&mut self, (fdmdata, mut keyboardstate): Self::SystemData) 
     {
-        for (_inpdata, keystate) in (&inputdata, &mut keyboardstate).join() 
+        for (_fdm, keystate) in (&fdmdata, &mut keyboardstate).join() 
         {
             //Set all states false before we know if they are being activated
             keystate.thrust_up = false; 
@@ -289,16 +273,13 @@ struct EquationsOfMotion;
 impl<'a> System<'a> for EquationsOfMotion
 {
     type SystemData = (
-        ReadStorage<'a, PerformanceData>,
-        WriteStorage<'a, Position>,
-        WriteStorage<'a, OutputData>,
-        WriteStorage<'a, InputData>,
+        WriteStorage<'a, DataFDM>,
         ReadStorage<'a, KeyboardState>
     );
 
-    fn run(&mut self, (performancedata, mut position, mut outputdata, mut inputdata, keyboardstate): Self::SystemData) 
+    fn run(&mut self, (mut fdmdata, keyboardstate): Self::SystemData) 
     {
-        for (perfdata, pos, outdata, inpdata, keystate) in (&performancedata, &mut position, &mut outputdata, &mut inputdata, &keyboardstate).join() 
+        for (fdm, keystate) in (&mut fdmdata, &keyboardstate).join() 
         {
             
             let mut qcopy = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -310,56 +291,56 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //Handle the input states
             //Thrust states
-            if inpdata.throttle < 1.0 && keystate.thrust_up == true
+            if fdm.throttle < 1.0 && keystate.thrust_up == true
             {
-                inpdata.throttle = inpdata.throttle + 0.05;
+                fdm.throttle = fdm.throttle + 0.05;
                 
             }   
-            else if inpdata.throttle > 0.0 && keystate.thrust_down == true
+            else if fdm.throttle > 0.0 && keystate.thrust_down == true
             {
-                inpdata.throttle = inpdata.throttle - 0.05;
-                if inpdata.throttle < 0.001 
+                fdm.throttle = fdm.throttle - 0.05;
+                if fdm.throttle < 0.001 
                 {
-                    inpdata.throttle = 0.0;
+                    fdm.throttle = 0.0;
                 }
             }  
             //Angle of attack states
-            if inpdata.alpha < 20.0 && keystate.aoa_up == true
+            if fdm.alpha < 20.0 && keystate.aoa_up == true
             {
-                inpdata.alpha = inpdata.alpha + 1.0;
+                fdm.alpha = fdm.alpha + 1.0;
             
             }  
-            else if inpdata.alpha > -16.0 && keystate.aoa_down == true
+            else if fdm.alpha > -16.0 && keystate.aoa_down == true
             {
-                inpdata.alpha = inpdata.alpha - 1.0
+                fdm.alpha = fdm.alpha - 1.0
             }  
             //Bank states
-            if inpdata.bank < 20.0 && keystate.bank_right == true
+            if fdm.bank < 20.0 && keystate.bank_right == true
             {
-                inpdata.bank = inpdata.bank + 1.0;
+                fdm.bank = fdm.bank + 1.0;
             
             }  
-            else if inpdata.bank > -16.0 && keystate.bank_left == true
+            else if fdm.bank > -16.0 && keystate.bank_left == true
             {
-                inpdata.bank = inpdata.bank - 1.0;
+                fdm.bank = fdm.bank - 1.0;
             }  
 
             //Flap states
-            if inpdata.flap == 0.0 && keystate.flaps_down == true
+            if fdm.flap == 0.0 && keystate.flaps_down == true
             {
-                inpdata.flap = 20.0;
+                fdm.flap = 20.0;
             }  
-            else if inpdata.flap == 20.0 && keystate.flaps_down == true
+            else if fdm.flap == 20.0 && keystate.flaps_down == true
             {
-                inpdata.flap = 40.0;
+                fdm.flap = 40.0;
             }  
-            else if (inpdata.flap == 20.0 || inpdata.flap == 40.0) && keystate.zero_flaps == true
+            else if (fdm.flap == 20.0 || fdm.flap == 40.0) && keystate.zero_flaps == true
             {
-                inpdata.flap = 0.0;
+                fdm.flap = 0.0;
             }  
         
   
-            //note:this closure is what was "planeRightHandSide"... might should make this a function outside the system which is called in the system. could pass in the component structs
+            //note:this closure is what was "planeRightHandSide"
             let a = |q: &mut Vec<f64>, delta_q: &mut Vec<f64>, &ds: & f64, q_scale: f64, dq: &mut Vec<f64>| 
             {
                 let mut new_q = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; // intermediate dependent variable values 
@@ -376,7 +357,7 @@ impl<'a> System<'a> for EquationsOfMotion
                 //  Convert bank angle from degrees to radians
                 //  Angle of attack is not converted because the
                 //  Cl-alpha curve is defined in terms of degrees.
-                let bank = inpdata.bank.to_radians();
+                let bank = fdm.bank.to_radians();
             
                 //  Compute the intermediate values of the 
                 //  dependent variables.
@@ -407,28 +388,28 @@ impl<'a> System<'a> for EquationsOfMotion
                 let factor: f64 = (omega - 0.12)/  0.88;
             
                 //  Compute thrust 
-                let advance_ratio: f64 = vtotal / (perfdata.engine_rps * perfdata.prop_diameter);
-                let thrust: f64 = inpdata.throttle * factor * perfdata.engine_power * (perfdata.a + perfdata.b * advance_ratio * advance_ratio) / (perfdata.engine_rps * perfdata.prop_diameter);
+                let advance_ratio: f64 = vtotal / (fdm.mass_properties.engine_rps * fdm.mass_properties.prop_diameter);
+                let thrust: f64 = fdm.throttle * factor * fdm.mass_properties.engine_power * (fdm.mass_properties.a + fdm.mass_properties.b * advance_ratio * advance_ratio) / (fdm.mass_properties.engine_rps * fdm.mass_properties.prop_diameter);
             
                 //  Compute lift coefficient. The Cl curve is 
                 //  modeled using two straight lines.
-                if  inpdata.alpha < perfdata.alpha_cl_max
+                if  fdm.alpha < fdm.mass_properties.alpha_cl_max
                 {
-                    cl = perfdata.cl_slope0 * inpdata.alpha + perfdata.cl0;
+                    cl = fdm.mass_properties.cl_slope0 * fdm.alpha + fdm.mass_properties.cl0;
                 }
                 else 
                 {
-                    cl = perfdata.cl_slope1 * inpdata.alpha + perfdata.cl1;
+                    cl = fdm.mass_properties.cl_slope1 * fdm.alpha + fdm.mass_properties.cl1;
                 }
             
                 //  Include effects of flaps and ground effects.
                 //  Ground effects are present if the plane is
                 //  within 5 meters of the ground.
-                if inpdata.flap == 20.0
+                if fdm.flap == 20.0
                 {
                     cl += 0.25;
                 }
-                if inpdata.flap == 40.0
+                if fdm.flap == 40.0
                 {
                     cl += 0.5;
                 }
@@ -438,14 +419,14 @@ impl<'a> System<'a> for EquationsOfMotion
                 }
             
                 //  Compute lift
-                let lift: f64 = 0.5 * cl * density * vtotal * vtotal * perfdata.wing_area;
+                let lift: f64 = 0.5 * cl * density * vtotal * vtotal * fdm.mass_properties.wing_area;
             
                 // Compute drag coefficient
-                let aspect_ratio: f64 = perfdata.wing_span * perfdata.wing_span / perfdata.wing_area;
-                let cd = perfdata.cdp + cl * cl / (pi * aspect_ratio * perfdata.eff);
+                let aspect_ratio: f64 = fdm.mass_properties.wing_span * fdm.mass_properties.wing_span / fdm.mass_properties.wing_area;
+                let cd = fdm.mass_properties.cdp + cl * cl / (pi * aspect_ratio * fdm.mass_properties.eff);
                 
                 //  Compute drag force
-                let drag: f64 = 0.5 * cd * density * vtotal * vtotal * perfdata.wing_area;
+                let drag: f64 = 0.5 * cd * density * vtotal * vtotal * fdm.mass_properties.wing_area;
             
                 //  Define some shorthand convenience variables
                 //  for use with the rotation matrix.
@@ -483,7 +464,7 @@ impl<'a> System<'a> for EquationsOfMotion
                 let mut fz: f64 = sin_p * (thrust - drag) + cos_p * cos_w * lift;
             
                 //  Add the gravity force to the z-direction force.
-                fz = fz + perfdata.mass * g;
+                fz = fz + fdm.mass_properties.mass * g;
             
                 //  Since the plane can't sink into the ground, if the
                 //  altitude is less than or equal to zero and the z-component
@@ -495,21 +476,21 @@ impl<'a> System<'a> for EquationsOfMotion
                 }
             
                 //  Load the right-hand sides of the ODE's
-                dq[0] = ds * (fx / perfdata.mass);
+                dq[0] = ds * (fx / fdm.mass_properties.mass);
                 dq[1] = ds * vx;
-                dq[2] = ds * (fy / perfdata.mass);
+                dq[2] = ds * (fy / fdm.mass_properties.mass);
                 dq[3] = ds * vy;
-                dq[4] = ds * (fz / perfdata.mass);
+                dq[4] = ds * (fz / fdm.mass_properties.mass);
                 dq[5] = ds * vz;
 
             }; //End closure
 
 
             //Begin what was "rangeKutta4" method
-            let priorx = outdata.q[1]; //Will be used to calculate delta_traveled
+            let priorx = fdm.q[1]; //Will be used to calculate delta_traveled
 
             //Retrieve value of dependent variable
-            let mut q = outdata.q.clone();
+            let mut q = fdm.q.clone();
 
             //Get the static time variable DT
             let ds = DT;
@@ -531,13 +512,78 @@ impl<'a> System<'a> for EquationsOfMotion
             for i in 0..6
             {
                 q[i] = q[i] + (dq1[i] + 2.0 * dq2[i] + 2.0 * dq3[i] + dq4[i]) / 6.0;
-                outdata.q[i] = q[i];
+                fdm.q[i] = q[i];
             }
     
-            outdata.delta_traveled = (outdata.q[1]) - (priorx); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
-            pos.ecef_vec.x = pos.ecef_vec.x + outdata.delta_traveled; //add latitude change to the ecef
+            fdm.delta_traveled = (fdm.q[1]) - (priorx); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
+            fdm.ecef_vec.x = fdm.ecef_vec.x + fdm.delta_traveled; //add latitude change to the ecef
 
-            outdata.airspeed = (outdata.q[0] * outdata.q[0] + outdata.q[2] * outdata.q[2] + outdata.q[4] * outdata.q[4]).sqrt();
+            fdm.airspeed = (fdm.q[0] * fdm.q[0] + fdm.q[2] * fdm.q[2] + fdm.q[4] * fdm.q[4]).sqrt();
+
+
+            //Print some relevant data
+            println!("x traveled (m) = {}", fdm.q[1] / 3.6); //converted to meters
+            println!("altitude (m) = {}", fdm.q[5]);
+            println!("airspeed (km/h) = {}", fdm.airspeed);
+            println!("throttle % = {}", fdm.throttle);
+            println!("angle of attack (deg) = {}", fdm.alpha);
+            println!("x travel change (m) since last frame = {}", fdm.delta_traveled);
+            println!("bank angle (deg) = {}", fdm.bank);
+            println!("flap deflection (deg) = {}", fdm.flap);
+        }//end for
+    }//end run
+}//end system
+
+
+
+//System to make packets
+struct MakePacket;
+impl<'a> System<'a> for MakePacket
+{
+    type SystemData = (
+        ReadStorage<'a, DataFDM>,
+        WriteStorage<'a, Packet>,
+    );
+
+    fn run(&mut self, (datafdm, mut packet): Self::SystemData) 
+    {
+        for (fdm, mut pckt) in (&datafdm, &mut packet).join() 
+        {
+            //All data passed into the FGNetFDM struct is converted to network byte order
+
+            //Create fdm instance
+            let mut fg_fdm: FGNetFDM = Default::default();
+
+            //Set Roll, Pitch, Yaw
+            let roll: f32 = fdm.bank as f32;
+            let pitch: f32 = fdm.alpha as f32; //Will use angle of attack because its "easier"
+            let yaw: f32 = 90.0; //Only need to face in one direction
+
+            //Coordinate conversion: cartesian to geodetic
+            let lla = geo::ecef2lla(&fdm.ecef_vec, &ELLIPSOID); 
+
+
+           //try no ecef
+        //    fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
+        //    fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
+        //    fdm.altitude = f64::from_be_bytes(fdm.q[5].to_ne_bytes()); //lla.z seems to increase altitude artificially...
+
+            //Set lat, long, alt
+            fg_fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
+            fg_fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
+            fg_fdm.altitude = f64::from_be_bytes(fdm.q[5].to_ne_bytes()); //lla.z seems to increase altitude artificially...
+
+            //Roll, Pitch, Yaw
+            fg_fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
+            fg_fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
+            fg_fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
+
+            //Other airplane data
+            let fg_net_fdm_version = 24_u32;
+            fg_fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
+
+            //Convert struct to array of u8 bytes
+            pckt.bytes = bincode::serialize(&fg_fdm).unwrap();
 
         }//end for
     }//end run
@@ -550,96 +596,24 @@ struct SendPacket;
 impl<'a> System<'a> for SendPacket
 {
     type SystemData = (
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, OutputData>,
-        ReadStorage<'a, FGNetFDM>,
-        ReadStorage<'a, InputData>,
+        ReadStorage<'a, DataFDM>,
+        ReadStorage<'a, Packet>,
     );
-
-    fn run(&mut self, (position, outdata, fgnetfdm, inputdata): Self::SystemData) 
+    //i do not need to read in datafdm...
+    fn run(&mut self, (datafdm, packet): Self::SystemData) 
     {
-        for (pos, outdata, _netfdm, inpdata) in (&position, &outdata, &fgnetfdm, &inputdata).join() 
+        for (_fdm, pckt) in (&datafdm, &packet).join() 
         {
-            //All data passed into the FGNetFDM struct is converted to network byte order
-
-            //Create fdm instance
-            let mut fdm: FGNetFDM = Default::default();
-
-            //Set Roll, Pitch, Yaw
-            let roll: f32 = inpdata.bank as f32;
-            let pitch: f32 = inpdata.alpha as f32; //Will use angle of attack because its "easier"
-            let yaw: f32 = 90.0; //Only need to face in one direction
-
-            //Coordinate conversion: cartesian to geodetic
-            let lla = geo::ecef2lla(&pos.ecef_vec, &ELLIPSOID); 
-
-
-           //try no ecef
-        //    fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
-        //    fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
-        //    fdm.altitude = f64::from_be_bytes(outdata.q[5].to_ne_bytes()); //lla.z seems to increase altitude artificially...
-
-
-
-            //Set lat, long, alt
-            fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
-            fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
-            fdm.altitude = f64::from_be_bytes(outdata.q[5].to_ne_bytes()); //lla.z seems to increase altitude artificially...
-
-            //Roll, Pitch, Yaw
-            fdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
-            fdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes()); //will use angle of attack because its "easier"
-            fdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
-
-            //Other airplane data
-            let fg_net_fdm_version = 24_u32;
-            let visibility: f32 = 5000.0;
-            fdm.version = u32::from_be_bytes(fg_net_fdm_version.to_ne_bytes());
-            fdm.num_engines = u32::from_be_bytes(1_u32.to_ne_bytes());
-            fdm.num_tanks = u32::from_be_bytes(1_u32.to_ne_bytes());
-            fdm.num_wheels = u32::from_be_bytes(1_u32.to_ne_bytes());
-            fdm.warp = f32::from_be_bytes(1_f32.to_ne_bytes());
-            fdm.visibility = f32::from_be_bytes(visibility.to_ne_bytes());
-
-
-            //Convert struct array of u8 of bytes
-            let bytes: &[u8] = unsafe { any_as_u8_slice(&fdm) };
-
-            //Finally send &[u8] of bytes to flight gear
-            //Connect first (would be nice to only do this once...)
-            SOCKET.connect("127.0.0.1:5500").expect("connect function failed");
-            //Send!
-            SOCKET.send(bytes).expect("couldn't send message");
-
-
-            //Print some relevant data
-            println!("x traveled (m) = {}", outdata.q[1] / 3.6); //converted to meters
-            println!("altitude (m) = {}", outdata.q[5]);
-            println!("airspeed (km/h) = {}", outdata.airspeed);
-            println!("throttle % = {}", inpdata.throttle);
-            println!("angle of attack (deg) = {}", inpdata.alpha);
-            println!("x travel change (m) since last frame = {}", outdata.delta_traveled);
-            println!("bank angle (deg) = {}", inpdata.bank);
-            println!("flap deflection (deg) = {}", inpdata.flap);
-  
+           
+            //Finally send &[u8] of bytes over socket connected on FlightGear
+            SOCKET.send(&pckt.bytes).expect("couldn't send packet");
 
         }//end for
     }//end run
 }//end system
 
 
-
-
-
-
 //Set some global variables:
-
-//Time in between each eom calculation
-
-static FRAME_RATE: f64 = 30.0;
-static DT: f64 = 1.0 / FRAME_RATE; //seconds
-
-//Macro to define other globals
 lazy_static!
 {
     //define earth ellipsoid
@@ -648,6 +622,8 @@ lazy_static!
     static ref SOCKET: std::net::UdpSocket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
 }
 
+static FRAME_RATE: f64 = 30.0;
+static DT: f64 = 1.0 / FRAME_RATE; //seconds
 
 fn main()
 {
@@ -657,59 +633,51 @@ fn main()
 
     //Create world
     let mut world = World::new();
-    // world.register::<Position>();
-    // world.register::<PerformanceData>();
-    // world.register::<OutputData>();
-    // world.register::<InputData>();
-    // world.register::<FGNetFDM>();
-    // world.register::<KeyboardState>();
 
     //Create dispatcher of the systems
     let mut dispatcher = DispatcherBuilder::new()
     .with(FlightControl, "flightcontrol", &[])
     .with(EquationsOfMotion, "EOM", &[])
+    .with(MakePacket, "makepacket", &[])
     .with(SendPacket, "sendpacket", &[])
     .build();
     dispatcher.setup(&mut world);
 
     //Create plane entity with components
     let _plane = world.create_entity()
-    .with(Position{
-       // ecef_vec: Vector3::new( 0.6951355515021288, -1.4668619698501122, 248.0)})
-        ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236)}) //location of runway at 0 height
-    .with(PerformanceData{
-        wing_area: 16.2,             //  wing wetted area, m^2
-        wing_span: 10.9,             //  wing span, m
-        tail_area: 2.0,              //  tail wetted area, m^2
-        cl_slope0: 0.0889,           //  slope of Cl-alpha curve
-        cl0: 0.178,                 //  Cl value when alpha = 0
-        cl_slope1: -0.1,             //  slope of post-stall Cl-alpha curve
-        cl1: 3.2,                   //  intercept of post-stall Cl-alpha curve
-        alpha_cl_max: 16.0,           //  alpha at Cl(max)
-        cdp: 0.034,                 //  parasitic drag coefficient
-        eff: 0.77,                  //  induced drag efficiency coefficient
-        mass: 1114.0,               //  airplane mass, kg
-        engine_power: 119310.0,      //  peak engine power, W
-        engine_rps: 40.0,            //  engine turnover rate, rev/s
-        prop_diameter: 1.905,        //  propeller diameter, m
-        a: 1.83,                    //  propeller efficiency curve fit coefficient
-        b:-1.32,                    //  propeller efficiency curve fit coefficient
-        })
-    .with(OutputData{
-        current_frame: 0, //time in seconds
+    .with(DataFDM{
+        ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236),
+
+        current_frame: 0,
         q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
         airspeed: 0.0,
         delta_traveled: 0.0,
-        })
-    .with(InputData{
+
         bank: 0.0, //bank angle
         alpha: 0.0,//  angle of attack
         throttle: 0.0, //throttle percentage
         flap: 0.0,  //  flap deflection amount
-        })
-    .with(FGNetFDM{
-        ..Default::default()
-        })
+
+        mass_properties: PerformanceData{
+            wing_area: 16.2,             //  wing wetted area, m^2
+            wing_span: 10.9,             //  wing span, m
+            tail_area: 2.0,              //  tail wetted area, m^2
+            cl_slope0: 0.0889,           //  slope of Cl-alpha curve
+            cl0: 0.178,                 //  Cl value when alpha = 0
+            cl_slope1: -0.1,             //  slope of post-stall Cl-alpha curve
+            cl1: 3.2,                   //  intercept of post-stall Cl-alpha curve
+            alpha_cl_max: 16.0,           //  alpha at Cl(max)
+            cdp: 0.034,                 //  parasitic drag coefficient
+            eff: 0.77,                  //  induced drag efficiency coefficient
+            mass: 1114.0,               //  airplane mass, kg
+            engine_power: 119310.0,      //  peak engine power, W
+            engine_rps: 40.0,            //  engine turnover rate, rev/s
+            prop_diameter: 1.905,        //  propeller diameter, m
+            a: 1.83,                    //  propeller efficiency curve fit coefficient
+            b:-1.32,                    //  propeller efficiency curve fit coefficient
+        }
+
+    })
     .with(KeyboardState{
         thrust_up: false,
         thrust_down: false,
@@ -722,10 +690,14 @@ fn main()
 
         flaps_down: false,
         zero_flaps: false,
-
+    })
+    .with(Packet{
+        ..Default::default()
     })
     .build();
 
+    //Connect to the socket on FlightGear
+    SOCKET.connect("127.0.0.1:5500").expect("connect function failed");
 
 
     //create time type with the desired DT in milliseconds
@@ -747,11 +719,6 @@ fn main()
         dispatcher.dispatch(&world);
         world.maintain();
 
-       // let ten_millis = time::Duration::from_millis(10);
-       // thread::sleep(ten_millis);
-        //println!("{:?}", ten_millis);
-
-        
         //find difference in time elapsed this loop versus the timestep
         let sleep_time = timestep.checked_sub(time::Instant::now().duration_since(start));
 
