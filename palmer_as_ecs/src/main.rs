@@ -87,13 +87,17 @@ struct DataFDM
 
     mass_properties : PerformanceData,
 
-    ecef_vec: Vector3<f64>
+    ecef_vec: Vector3<f64>,
 
 }
 impl Component for DataFDM
 {
     type Storage = VecStorage<Self>;
 }
+
+//time step (delta time) resource
+#[derive(Default)]
+struct DeltaTime(f64);
 
 //////Component FGNetFDM for networking
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -198,7 +202,7 @@ impl<'a> System<'a> for FlightControl
         ReadStorage<'a, DataFDM>, 
         WriteStorage<'a, KeyboardState>,
     );
-    //we dont need input data!!!! need a way to take this out and read in only keyboardstate
+    //we dont need fdm data!!!! need a way to take this out and read in only keyboardstate
     fn run(&mut self, (fdmdata, mut keyboardstate): Self::SystemData) 
     {
         for (_fdm, keystate) in (&fdmdata, &mut keyboardstate).join() 
@@ -273,12 +277,19 @@ struct EquationsOfMotion;
 impl<'a> System<'a> for EquationsOfMotion
 {
     type SystemData = (
+        Read<'a, DeltaTime>,
         WriteStorage<'a, DataFDM>,
         ReadStorage<'a, KeyboardState>
     );
 
-    fn run(&mut self, (mut fdmdata, keyboardstate): Self::SystemData) 
+    fn run(&mut self, (delta, mut fdmdata, keyboardstate): Self::SystemData) 
     {
+
+
+
+        // `Read` implements `Deref`, so it
+        // coerces to `&DeltaTime`.
+        let delta = delta.0;
         for (fdm, keystate) in (&mut fdmdata, &keyboardstate).join() 
         {
             
@@ -340,7 +351,7 @@ impl<'a> System<'a> for EquationsOfMotion
             }  
         
   
-            //note:this closure is what was "planeRightHandSide"
+            //this closure is what was "planeRightHandSide"
             let a = |q: &mut Vec<f64>, delta_q: &mut Vec<f64>, &ds: & f64, q_scale: f64, dq: &mut Vec<f64>| 
             {
                 let mut new_q = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; // intermediate dependent variable values 
@@ -456,7 +467,7 @@ impl<'a> System<'a> for EquationsOfMotion
                     cos_t = vx / vh;
                     sin_t = vy / vh;
                 }
-            
+                
                 //  Convert the thrust, drag, and lift forces into
                 //  x-, y-, and z-components using the rotation matrix.
                 let fx: f64 = cos_t * cos_p * (thrust - drag) + (sin_t * sin_w - cos_t * sin_p * cos_w) * lift;
@@ -470,7 +481,7 @@ impl<'a> System<'a> for EquationsOfMotion
                 //  altitude is less than or equal to zero and the z-component
                 //  of force is less than zero, set the z-force
                 //  to be zero.
-                if  z <= 0.0 && fz <= 0.0  
+                if z <= 0.0 && fz <= 0.0  
                 {
                     fz = 0.0;
                 }
@@ -493,7 +504,7 @@ impl<'a> System<'a> for EquationsOfMotion
             let mut q = fdm.q.clone();
 
             //Get the static time variable DT
-            let ds = DT;
+            let ds = delta;
 
             // Compute the four Runge-Kutta steps, The return 
             // value of planeRightHandSide method is an array
@@ -515,14 +526,14 @@ impl<'a> System<'a> for EquationsOfMotion
                 fdm.q[i] = q[i];
             }
     
-            fdm.delta_traveled = (fdm.q[1]) - (priorx); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
-            fdm.ecef_vec.x = fdm.ecef_vec.x + fdm.delta_traveled; //add latitude change to the ecef
+            fdm.delta_traveled = (fdm.q[1] - priorx).abs(); //get the change in meters from last frame to this frame, will be used to calculate new latitude based on how far we've gone
+            fdm.ecef_vec.x = fdm.ecef_vec.x + (fdm.delta_traveled); //add latitude change to the ecef
 
             fdm.airspeed = (fdm.q[0] * fdm.q[0] + fdm.q[2] * fdm.q[2] + fdm.q[4] * fdm.q[4]).sqrt();
 
 
             //Print some relevant data
-            println!("x traveled (m) = {}", fdm.q[1] / 3.6); //converted to meters
+            println!("x traveled (m) = {}", fdm.q[1]);
             println!("altitude (m) = {}", fdm.q[5]);
             println!("airspeed (km/h) = {}", fdm.airspeed);
             println!("throttle % = {}", fdm.throttle);
@@ -564,9 +575,9 @@ impl<'a> System<'a> for MakePacket
 
 
            //try no ecef
-        //    fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
-        //    fdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); //this stays fixed
-        //    fdm.altitude = f64::from_be_bytes(fdm.q[5].to_ne_bytes()); //lla.z seems to increase altitude artificially...
+        //    fg_fdm.latitude = f64::from_be_bytes(fdm.ecef_vec.x.to_ne_bytes());
+        //    fg_fdm.longitude = f64::from_be_bytes(fdm.ecef_vec.y.to_ne_bytes()); //this stays fixed
+        //    fg_fdm.altitude = f64::from_be_bytes((248.0 + fdm.q[5]).to_ne_bytes()); //lla.z seems to increase altitude artificially...
 
             //Set lat, long, alt
             fg_fdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
@@ -591,27 +602,20 @@ impl<'a> System<'a> for MakePacket
 
 
 
-//System to send packets
 struct SendPacket;
-impl<'a> System<'a> for SendPacket
+impl<'a> System<'a> for SendPacket 
 {
-    type SystemData = (
-        ReadStorage<'a, DataFDM>,
-        ReadStorage<'a, Packet>,
-    );
-    //i do not need to read in datafdm...
-    fn run(&mut self, (datafdm, packet): Self::SystemData) 
-    {
-        for (_fdm, pckt) in (&datafdm, &packet).join() 
+    type SystemData = ReadStorage<'a, Packet>;
+
+    fn run(&mut self, packet: Self::SystemData) {
+
+        for pckt in packet.join() 
         {
-           
-            //Finally send &[u8] of bytes over socket connected on FlightGear
-            SOCKET.send(&pckt.bytes).expect("couldn't send packet");
-
-        }//end for
-    }//end run
-}//end system
-
+             //Finally send &[u8] of bytes over socket connected on FlightGear
+             SOCKET.send(&pckt.bytes).expect("couldn't send packet");
+        }
+    }
+}
 
 //Set some global variables:
 lazy_static!
@@ -622,18 +626,26 @@ lazy_static!
     static ref SOCKET: std::net::UdpSocket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
 }
 
-static FRAME_RATE: f64 = 30.0;
-static DT: f64 = 1.0 / FRAME_RATE; //seconds
+
 
 fn main()
 {
+
+
     //Create variable to keep track of time elapsed
-    let mut current_time: f64 = 0.0;
+    let mut current_time = 0.0;
     let mut current_frame_main: usize = 0;
 
     //Create world
     let mut world = World::new();
 
+    //choose frame rate, which will calculate delta time
+    let FRAME_RATE: f64 = 30.0;
+    let DT: f64 = 1.0 / FRAME_RATE; //seconds
+    world.insert(DeltaTime(DT)); 
+    //let mut delta = world.write_resource::<DeltaTime>();
+
+    //*delta = DeltaTime(1.0 / FRAME_RATE);
     //Create dispatcher of the systems
     let mut dispatcher = DispatcherBuilder::new()
     .with(FlightControl, "flightcontrol", &[])
@@ -647,7 +659,7 @@ fn main()
     let _plane = world.create_entity()
     .with(DataFDM{
         ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236),
-
+        //ecef_vec: Vector3::new(0.6951355515021288, -1.4668619698501122, 248.0),
         current_frame: 0,
         q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
         airspeed: 0.0,
