@@ -7,7 +7,6 @@ use crate::data::DeltaTime;
 //Specs
 use specs::prelude::*;
 
-
 //System to perform physics calculations
 pub struct EquationsOfMotion;
 impl<'a> System<'a> for EquationsOfMotion
@@ -208,10 +207,10 @@ impl<'a> System<'a> for EquationsOfMotion
             fdm.airspeed = (fdm.q[0] * fdm.q[0] + fdm.q[2] * fdm.q[2] + fdm.q[4] * fdm.q[4]).sqrt();
 
 
-            //Print some relevant data
-            println!("Total distance x (m) =    {}", fdm.q[1]);
-            println!("Altitude (m) =            {}", fdm.q[5]);
-            println!("Airspeed (m/s) =          {}", fdm.airspeed);
+            //Print some relevant data, set precision to match that of Palmer's C model
+            println!("Total distance x (m) =    {:.6}", fdm.q[1]);
+            println!("Altitude (m) =            {:.6}", fdm.q[5]);
+            println!("Airspeed (m/s) =          {:.6}", fdm.airspeed);
             println!("Throttle =                {}", fdm.throttle);
             println!("Angle of attack (deg) =   {}", fdm.alpha);
             println!("Bank angle (deg) =        {}", fdm.bank);

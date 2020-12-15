@@ -1,9 +1,9 @@
-//This file contains all of the Component data required by the Systems: DataFDM. Also, present here is the DeltaTime resource
+//This file contains all of the Component data required by the System: DataFDM. Also, present here is the DeltaTime resource
 
 //Specs
 use specs::prelude::*;
 
-//time step (delta time) shared resource
+//Time step (delta time) shared resource
 #[derive(Default)]
 pub struct DeltaTime(pub f64);
 
@@ -16,14 +16,14 @@ pub struct PerformanceData
     pub tail_area: f64,
     pub cl_slope0: f64,   // slope of Cl-alpha curve
     pub cl0: f64,         // intercept of Cl-alpha curve
-    pub cl_slope1: f64,    // post-stall slope of Cl-alpha curve
-    pub cl1: f64,        // post-stall intercept of Cl-alpha curve
-    pub alpha_cl_max: f64,  // alpha when Cl=Clmax
+    pub cl_slope1: f64,   // post-stall slope of Cl-alpha curve
+    pub cl1: f64,         // post-stall intercept of Cl-alpha curve
+    pub alpha_cl_max: f64,// alpha when Cl=Clmax
     pub cdp: f64,         // parasite drag coefficient
     pub eff: f64,         // induced drag efficiency coefficient
     pub mass: f64,
     pub engine_power: f64,
-    pub engine_rps: f64,   // revolutions per second
+    pub engine_rps: f64,  // revolutions per second
     pub prop_diameter: f64,
     pub a: f64,           //  propeller efficiency coefficient
     pub b: f64,           //  propeller efficiency coefficient

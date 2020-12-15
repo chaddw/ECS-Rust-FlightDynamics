@@ -1,12 +1,5 @@
 //This main file sets up the ECS architecture, creates the entity, and runs the main simulation loop
 
-//FlightGear is ran with this line of command argumments on the fgfs executable:
-//fgfs.exe --aircraft=ufo --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --timeofday=noon --native-fdm=socket,in,30,,5500,udp
-
-//Cessna Skyhawk visual
-//fgfs.exe --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --timeofday=noon --native-fdm=socket,in,30,,5500,udp
-
-
 //Specs
 use specs::prelude::*;
 
@@ -48,10 +41,10 @@ fn main()
     let _plane = world.create_entity()
     .with(DataFDM{
         //Parameters altered for equivalency tests
-        bank: 0.0, //bank angle
-        alpha: 4.0,//angle of attack
         throttle: 1.0, //throttle percentage
-        flap: 0.0,  //flap deflection amount
+        alpha: 4.0,//angle of attack
+        bank: 0.0, //bank angle
+        flap: 20.0,  //flap deflection amount
 
         current_frame: 0,
         q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
