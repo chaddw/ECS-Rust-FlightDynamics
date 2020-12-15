@@ -6,7 +6,7 @@ use specs::prelude::*;
 //Get data needed for the System
 use crate::data::Packet;
 
-//global socket variable inside lazy static macro in main
+//Global socket variable inside lazy static macro in main
 use crate::SOCKET;
 
 pub struct SendPacket;

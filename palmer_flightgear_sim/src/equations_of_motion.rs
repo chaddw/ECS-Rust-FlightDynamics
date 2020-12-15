@@ -264,24 +264,24 @@ impl<'a> System<'a> for EquationsOfMotion
                 fdm.q[i] = q[i];
             }
     
-            //get distance travaled from last frame to this frame in meters
+            //Get distance traveled from last frame to this frame in meters
             fdm.delta_traveled = (fdm.q[1] - priorx).abs(); 
-            //add this distance traveled to the x axis position, ecef uses meters
+            //Add this distance traveled to the x axis position, ecef uses meters
             fdm.ecef_vec.x = fdm.ecef_vec.x + fdm.delta_traveled;
 
+            //Calculate airspeed
             fdm.airspeed = (fdm.q[0] * fdm.q[0] + fdm.q[2] * fdm.q[2] + fdm.q[4] * fdm.q[4]).sqrt();
 
 
             //Print some relevant data
-            println!("Distance traveled x (m) = {}", fdm.q[1]);
-            println!("Distance traveled (m) since last frame = {}", fdm.delta_traveled);
-            println!("Altitude (m) = {}", fdm.q[5]);
-            println!("Airspeed (m/s) = {}", fdm.airspeed);
-            println!("Throttle = {}", fdm.throttle);
-            println!("Angle of attack (deg) = {}", fdm.alpha);
-            println!("Bank angle (deg) = {}", fdm.bank);
-            println!("Flap deflection (deg) = {}", fdm.flap);
-            
+            println!("Total distance x (m) =    {}", fdm.q[1]);
+            println!("Altitude (m) =            {}", fdm.q[5]);
+            println!("Airspeed (m/s) =          {}", fdm.airspeed);
+            println!("Throttle =                {}", fdm.throttle);
+            println!("Angle of attack (deg) =   {}", fdm.alpha);
+            println!("Bank angle (deg) =        {}", fdm.bank);
+            println!("Flap deflection (deg) =   {}", fdm.flap);
+
         }//end for
     }//end run
 }//end system

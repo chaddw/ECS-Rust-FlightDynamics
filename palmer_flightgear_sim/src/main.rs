@@ -66,7 +66,7 @@ fn main()
     let frame_rate: f64 = 30.0;
     let dt: f64 = 1.0 / frame_rate; //seconds
 
-    //add dt as a specs resource
+    //Add dt as a specs resource
     world.insert(DeltaTime(dt)); 
 
    
@@ -135,23 +135,23 @@ fn main()
     //Loop simulation
     loop 
     {
-        //get current time
+        //Get current time
         let start = time::Instant::now();
 
-        //increment time count
+        //Increment time count
         current_time = current_time + dt;
         current_frame_main = current_frame_main + 1;
         println!("{}", "====================================================");
-        println!("time (seconds): {}, frames: {}", current_time, current_frame_main);
+        println!("Time (seconds): {}, frames: {}", current_time, current_frame_main);
 
-        //process this frame
+        //Process this frame
         dispatcher.dispatch(&world);
         world.maintain();
 
-        //find difference in time elapsed this loop versus the timestep
+        //Find difference in time elapsed this loop versus the timestep
         let sleep_time = timestep.checked_sub(time::Instant::now().duration_since(start));
 
-        //sleep for extra time if calculation took less time than the DT time step
+        //Sleep for extra time if calculation took less time than the DT time step
         if sleep_time != None 
         {
             thread::sleep(sleep_time.unwrap());
