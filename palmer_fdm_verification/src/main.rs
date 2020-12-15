@@ -44,7 +44,7 @@ fn main()
         throttle: 1.0, //throttle percentage
         alpha: 4.0,//angle of attack
         bank: 0.0, //bank angle
-        flap: 20.0,  //flap deflection amount
+        flap: 0.0,  //flap deflection amount
 
         current_frame: 0,
         q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
