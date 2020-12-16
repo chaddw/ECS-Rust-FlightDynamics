@@ -10,7 +10,7 @@ Palmer re-implememtation
 
 Bourg re-implementation
 
-"bourg_fdm_verification" - same description, but for bourg
+"fdm_verification" - same description, but for bourg
 
-"bourg_flightgear_sim" - same description
+"flightgear_sim" - same description
 
