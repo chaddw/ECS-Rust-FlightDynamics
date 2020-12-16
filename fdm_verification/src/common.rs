@@ -126,31 +126,6 @@ impl Myvec
         return u.x*v.x + u.y*v.y + u.z*v.z;
 
     }
-
-
-    //how we would set up if we want to use dot operator on the instance
-    //could also set up to operator overload but not worried about that now
-    // pub fn subtract(&mut self, u: Myvec)
-    // {
-    //     self.x -= u.x;
-    //     self.y -= u.y;
-    //     self.z -= u.z;
-    // }
-
-    // pub fn multiply(&mut self, u: Myvec)
-    // {
-    //     self.x *= u.x;
-    //     self.y *= u.y;
-    //     self.z *= u.z;
-    // }
-
-    // pub fn divide(&mut self, u: Myvec)
-    // {
-    //     self.x /= u.x;
-    //     self.y /= u.y;
-    //     self.z /= u.z;
-    // }
-
 }
 
 #[derive(Debug, Default)]
@@ -334,15 +309,15 @@ impl Myquaternion
             let r12 = 2.0 * (q.v.x*q.v.y - q.n*q.v.z);
             let r13 = 2.0 * (q.v.x*q.v.z + q.n*q.v.y);
         
-            u.x = 0.0_f32.to_degrees();                                           // roll
-            u.y = (-(pi/2.0) * r31/tmp).to_degrees();  // pitch
-            u.z = (-r12.atan2(-r31*r13)).to_degrees(); // yaw
+            u.x = 0.0_f32.to_degrees(); //roll
+            u.y = (-(pi/2.0) * r31/tmp).to_degrees(); //pitch
+            u.z = (-r12.atan2(-r31*r13)).to_degrees(); //yaw
             return u;
         }
         
-        u.x = (r32.atan2(r33)).to_degrees(); // roll
-        u.y = (-r31.asin()).to_degrees();    // pitch
-        u.z = (r21.atan2(r11)).to_degrees(); // yaw
+        u.x = (r32.atan2(r33)).to_degrees(); //roll
+        u.y = (-r31.asin()).to_degrees(); //pitch
+        u.z = (r21.atan2(r11)).to_degrees(); //yaw
         return u;
 
     }
@@ -375,10 +350,6 @@ impl Myquaternion
 
         return q;
     }
-
-
-
-
 }
 
 
