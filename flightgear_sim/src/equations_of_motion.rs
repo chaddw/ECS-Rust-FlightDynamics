@@ -1,14 +1,14 @@
 //This file contains EquationsOfMotion System
 
+//SPECS
+use specs::prelude::*;
+
 //Get data needed to perform the System operations
 use crate::data::KeyboardState;
 use crate::data::DataFDM;
 use crate::data::DeltaTime;
 use crate::data::MaxThrust;
 use crate::data::DeltaThrust;
-
-//SPECS
-use specs::prelude::*;
 
 //Vector, Matrix, Quaternion module
 use crate::common::Myvec;
