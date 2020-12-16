@@ -1,6 +1,6 @@
-//This main file sets up the ECS architecture, creates the entity, and runs the main simulation loop
+//This main file sets up the ECS architecture, creates the Entity, and runs the main simulation loop
 
-//Specs
+//SPECS
 use specs::prelude::*;
 
 //Import Components and resources

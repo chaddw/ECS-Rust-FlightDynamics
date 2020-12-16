@@ -1,6 +1,6 @@
 //This file contains all of the Component data required by the System: DataFDM. Also, present here is the DeltaTime resource
 
-//Specs
+//SPECS
 use specs::prelude::*;
 
 //Time step (delta time) shared resource

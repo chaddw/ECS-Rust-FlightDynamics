@@ -4,7 +4,7 @@
 use crate::data::DataFDM;
 use crate::data::DeltaTime;
 
-//Specs
+//SPECS
 use specs::prelude::*;
 
 //System to perform physics calculations using a 4th-order Runge-Kutta solver
@@ -18,9 +18,9 @@ impl<'a> System<'a> for EquationsOfMotion
 
     fn run(&mut self, (delta, mut datafdm): Self::SystemData) 
     {
-
-
+        //Get DeltaTime resource
         let delta = delta.0;
+        
         for mut fdm in (&mut datafdm).join() 
         {
             
@@ -66,9 +66,9 @@ impl<'a> System<'a> for EquationsOfMotion
             println!("Bank angle (deg) =        {}", fdm.bank);
             println!("Flap deflection (deg) =   {}", fdm.flap);
 
-        }//end for
-    }//end run
-}//end system
+        }
+    }
+}
 
 
 //This function is called by the EquationsOfMotion System and loads the right-hand sides for the plane ODEs
