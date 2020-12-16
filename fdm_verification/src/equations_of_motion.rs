@@ -358,10 +358,8 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
      fdm.v_forces = Myquaternion::qvrotate(&fdm.q_orientation, &fb);
 
     //Apply gravity (g is -32.174 ft/s^2), 
-    if fdm.v_position.z > 0.0 //only apply when the airplane is higher than an elevation of zero. This could be changed to elevation of desired flight location (248 meters at wpafb)
-    {
-        fdm.v_forces.z = fdm.v_forces.z + (-32.17399979) * fdm.mass;
-    }
+    fdm.v_forces.z = fdm.v_forces.z + (-32.17399979) * fdm.mass;
+    
 
     fdm.v_moments = Myvec::addvec(&fdm.v_moments, &mb);
 }
