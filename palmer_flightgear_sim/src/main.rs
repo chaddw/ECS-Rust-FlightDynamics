@@ -12,13 +12,6 @@ use coord_transforms::prelude::*;
 //SPECS
 use specs::prelude::*;
 
-//Networking
-use std::net::UdpSocket;
-
-//Ellipsoid global variable
-#[macro_use]
-extern crate lazy_static;
-
 //Main loop
 use std::{thread, time};
 
@@ -35,17 +28,6 @@ mod equations_of_motion;
 mod flight_control;
 mod make_packet;
 mod send_packet;
-
-
-//Set some global variables:
-//Failed in trying to get these to be resources they do not implement default
-lazy_static!
-{
-    //Define earth ellipsoid
-    static ref ELLIPSOID: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
-    //Create socket
-    static ref SOCKET: std::net::UdpSocket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
-}
 
 fn main()
 {
@@ -122,10 +104,6 @@ fn main()
         ..Default::default()
     })
     .build();
-
-
-    //Connect to the socket on FlightGear
-    SOCKET.connect("127.0.0.1:5500").expect("connect function failed");
 
     //Create time type with the dt in milliseconds
     let timestep = time::Duration::from_millis((dt * 1000.0) as u64);

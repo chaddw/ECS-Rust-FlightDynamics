@@ -3,11 +3,11 @@
 //SPECS
 use specs::prelude::*;
 
+//Networking
+use std::net::UdpSocket;
+
 //Get data needed for the System
 use crate::data::Packet;
-
-//Global socket variable inside lazy static macro in main
-use crate::SOCKET;
 
 pub struct SendPacket;
 impl<'a> System<'a> for SendPacket 
@@ -18,8 +18,14 @@ impl<'a> System<'a> for SendPacket
 
         for pckt in packet.join() 
         {
-             //Finally send &[u8] of bytes over socket connected on FlightGear
-             SOCKET.send(&pckt.bytes).expect("couldn't send packet");
+            //Open a socket
+            let socket: std::net::UdpSocket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
+
+            //Connect to the socket on FlightGear
+            socket.connect("127.0.0.1:5500").expect("connect function failed");
+
+            //Finally send &[u8] of bytes over socket connected on FlightGear
+            socket.send(&pckt.bytes).expect("couldn't send packet");
         }
     }
 }

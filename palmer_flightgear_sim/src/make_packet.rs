@@ -8,11 +8,7 @@ use coord_transforms::prelude::*;
 
 //Get data needed for the System to work
 use crate::data::Packet;
-use crate::data::FGNetFDM;
 use crate::data::DataFDM;
-
-//Global ellipsoid variable inside of lazy static macro in main
-use crate::ELLIPSOID;
 
 //System to make packets
 pub struct MakePacket;
@@ -35,8 +31,11 @@ impl<'a> System<'a> for MakePacket
             let pitch: f32 = fdm.alpha as f32;
             let yaw: f32 = 90.0; //Only need to face in one direction
 
+            //Define earth ellipsoid for coordinate conversion
+            let ellipsoid: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
+
             //Coordinate conversion: cartesian to geodetic
-            let lla = geo::ecef2lla(&fdm.ecef_vec, &ELLIPSOID); 
+            let lla = geo::ecef2lla(&fdm.ecef_vec, &ellipsoid); 
 
             //Set lat, long, alt
             pckt.fgnetfdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());

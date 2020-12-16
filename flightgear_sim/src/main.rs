@@ -9,13 +9,6 @@
 //SPECS
 use specs::prelude::*;
 
-//Networking
-use std::net::UdpSocket;
-
-//Special global variables
-#[macro_use]
-extern crate lazy_static;
-
 //Main loop
 use std::{thread, time};
 
@@ -46,17 +39,6 @@ mod common;
 
 //Import calculate mass properties function for use when the airplane Entity is created
 use crate::equations_of_motion::calc_airplane_mass_properties;
-
-//Macro to define special global variables
-//Failed in trying to get this socket to be a resource because UdpSocket does not implement default
-lazy_static!
-{
-    //Create socket
-    static ref SOCKET: std::net::UdpSocket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
-    //Define earth ellipsoid
-   // static ref ELLIPSOID: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
-}
-
 
 fn main()
 {
@@ -186,10 +168,6 @@ fn main()
         ..Default::default()
     })
     .build();
-
-
-    //Connect to the socket on FlightGear
-    SOCKET.connect("127.0.0.1:5500").expect("connect function failed");
 
     //Create time type with the desired DT in milliseconds
     let timestep = time::Duration::from_millis((dt * 1000.0) as u64);
