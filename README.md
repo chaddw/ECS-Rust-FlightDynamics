@@ -1,4 +1,4 @@
-# rust
+#readme
 
 Palmer re-implememtation
 
@@ -10,7 +10,7 @@ Palmer re-implememtation
 
 Bourg re-implementation
 
-"bourg_fdm_verification" - same description
+"bourg_fdm_verification" - same description, but for bourg
 
 "bourg_flightgear_sim" - same description
 
