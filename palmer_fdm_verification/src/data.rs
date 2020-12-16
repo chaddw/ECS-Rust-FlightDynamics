@@ -1,3 +1,8 @@
+//This file contains all of the data required by the System: EquationsOfMotion
+//The Component is: DataFDM
+//The structure that is a part of DataFDM is: PerformanceData
+//The resource is:  DeltaThrust
+
 //This file contains all of the Component data required by the System: DataFDM. Also, present here is the DeltaTime resource
 
 //SPECS

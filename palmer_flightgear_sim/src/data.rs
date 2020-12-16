@@ -1,6 +1,6 @@
-//This file contains all of the data required by the Systems
+//This file contains all of the data required by the Systems: EquationsOfMotion, FlightControl, MakePacket, SendPacket
 //The Components are: KeyboardState, EquationsOfMotion, Packet 
-//The structures that are part of some Components are: PerformanceData, FGNetFDM
+//The structure part of DataFDM is: Performance Data. The structure part of Packet is: FGNetFDM
 //The resource is: DeltaTime
 
 //SPECS
