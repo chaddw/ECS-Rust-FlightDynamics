@@ -1,6 +1,6 @@
 //This file contains the SendPacket System
 
-//Specs
+//SPECS
 use specs::prelude::*;
 
 //Get data needed for the System

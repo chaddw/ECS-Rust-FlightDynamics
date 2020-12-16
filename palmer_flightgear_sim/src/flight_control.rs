@@ -1,6 +1,6 @@
 //This file contains the FlightControl System
 
-//Specs
+//SPECS
 use specs::prelude::*;
 
 //Flight control
@@ -11,20 +11,16 @@ use std::process;
 
 //Get data needed for the System to work
 use crate::data::KeyboardState;
-use crate::data::DataFDM; //this actually isnt needed for the system to work... having an issue only using the one keyboardstate writestorage component
 
 //System to handle user input
 pub struct FlightControl;
 impl<'a> System<'a> for FlightControl
 {
-    type SystemData = ( 
-        ReadStorage<'a, DataFDM>, //we dont need fdm data for system to work
-        WriteStorage<'a, KeyboardState>,
-    );
+    type SystemData = WriteStorage<'a, KeyboardState>;
 
-    fn run(&mut self, (datafdm, mut keyboardstate): Self::SystemData) 
+    fn run(&mut self, mut keyboardstate: Self::SystemData) 
     {
-        for (_fdm, keystate) in (&datafdm, &mut keyboardstate).join() 
+        for mut keystate in (&mut keyboardstate).join() 
         {
             //Set all states false before we know if they are being activated
             keystate.thrust_up = false; 
@@ -86,6 +82,6 @@ impl<'a> System<'a> for FlightControl
                 process::exit(1);
             }
 
-        }//end for
-    }//end run
-}//end system
+        }
+    }
+}

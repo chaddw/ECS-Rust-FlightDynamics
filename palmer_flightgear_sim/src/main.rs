@@ -9,7 +9,7 @@
 //Coordinate conversions
 use coord_transforms::prelude::*;
 
-//Specs
+//SPECS
 use specs::prelude::*;
 
 //Networking
@@ -38,22 +38,17 @@ mod send_packet;
 
 
 //Set some global variables:
-//failed in trying to get these to be resources they do not implement default
-//these could be reinitialized each time the systems runs to get rid of the global aspect
+//Failed in trying to get these to be resources they do not implement default
 lazy_static!
 {
-    //define earth ellipsoid
+    //Define earth ellipsoid
     static ref ELLIPSOID: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
-    //create socket
+    //Create socket
     static ref SOCKET: std::net::UdpSocket = UdpSocket::bind("127.0.0.1:1337").expect("couldn't bind to address");
 }
 
 fn main()
 {
-    //Create variable to keep track of time elapsed
-    let mut current_time = 0.0;
-    let mut current_frame_main: usize = 0;
-
     //Create world
     let mut world = World::new();
     
@@ -66,9 +61,12 @@ fn main()
     let frame_rate: f64 = 30.0;
     let dt: f64 = 1.0 / frame_rate; //seconds
 
-    //Add dt as a specs resource
+    //Add dt as a SPECS resource
     world.insert(DeltaTime(dt)); 
 
+    //Create variable to keep track of time elapsed
+    let mut current_time = 0.0;
+    let mut current_frame_main: usize = 0;
    
     //Create dispatcher of the Systems
     let mut dispatcher = DispatcherBuilder::new()

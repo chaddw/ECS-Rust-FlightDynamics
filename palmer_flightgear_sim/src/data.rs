@@ -1,6 +1,9 @@
-//This file contains all of the Component data required by the Systems: KeyboardState, DataFDM, Packet. Also, present here is the DeltaTime resource
+//This file contains all of the data required by the Systems
+//The Components are: KeyboardState, EquationsOfMotion, Packet 
+//The structures that are part of some Components are: PerformanceData, FGNetFDM
+//The resource is: DeltaTime
 
-//Specs
+//SPECS
 use specs::prelude::*;
 
 //Contains Vector3
@@ -9,7 +12,7 @@ use coord_transforms::prelude::*;
 //Converting FGNetFDM struct to bytes to be sent as a packet
 use serde::{Deserialize, Serialize};
 
-//time step (delta time) shared resource
+//Time step (delta time) shared resource
 #[derive(Default)]
 pub struct DeltaTime(pub f64);
 
@@ -84,11 +87,12 @@ impl Component for DataFDM
 
 
 
-//Component containg the packet created
+//Component containg the the FGNetFDM structure, and its conversion into bytes
 #[derive(Debug, Default)]
 pub struct Packet
 {
-   pub bytes: Vec<u8>,
+    pub fgnetfdm: FGNetFDM,
+    pub bytes: Vec<u8>,
 }
 impl Component for Packet
 {
