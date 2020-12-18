@@ -117,67 +117,6 @@ impl<'a> System<'a> for EquationsOfMotion
             // fdm.element[1].i_flap = -1;
             // fdm.element[2].i_flap = -1;
             // fdm.flaps = true;
-
-
-            //Handle the input states, this is where keyboard input comes into play
-            //Thrust states
-        //     if fdm.thrustforce < max_thrust && keystate.thrust_up == true
-        //     {
-        //         fdm.thrustforce = fdm.thrustforce + d_thrust;
-        //     }   
-        //     else if fdm.thrustforce > 0.0 && keystate.thrust_down == true
-        //     {
-        //         fdm.thrustforce = fdm.thrustforce - d_thrust;
-        //     }
-
-        //     //Rudder States
-        //     if keystate.left_rudder == true
-        //     { 
-        //         fdm.element[6].f_incidence = 16.0;
-        //     } 
-        //     else if keystate.right_rudder == true
-        //     { 
-        //         fdm.element[6].f_incidence = -16.0;
-        //     } 
-
-        //     //Roll States
-        //     if keystate.roll_left == true
-        //     { 
-        //         fdm.element[0].i_flap = 1;
-        //         fdm.element[3].i_flap = -1;
-        //     } 
-        //    else if keystate.roll_right == true
-        //     { 
-        //         fdm.element[0].i_flap = -1;
-        //         fdm.element[3].i_flap = 1;
-        //     } 
-
-        //     //Pitch States
-        //     if keystate.pitch_up == true
-        //     { 
-        //         fdm.element[4].i_flap = 1;
-        //         fdm.element[5].i_flap = 1;
-        //     } 
-        //     else if keystate.pitch_down == true
-        //     { 
-        //         fdm.element[4].i_flap = -1;
-        //         fdm.element[5].i_flap = -1;
-        //     } 
-
-        //     //Flap States
-        //     if keystate.flaps_down == true
-        //     { 
-        //         fdm.element[1].i_flap = -1;
-        //         fdm.element[2].i_flap = -1;
-        //         fdm.flaps = true;
-        //     }
-        //     else if keystate.zero_flaps == true
-        //     { 
-        //         fdm.element[1].i_flap = 0;
-        //         fdm.element[2].i_flap = 0;
-        //         fdm.flaps = false;
-        //     } 
-
     
             //Calculate all of the forces and moments on the airplane
             calc_airplane_loads(&mut fdm);
@@ -186,14 +125,10 @@ impl<'a> System<'a> for EquationsOfMotion
             let ae: Myvec = Myvec::dividescalar(&fdm.v_forces, fdm.mass);
 
             //Calculate velocity of airplane in earth space
-            let ae_mult_dt_tmp = Myvec::multiplyscalar(&ae, dt);
-            fdm.v_velocity = Myvec::addvec(&fdm.v_velocity, &ae_mult_dt_tmp); 
+            fdm.v_velocity = Myvec::addvec(&fdm.v_velocity, &Myvec::multiplyscalar(&ae, dt)); 
 
             //Calculate position of airplane in earth space
-            let vel_mult_dt_tmp = Myvec::multiplyscalar(&fdm.v_velocity, dt);
-
-            //Update the position with the displacement based on velocity
-            fdm.v_position = Myvec::addvec(&fdm.v_position, &vel_mult_dt_tmp); 
+            fdm.v_position = Myvec::addvec(&fdm.v_position, &Myvec::multiplyscalar(&fdm.v_velocity, dt)); 
 
             //Calculate angular velocity of airplane in body space
             let one = Mymatrix::multiply_matrix_by_vec(&fdm.m_inertia, &fdm.v_angular_velocity);
