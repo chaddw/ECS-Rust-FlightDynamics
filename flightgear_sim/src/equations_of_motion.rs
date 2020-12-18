@@ -124,26 +124,17 @@ impl<'a> System<'a> for EquationsOfMotion
             let ae: Myvec = Myvec::dividescalar(&fdm.v_forces, fdm.mass);
 
             //Calculate velocity of airplane in earth space
-            let ae_mult_dt_tmp = Myvec::multiplyscalar(&ae, dt);
-            fdm.v_velocity = Myvec::addvec(&fdm.v_velocity, &ae_mult_dt_tmp); 
+            fdm.v_velocity = Myvec::addvec(&fdm.v_velocity, &Myvec::multiplyscalar(&ae, dt)); 
 
             //Calculate position of airplane in earth space
-            let mut vel_mult_dt_tmp = Myvec::multiplyscalar(&fdm.v_velocity, dt);
+            //Need to convert feet measurements in Bourg's model to meters, and then convert that to lat/lon for FlightGear
+            //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 (at 38 degrees north latitude)
+            let x_displacement = ((fdm.v_velocity.x / 3.281) / 110947.2) * dt;
+            let y_displacement = ((fdm.v_velocity.y / 3.281) / 87843.36) * dt; 
+            let z_displacement = fdm.v_velocity.z / 3.281;
+            let displacement = &Myvec::new(x_displacement, y_displacement, z_displacement);
 
-            //Need to convert feet measurements in Bourg's model to lat/lon distances when simulating with FLightGear
-            //1 deg latitude = 364,000 feet, 1 deg lon = 288200 feet (at 38 degrees north latitude)
-
-            //The conversion does not work in practice, the airplane covers too much distance too quickly
-            //A 9's digit was added to the conversion to slow things down more...
-            //Latitude
-            vel_mult_dt_tmp.x = vel_mult_dt_tmp.x / 9364000.0;
-            //Longitude
-            vel_mult_dt_tmp.y = vel_mult_dt_tmp.y / 9288200.0; 
-            //Altitude
-            vel_mult_dt_tmp.z = vel_mult_dt_tmp.z / 3.281; 
-
-            //Add the converted degrees of lat/lon/and meters to update the position
-            fdm.v_position = Myvec::addvec(&fdm.v_position, &vel_mult_dt_tmp); 
+            fdm.v_position = Myvec::addvec(&fdm.v_position, &Myvec::multiplyscalar(&displacement, dt)); 
 
             //Calculate angular velocity of airplane in body space
             let one = Mymatrix::multiply_matrix_by_vec(&fdm.m_inertia, &fdm.v_angular_velocity);
@@ -322,6 +313,7 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
 
 
 //Calculate mass properties based on the airplane's different body pieces
+//This is called from inside main before the airplane Entity is created
 pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
 {
     let mut inn: f32;

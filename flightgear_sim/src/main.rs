@@ -71,8 +71,8 @@ fn main()
 
     //Create a dispatcher to manage system execution
     let mut dispatcher = DispatcherBuilder::new()
-    .with(flight_control::FlightControl, "flightcontrol", &[])
     .with(equations_of_motion::EquationsOfMotion, "EOM", &[])
+    .with(flight_control::FlightControl, "flightcontrol", &[])
     .with(make_packet::MakePacket, "makepacket", &[])
     .with(send_packet::SendPacket, "sendpacket", &[])
     .build();
@@ -108,7 +108,8 @@ fn main()
         m_inertia_inverse: myairplane.m_inertia_inverse,
 
         //Define initial flight parameters
-        v_position: common::Myvec{x: 0.6951355515021288, y: -1.4668619698501122, z: 857.0},
+        //Wpafb runway geodetic coordinates at 2000 ft (609 meters)
+        v_position: common::Myvec{x: 0.6951355515021288, y: -1.4668619698501122, z: 609.0},
         v_velocity: common::Myvec{x: 60.0, y: 0.0, z: 0.0},
         f_speed: 60.0,
         v_forces: common::Myvec{x: 500.0, y: 0.0, z: 0.0},
@@ -151,7 +152,7 @@ fn main()
         current_time = current_time + dt;
         current_frame_main = current_frame_main + 1;
         println!("{}", "====================================================");
-        println!("time: {}, frames: {}", current_time, current_frame_main);
+        println!("Time: {}, Frames: {}", current_time, current_frame_main);
 
         //Process this frame
         dispatcher.dispatch(&world); 
