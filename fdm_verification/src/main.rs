@@ -50,7 +50,7 @@ fn main()
     world.insert(DeltaThrust(d_thrust));
 
     //Create variable to keep track of time elapsed
-    let mut current_time: f32 = 0.0;
+    let mut current_time: f64 = 0.0;
     let mut current_frame_main: usize = 0;
 
     //Create a dispatcher to manage system execution
@@ -105,13 +105,13 @@ fn main()
     .build();
 
     //Main simulation loop
-    for _ in 0..900
+    while current_time < 30.0 //seconds
     {
         //Increment time count
-        current_time = current_time + dt;
+        current_time = current_time + dt as f64;
         current_frame_main = current_frame_main + 1;
         println!("{}", "====================================================");
-        println!("time: {}, frames: {}", current_time, current_frame_main);
+        println!("Time: {}, Frames: {}", current_time as f32, current_frame_main);
 
         //Process this frame
         dispatcher.dispatch(&world); 

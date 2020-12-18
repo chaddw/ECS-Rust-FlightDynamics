@@ -192,7 +192,7 @@ impl<'a> System<'a> for EquationsOfMotion
             //Calculate position of airplane in earth space
             let vel_mult_dt_tmp = Myvec::multiplyscalar(&fdm.v_velocity, dt);
 
-            //Add the converted degrees of lat/lon/and meters to update the position
+            //Update the position with the displacement based on velocity
             fdm.v_position = Myvec::addvec(&fdm.v_position, &vel_mult_dt_tmp); 
 
             //Calculate angular velocity of airplane in body space
@@ -366,6 +366,7 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
 
 
 //Calculate mass properties based on the airplane's different body pieces
+//This is called from inside main before the airplane Entity is created
 pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
 {
     let mut inn: f32;
