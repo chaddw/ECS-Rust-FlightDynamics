@@ -114,23 +114,29 @@ impl<'a> System<'a> for EquationsOfMotion
             }
     
             //Get distance traveled from last frame to this frame in meters
-            fdm.delta_traveled = (fdm.q[1] - priorx).abs(); 
-            //Add this distance traveled to the x axis position, ecef uses meters
-            fdm.ecef_vec.x = fdm.ecef_vec.x + fdm.delta_traveled;
+            fdm.delta_traveled = fdm.q[1] - priorx; 
+
+            //Add this distance traveled to the x coordinate position
+            //First convert the meters computed by the FDM into degrees of latitude
+            //1 deg latitude = 364,000 feet = 110947.2 meters (at 38 degrees north latitude)
+            fdm.position[0] = fdm.position[0] + (fdm.delta_traveled / 110947.2) * ds;
 
             //Calculate airspeed
             fdm.airspeed = (fdm.q[0] * fdm.q[0] + fdm.q[2] * fdm.q[2] + fdm.q[4] * fdm.q[4]).sqrt();
 
-
             //Print some relevant datas, set precision to match that of Palmer's C model
             println!("Total distance x (m) =    {:.6}", fdm.q[1]);
             println!("Altitude (m) =            {:.6}", fdm.q[5]);
-            println!("Airspeed (m/s) =          {:.6}", fdm.airspeed);
+            println!("Airspeed (km/hr) =        {:.6}", fdm.airspeed * 3.6); //convert from m/s to km/h
+            println!("Heading angle (deg)       {}", fdm.heading_angle.to_degrees());
+            println!("Climb angle (deg)         {}", fdm.climb_angle.to_degrees());
+            println!("Climb rate (m/s)          {}", fdm.climb_rate);
             println!("Throttle =                {}", fdm.throttle);
             println!("Angle of attack (deg) =   {}", fdm.alpha);
             println!("Bank angle (deg) =        {}", fdm.bank);
             println!("Flap deflection (deg) =   {}", fdm.flap);
 
+            
         }
     }
 }
@@ -278,5 +284,51 @@ fn plane_right_hand_side(fdm: &mut DataFDM, q: &mut Vec<f64>, delta_q: &mut Vec<
     dq[3] = ds * vy;
     dq[4] = ds * (fz / fdm.mass_properties.mass);
     dq[5] = ds * vz;
+
+    //Calculate climb angle and heading angle
+    if vh == 0.0 
+    {
+        fdm.climb_angle = 0.0;
+    }
+    else 
+    {
+        fdm.climb_angle = (vz/vh).atan();
+    }
+  
+    if vx >= 0.0 && vy == 0.0 
+    {
+        fdm.heading_angle = 0.0;
+    }
+    else if vx == 0.0 && vy > 0.0 
+    {
+        fdm.heading_angle = 0.5*pi;
+    }
+    else if vx <= 0.0 && vy == 0.0 
+    {
+        fdm.heading_angle = pi;
+    }
+    else if vx == 0.0 && vy < 0.0 
+    {
+        fdm.heading_angle = 1.5*pi;
+    }
+    else if vx > 0.0 && vy > 0.0 
+    {
+        fdm.heading_angle = (vy/vx).atan();
+    }
+    else if vx < 0.0 && vy > 0.0 
+    {
+        fdm.heading_angle = 0.5*pi + ((vx/vy).abs()).atan();
+    }
+    else if vx < 0.0 && vy < 0.0 
+    {
+        fdm.heading_angle = pi + (vy/vx).atan();
+    }
+    else 
+    {
+        fdm.heading_angle = 1.5*pi + ((vx/vy).abs()).atan();
+    }
+
+    fdm.climb_rate = vz;
+
 }
 

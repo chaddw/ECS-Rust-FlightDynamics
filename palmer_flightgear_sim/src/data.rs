@@ -7,7 +7,7 @@
 use specs::prelude::*;
 
 //Contains Vector3
-use coord_transforms::prelude::*;
+//use coord_transforms::prelude::*;
 
 //Converting FGNetFDM struct to bytes to be sent as a packet
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ impl Component for KeyboardState
 
 
 
-//Performance data of the airplane, is used in DataFDM Component
+//Performance data of the airplane, contains lifting surface data and mass properties. This structure is used in DataFDM Component
 #[derive(Debug, Default)]
 pub struct PerformanceData
 {
@@ -62,19 +62,23 @@ pub struct PerformanceData
 #[derive(Debug, Default)]
 pub struct DataFDM
 {
-    pub current_frame: usize, //tracks current frame
     pub q: Vec<f64>, //will store ODE results
     pub airspeed: f64, //speed m/s
     pub delta_traveled: f64, //tracks distance traveled per frame
+
+    pub position: Vec<f64>,
+    pub climb_angle: f64,
+    pub heading_angle: f64,
+    pub climb_rate: f64,
 
     pub bank: f64, //bank angle
     pub alpha: f64, //angle of attack
     pub throttle: f64, //throttle percentage
     pub flap: f64, //flap deflection amount
 
-    pub mass_properties : PerformanceData, //lifting surface data
+    pub mass_properties : PerformanceData,
 
-    pub ecef_vec: Vector3<f64>, //position
+
 
 }
 impl Component for DataFDM

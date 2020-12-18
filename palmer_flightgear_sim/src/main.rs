@@ -7,7 +7,7 @@
 //fgfs.exe --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --timeofday=noon --native-fdm=socket,in,30,,5500,udp
 
 //Coordinate conversions
-use coord_transforms::prelude::*;
+//use coord_transforms::prelude::*;
 
 //SPECS
 use specs::prelude::*;
@@ -52,8 +52,8 @@ fn main()
    
     //Create dispatcher of the Systems
     let mut dispatcher = DispatcherBuilder::new()
-    .with(flight_control::FlightControl, "flightcontrol", &[])
     .with(equations_of_motion::EquationsOfMotion, "EOM", &[])
+    .with(flight_control::FlightControl, "flightcontrol", &[])
     .with(make_packet::MakePacket, "makepacket", &[])
     .with(send_packet::SendPacket, "sendpacket", &[])
     .build();
@@ -62,15 +62,24 @@ fn main()
     //Create airplane Entity with Components
     let _plane = world.create_entity()
     .with(DataFDM{
-        ecef_vec: Vector3::new(904799.960942606, -5528914.45139109, 3038233.40847236),
-        current_frame: 0,
-        q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
-        airspeed: 0.0,
-        delta_traveled: 0.0,
+        
+        //Starting position in geodetic coordinates
+        //Wpafb runway at ground level (248.0 meters)
+        position: vec![0.6951355515021288, -1.4668619698501122, 248.0],
+       
         bank: 0.0, //bank angle
         alpha: 0.0,//angle of attack
         throttle: 0.0, //throttle percentage
         flap: 0.0,  //flap deflection amount
+
+        q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
+        airspeed: 0.0,
+        delta_traveled: 0.0,
+
+        climb_angle: 0.0,
+        heading_angle: 0.0,
+        climb_rate: 0.0,
+        
         mass_properties: PerformanceData{
             wing_area: 16.2,            //  wing wetted area, m^2
             wing_span: 10.9,            //  wing span, m
@@ -89,6 +98,7 @@ fn main()
             a: 1.83,                    //  propeller efficiency curve fit coefficient
             b:-1.32,                    //  propeller efficiency curve fit coefficient
         }
+
     })
     .with(KeyboardState{
         thrust_up: false,
@@ -118,7 +128,7 @@ fn main()
         current_time = current_time + dt;
         current_frame_main = current_frame_main + 1;
         println!("{}", "====================================================");
-        println!("Time (seconds): {}, frames: {}", current_time, current_frame_main);
+        println!("Time (seconds): {}, Frames: {}", current_time, current_frame_main);
 
         //Process this frame
         dispatcher.dispatch(&world);
