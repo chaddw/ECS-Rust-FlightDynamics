@@ -3,6 +3,9 @@
 //SPECS
 use specs::prelude::*;
 
+//Main loop
+use std::{thread, time};
+
 //Import Components and resources
 mod data;
 use crate::data::DataFDM;
@@ -14,10 +17,6 @@ mod equations_of_motion;
 
 fn main()
 {
-    //Create variable to keep track of time elapsed
-    let mut current_time = 0.0;
-    let mut current_frame_main: usize = 0;
-
     //Create world
     let mut world = World::new();
     
@@ -25,11 +24,15 @@ fn main()
     world.register::<DataFDM>();
 
     //Choose frame rate, which will calculate delta time
-    let frame_rate: f64 = 2.0;
+    let frame_rate: f64 = 30.0;
     let dt: f64 = 1.0 / frame_rate; //seconds
 
     //Add dt as a specs resource
     world.insert(DeltaTime(dt)); 
+
+    //Create variable to keep track of time elapsed
+    let mut current_time = 0.0;
+    let mut current_frame_main: usize = 0;
 
     //Create dispatcher of the Systems
     let mut dispatcher = DispatcherBuilder::new()
@@ -40,15 +43,20 @@ fn main()
     //Create airplane Entity with Components
     let _plane = world.create_entity()
     .with(DataFDM{
+        
         //Parameters altered for equivalency tests
         throttle: 1.0, //throttle percentage
         alpha: 4.0,//angle of attack
         bank: 0.0, //bank angle
         flap: 0.0,  //flap deflection amount
 
-        current_frame: 0,
+        climb_angle: 0.0,
+        heading_angle: 0.0,
+        climb_rate: 0.0,
+
         q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
         airspeed: 0.0,
+
         mass_properties: PerformanceData{
             wing_area: 16.2,            //  wing wetted area, m^2
             wing_span: 10.9,            //  wing span, m
@@ -71,19 +79,34 @@ fn main()
     .build();
 
 
+    //Create time type with the dt in milliseconds
+    let timestep = time::Duration::from_millis((dt * 1000.0) as u64);
+
     //Loop simulation
-    while current_time < 40.0
+    while current_time < 40.0 //seconds
     {
+
+        //Get current time
+        let start = time::Instant::now();
 
         //Increment time count
         current_time = current_time + dt;
         current_frame_main = current_frame_main + 1;
         println!("{}", "====================================================");
-        println!("Time (seconds): {}, frames: {}", current_time, current_frame_main);
+        println!("Time (seconds): {}, Frames: {}", current_time, current_frame_main);
 
         //Process this frame
         dispatcher.dispatch(&world);
         world.maintain();
+
+        //Find difference in time elapsed this loop versus the timestep
+        let sleep_time = timestep.checked_sub(time::Instant::now().duration_since(start));
+
+        //Sleep for extra time if calculation took less time than the DT time step
+        if sleep_time != None 
+        {
+            thread::sleep(sleep_time.unwrap());
+        }
 
     }
 }

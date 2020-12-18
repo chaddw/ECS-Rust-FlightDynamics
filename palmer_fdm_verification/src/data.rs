@@ -12,7 +12,7 @@ use specs::prelude::*;
 #[derive(Default)]
 pub struct DeltaTime(pub f64);
 
-//Performance data of the airplane, is used in DataFDM Component
+//Performance data of the airplane, contains lifting surface data and mass properties. This structure is used in DataFDM Component
 #[derive(Debug, Default)]
 pub struct PerformanceData
 {
@@ -38,15 +38,21 @@ pub struct PerformanceData
 #[derive(Debug, Default)]
 pub struct DataFDM
 {
-    pub current_frame: usize, //tracks current frame
     pub q: Vec<f64>, //will store ODE results
     pub airspeed: f64, //speed m/s
+
+    pub climb_angle: f64,
+    pub heading_angle: f64,
+    pub climb_rate: f64,
+
     pub bank: f64, //bank angle
     pub alpha: f64, //angle of attack
     pub throttle: f64, //throttle percentage
     pub flap: f64, //flap deflection amount
 
-    pub mass_properties : PerformanceData, //lifting surface data
+    pub mass_properties : PerformanceData,
+
+
 
 }
 impl Component for DataFDM
