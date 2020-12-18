@@ -3,6 +3,9 @@
 //SPECS
 use specs::prelude::*;
 
+//Main loop
+use std::{thread, time};
+
 //Import Components and resources
 mod data;
 
@@ -104,9 +107,15 @@ fn main()
     })
     .build();
 
+    //Create time type with the dt in milliseconds
+    let timestep = time::Duration::from_millis((dt * 1000.0) as u64);
+
     //Main simulation loop
     while current_time < 30.0 //seconds
     {
+        //Get current time
+        let start = time::Instant::now();
+
         //Increment time count
         current_time = current_time + dt as f64;
         current_frame_main = current_frame_main + 1;
@@ -116,6 +125,15 @@ fn main()
         //Process this frame
         dispatcher.dispatch(&world); 
         world.maintain();
+
+        //Find difference in time elapsed this loop versus the timestep
+        let sleep_time = timestep.checked_sub(time::Instant::now().duration_since(start));
+
+        //Sleep for extra time if calculation took less time than the DT time step
+        if sleep_time != None 
+        {
+            thread::sleep(sleep_time.unwrap());
+        }
     }
 }
 
