@@ -85,7 +85,6 @@ pub struct DataFDM
     pub thrustforce: f32, // magnitude of thrust
     pub v_moments: Myvec, // total moment (torque) on body
     pub element: Vec<PointMass>, // vector of point mass elements
-    pub current_frame: usize,
 }
 impl Component for DataFDM
 {

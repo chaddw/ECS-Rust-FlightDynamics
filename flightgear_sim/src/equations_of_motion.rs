@@ -38,9 +38,6 @@ impl<'a> System<'a> for EquationsOfMotion
 
         for (mut fdm, keystate) in (&mut datafdm, &keyboardstate).join() 
         {
-            //FOR EQUIVALENCY TESTS: increment current frame tracker
-            fdm.current_frame = fdm.current_frame + 1;
-
             //Reset/zero the elevators, rudders, and ailerons every loo
             //Rudder
             fdm.element[6].f_incidence = 0.0;
