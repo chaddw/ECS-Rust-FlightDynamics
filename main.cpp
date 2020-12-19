@@ -4,20 +4,18 @@
 
 #include "BourgFDM.hpp"
 
-const int FRAME_RATE{5}; // frame rate
+const int FRAME_RATE{30}; // frame rate
 
 int main()
 {
    std::cout << "Flight Simulator\n";
    const float dt{1.0f / static_cast<float>(FRAME_RATE)};
-   float current_time{};
+   double current_time = 0.0;
+   int current_frame = 0;
 
    BourgFDM fdm;
 
-
-   int current_frame = 0;
-
-   while (current_time < 30.0)
+   while (current_time < 30.0) //total time
    {
        current_frame = current_frame + 1;
        current_time = current_time + dt;
@@ -69,7 +67,7 @@ int main()
         //{
         //    fdm.pitch_up();
         //}
-        //else //if (current_frame % 9 == 0)
+        //else if (current_frame % 9 == 0)
         //{
         //    fdm.right_rudder();
         //}
