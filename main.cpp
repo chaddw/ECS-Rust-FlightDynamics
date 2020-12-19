@@ -4,7 +4,7 @@
 
 #include "BourgFDM.hpp"
 
-const int FRAME_RATE{30}; // frame rate
+const int FRAME_RATE{5}; // frame rate
 
 int main()
 {
@@ -17,9 +17,11 @@ int main()
 
    int current_frame = 0;
 
-   for (int i{}; i < 900; i++) 
+   while (current_time < 30.0)
    {
-       current_frame = i + 1;
+       current_frame = current_frame + 1;
+       current_time = current_time + dt;
+
        fdm.zero_rudder();
        fdm.zero_ailerons();
        fdm.zero_elevators();
@@ -67,7 +69,7 @@ int main()
         //{
         //    fdm.pitch_up();
         //}
-        //else if (current_frame % 9 == 0)
+        //else //if (current_frame % 9 == 0)
         //{
         //    fdm.right_rudder();
         //}
@@ -75,8 +77,6 @@ int main()
         //TEST 6 FLAPS
        //fdm.flaps_down();
 
-
-       current_time += dt;
 
       fdm.update(dt);
 //      fdm.update2(dt);
@@ -95,7 +95,7 @@ int main()
       if (fdm.flaps) std::cout << "Flaps!\n";
       if (fdm.stalling) std::cout << "Stall!\n";
 
-      std::cout << "===================================================\n";
+      std::cout << "===============================================\n";
 
 
    }
