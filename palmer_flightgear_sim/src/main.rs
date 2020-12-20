@@ -6,9 +6,6 @@
 //Cessna Skyhawk visual
 //fgfs.exe --disable-panel --disable-sound --enable-hud --disable-random-objects --fdm=null --timeofday=noon --native-fdm=socket,in,30,,5500,udp
 
-//Coordinate conversions
-//use coord_transforms::prelude::*;
-
 //SPECS
 use specs::prelude::*;
 
@@ -74,7 +71,6 @@ fn main()
 
         q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
         airspeed: 0.0,
-        delta_traveled: 0.0,
 
         climb_angle: 0.0,
         heading_angle: 0.0,

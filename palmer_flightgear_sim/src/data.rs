@@ -6,9 +6,6 @@
 //SPECS
 use specs::prelude::*;
 
-//Contains Vector3
-//use coord_transforms::prelude::*;
-
 //Converting FGNetFDM struct to bytes to be sent as a packet
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +61,6 @@ pub struct DataFDM
 {
     pub q: Vec<f64>, //will store ODE results
     pub airspeed: f64, //speed m/s
-    pub delta_traveled: f64, //tracks distance traveled per frame
 
     pub position: Vec<f64>,
     pub climb_angle: f64,
