@@ -125,7 +125,7 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //Calculate position of airplane in earth space
             //Need to convert feet measurements in Bourg's model to meters, and then convert that to lat/lon for FlightGear
-            //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 (at 38 degrees north latitude)
+            //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 meters (at 38 degrees north latitude)
             let x_displacement = ((fdm.v_velocity.x / 3.281) / 110947.2) * dt;
             let y_displacement = ((fdm.v_velocity.y / 3.281) / 87843.36) * dt; 
             let z_displacement = fdm.v_velocity.z / 3.281;
