@@ -49,10 +49,10 @@ fn main()
    
     //Create dispatcher of the Systems
     let mut dispatcher = DispatcherBuilder::new()
-    .with(equations_of_motion::EquationsOfMotion, "EOM", &[])
     .with(flight_control::FlightControl, "flightcontrol", &[])
-    .with(make_packet::MakePacket, "makepacket", &[])
-    .with(send_packet::SendPacket, "sendpacket", &[])
+    .with(equations_of_motion::EquationsOfMotion, "EOM", &["flightcontrol"])
+    .with(make_packet::MakePacket, "makepacket", &["EOM"])
+    .with(send_packet::SendPacket, "sendpacket", &["makepacket"])
     .build();
     dispatcher.setup(&mut world);
 
