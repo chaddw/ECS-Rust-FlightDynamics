@@ -53,14 +53,6 @@ int main()
                                  << " v.z: " << v.z  << endl;
    }
 
- 
-   {
-      Vector v(1,2,3);
-      v = -v;
-      cout << "operator- : v = -v(1,2,3)" << " v.x: " << v.x
-                                          << " v.y: " << v.y
-                                          << " v.z: " << v.z  << endl;
-   }
 
    cout << "------------------------------\n";
    cout << "Tests: Functions and Operators\n";

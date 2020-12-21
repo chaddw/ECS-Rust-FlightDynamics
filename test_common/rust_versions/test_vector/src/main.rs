@@ -45,12 +45,6 @@ fn main()
         }
      
      
-        {
-                let mut v = common::Myvec::new(1.0, 2.0, 3.0);
-                v = common::Myvec::reverse_aka_conjugate(&v);
-                println!("conjugate : v = -v(1,2,3): v.x: {} v.y: {} v.z: {}", v.x, v.y, v.z);
-        }
-     
         println!("{}", "--------------"); 
         println!("{}", "Tests: Functions and Operators");
         println!("{}", "--------------"); 
