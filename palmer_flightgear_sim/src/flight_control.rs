@@ -23,8 +23,8 @@ impl<'a> System<'a> for FlightControl
         for mut keystate in (&mut keyboardstate).join() 
         {
             //Set all states false before we know if they are being activated
-            keystate.thrust_up = false; 
-            keystate.thrust_down = false;
+            keystate.throttle_up = false; 
+            keystate.throttle_down = false;
             keystate.aoa_up = false;
             keystate.aoa_down = false;
             keystate.bank_left = false;
@@ -36,14 +36,14 @@ impl<'a> System<'a> for FlightControl
             let device_state = DeviceState::new();
             let keys: Vec<Keycode> = device_state.get_keys();
 
-            //Thrust
+            //Throttle
             if keys.contains(&Keycode::A)
             {
-                keystate.thrust_up = true;
+                keystate.throttle_up = true;
             }
             else if keys.contains(&Keycode::Z)
             {
-                keystate.thrust_down = true;
+                keystate.throttle_down = true;
             }
 
             //angle of attack

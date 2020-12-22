@@ -97,8 +97,8 @@ fn main()
 
     })
     .with(KeyboardState{
-        thrust_up: false,
-        thrust_down: false,
+        throttle_up: false,
+        throttle_down: false,
         aoa_up: false,
         aoa_down: false,
         bank_right: false,

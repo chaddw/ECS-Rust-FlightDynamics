@@ -17,8 +17,8 @@ pub struct DeltaTime(pub f64);
 #[derive(Debug)]
 pub struct KeyboardState
 {
-    pub thrust_up: bool,
-    pub thrust_down: bool,
+    pub throttle_up: bool,
+    pub throttle_down: bool,
     pub aoa_up: bool,
     pub aoa_down: bool,
     pub bank_right: bool,

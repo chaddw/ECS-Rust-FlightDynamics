@@ -37,11 +37,11 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //Handle the input states
             //Thrust states
-            if fdm.throttle < 1.0 && keystate.thrust_up == true
+            if fdm.throttle < 1.0 && keystate.throttle_up == true
             {
                 fdm.throttle = fdm.throttle + 0.05;
             }   
-            else if fdm.throttle > 0.0 && keystate.thrust_down == true
+            else if fdm.throttle > 0.0 && keystate.throttle_down == true
             {
                 fdm.throttle = fdm.throttle - 0.05;
                 if fdm.throttle < 0.001 
@@ -67,7 +67,7 @@ impl<'a> System<'a> for EquationsOfMotion
                 fdm.bank = fdm.bank + 1.0;
             
             }  
-            else if fdm.bank > -16.0 && keystate.bank_left == true
+            else if fdm.bank > -20.0 && keystate.bank_left == true
             {
                 fdm.bank = fdm.bank - 1.0;
             }  
@@ -158,7 +158,7 @@ impl<'a> System<'a> for EquationsOfMotion
         //    let distance = p1.haversine_distance(&p2);
 
             
-            //Print some relevant datas, set precision to match that of Palmer's C model
+            //Print some relevant data, set precision to match that of Palmer's C model
             println!("Total distance x (m) =    {:.6}", fdm.q[1]);
             println!("Altitude (m) =            {:.6}", fdm.q[5]);
             println!("Airspeed (km/hr) =        {:.6}", fdm.airspeed * 3.6); //convert from m/s to km/h
