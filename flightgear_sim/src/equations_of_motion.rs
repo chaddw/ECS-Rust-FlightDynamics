@@ -62,7 +62,6 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //Rudder States
             //NOTE: the functionality was flipped between the two states to work with flightgear... 
-            //I am guessing because if flying on a different hemisphere right and left are inverted
             if keystate.left_rudder == true
             { 
                 fdm.element[6].f_incidence = -16.0;
@@ -74,7 +73,6 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //Roll States
             //NOTE: the functionality was flipped between the two states to work with flightgear... 
-            //I am guessing because if flying on a different hemisphere right and left are inverted
             if keystate.roll_left == true
             { 
                 fdm.element[0].i_flap = -1;
@@ -126,10 +124,10 @@ impl<'a> System<'a> for EquationsOfMotion
             //Calculate position of airplane in earth space
             //Need to convert feet measurements in Bourg's model to meters, and then convert that to lat/lon for FlightGear
             //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 meters (at 38 degrees north latitude)
-            let x_displacement = ((fdm.v_velocity.x / 3.281) / 110947.2) * dt;
-            let y_displacement = ((fdm.v_velocity.y / 3.281) / 87843.36) * dt; 
+            let x_displacement = (fdm.v_velocity.x / 3.281) / 110947.2;
+            let y_displacement = (fdm.v_velocity.y / 3.281) / 87843.36;
             let z_displacement = fdm.v_velocity.z / 3.281;
-            let displacement = &Myvec::new(x_displacement, y_displacement, z_displacement);
+            let displacement = Myvec::new(x_displacement, y_displacement, z_displacement);
 
             fdm.v_position = Myvec::addvec(&fdm.v_position, &Myvec::multiplyscalar(&displacement, dt)); 
 
@@ -165,13 +163,13 @@ impl<'a> System<'a> for EquationsOfMotion
             //Yaw OR Roll is negated deepending on position on the Earth
             //In Ohio, Roll is negated 
             //Pitch is always negated
-            fdm.v_euler_angles.x = -euler.x; //negate when in ohio
-            fdm.v_euler_angles.y = -euler.y;
-            fdm.v_euler_angles.z = euler.z; //this isnt supposed to be negative in bourgs model... (this needed to be negative when using the geodetic coordinates for ktts airport)
+            fdm.v_euler_angles.x = euler.x; 
+            fdm.v_euler_angles.y = euler.y;
+            fdm.v_euler_angles.z = euler.z;
             
             //Print some relevant data
             println!("Roll:             {}", fdm.v_euler_angles.x);
-            println!("Pitch:            {}", fdm.v_euler_angles.y); //Pitch was negated when Euler angles were computed
+            println!("Pitch:            {}", -fdm.v_euler_angles.y); //Pitch was negated when Euler angles were computed
             println!("Yaw:              {}", fdm.v_euler_angles.z);
             println!("Alt:              {}", fdm.v_position.z);
             println!("Thrust:           {}", fdm.thrustforce);
@@ -382,8 +380,8 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
     //Finally, set up airplanes mass and inertia matrix
     fdm.mass = total_mass;
     fdm.m_inertia = Mymatrix::new(ixx, -ixy, -ixz,
-                                               -ixy, iyy, -iyz,
-                                               -ixz, -iyz, izz);
+                                  -ixy, iyy, -iyz,
+                                  -ixz, -iyz, izz);
 
     //Get inverse of matrix
     fdm.m_inertia_inverse = Mymatrix::inverse(&fdm.m_inertia);
