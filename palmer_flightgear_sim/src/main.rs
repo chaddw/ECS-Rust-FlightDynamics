@@ -61,8 +61,8 @@ fn main()
     .with(DataFDM{
         
         //Starting position in geodetic coordinates
-        //Wpafb runway at ground level (248.0 meters)
-        position: vec![0.6951355515021288, -1.4668619698501122, 248.0],
+        //Wpafb runway latitude/longitude/altitude. Ground level is 248.0 meters above sea level
+        position: vec![39.826, -84.045, 248.0],
        
         bank: 0.0, //bank angle
         alpha: 0.0,//angle of attack

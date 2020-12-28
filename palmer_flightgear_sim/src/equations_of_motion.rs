@@ -114,49 +114,12 @@ impl<'a> System<'a> for EquationsOfMotion
             //Calculate airspeed
             fdm.airspeed = (fdm.q[0] * fdm.q[0] + fdm.q[2] * fdm.q[2] + fdm.q[4] * fdm.q[4]).sqrt();
 
-            //Calculate displacement to add to the position
-            //The displacement needs to be converted to from meters to degrees of latitude or longitude
-            //lat lon of wpafb runway is 39.826, -84.045, but flightgear only understands 0.6951355515021288, -1.4668619698501122
-
-            //1st tries
-            //fdm.position[0] = fdm.position[0] + ( fdm.airspeed * ds) / 111111.0; //use airspeed
-            fdm.position[0] = fdm.position[0] + ( fdm.q[0] * ds) / 111111.0; //use velocity
-
-
-            //2nd tries
-            // https://gis.stackexchange.com/questions/2951/algorithm-for-offsetting-a-latitude-longitude-by-some-amount-of-meters
-            //same as first try
-            //latitude
-            //fdm.position[0] = fdm.position[0] + (fdm.q[0] * ds) / 111111.0;
-            //longitude
-            // fdm.position[0] = fdm.position[0] + (fdm.q[0] * ds) / 111111.0 * 0.6951355515021288_f64.cos();
-
-
-            //3rd try
-            //https://stackoverflow.com/questions/7477003/calculating-new-longitude-latitude-from-old-n-meters
-            //let earth = 6378.137;  //radius of the earth in kilometer
-            //let m = (1.0 / ((2.0 * std::f64::consts::PI / 360.0) * earth)) / 1000.0;  //1 meter in degree
-            //fdm.position[0] = fdm.position[0] + ((fdm.q[0] * ds) * m) / (0.6951355515021288 *  (std::f64::consts::PI / 180.0)).cos();
-
-
-
-            //4th try
-        //     // number of km per degree = ~111km (111.32 in google maps, but range varies
-        //    // between 110.567km at the equator and 111.699km at the poles)
-        //     // 1km in degree = 1 / 111.32km = 0.0089
-        //     // 1m in degree = 0.0089 / 1000 = 0.0000089
-        //     let coef = (fdm.q[0] * ds) * 0.0000089;
-        //     //double new_lat = my_lat + coef;
-        //     // where pi / 180 = 0.018
-        //     fdm.position[0] = fdm.position[0] + coef / (39.826_f64 * 0.018).cos();
-
-           
-            //thr haversine formula does the reverse of what i want
-        //    let p1 = Point::<f64>::from((fdm.position[0], fdm.position[1]));
-        //    // London
-        //    let p2 = Point::<f64>::from((fdm.position[0], fdm.position[1] + (fdm.q[0] * ds)/111111.0   ));
-        //    let distance = p1.haversine_distance(&p2);
-
+            //Calculate displacement based on velocities to add to the latitude and longitude
+            //The displacement needs to be converted to from meters to degrees of longitude
+            //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 meters (at 38 degrees north latitude)
+            //https://www.usgs.gov/faqs/how-much-distance-does-a-degree-minute-and-second-cover-your-maps?qt-news_science_products=0#qt-news_science_products
+            fdm.position[0] = fdm.position[0] + (fdm.q[2] / 110947.2) * ds;
+            fdm.position[1] = fdm.position[1] + (fdm.q[0] / 87843.36) * ds;
             
             //Print some relevant data, set precision to match that of Palmer's C model
             println!("Total distance x (m) =    {:.6}", fdm.q[1]);
