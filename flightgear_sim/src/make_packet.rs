@@ -27,18 +27,15 @@ impl<'a> System<'a> for MakePacket
             let pitch: f32 = -fdm.v_euler_angles.y.to_radians() as f32; 
             let yaw: f32 = fdm.v_euler_angles.z.to_radians() as f32;
 
-            //TRYING TO USE ECEF COORDINATES AND CONVERTING TO LLA
-            //This does not work, all kinds of odd behavior takes place
-            // let nalgebra_ecef_pos = Vector3::new(fdm.v_position.x, fdm.v_position.y, fdm.v_position.z);
-            // let lla = geo::ecef2lla(&nalgebra_ecef_pos, &ELLIPSOID); 
-            // pckt.fgnetfdm.latitude = f64::from_be_bytes(lla.x.to_ne_bytes());
-            // pckt.fgnetfdm.longitude = f64::from_be_bytes(lla.y.to_ne_bytes()); 
-            // pckt.fgnetfdm.altitude = f64::from_be_bytes(lla.z.to_ne_bytes()); 
+            //Lat and lon degrees need to be converted to radians for FlightGear
+            let lat: f64 = fdm.v_position.x.to_radians() as f64;
+            let lon: f64 = fdm.v_position.y.to_radians() as f64;
+            let alt: f64 = fdm.v_position.z as f64; 
 
             //Set lat, long, alt
-            pckt.fgnetfdm.latitude = f64::from_be_bytes((fdm.v_position.x as f64).to_ne_bytes());
-            pckt.fgnetfdm.longitude = f64::from_be_bytes((fdm.v_position.y as f64).to_ne_bytes()); 
-            pckt.fgnetfdm.altitude = f64::from_be_bytes((fdm.v_position.z as f64).to_ne_bytes()); //flightgear wants meters here, but on screen it displays feet
+            pckt.fgnetfdm.latitude = f64::from_be_bytes(lat.to_ne_bytes());
+            pckt.fgnetfdm.longitude = f64::from_be_bytes(lon.to_ne_bytes()); 
+            pckt.fgnetfdm.altitude = f64::from_be_bytes(alt.to_ne_bytes()); //flightgear wants meters here, but on screen it displays feet
                                                                                     
             //Roll, Pitch, Yaw
             pckt.fgnetfdm.phi = f32::from_be_bytes(roll.to_ne_bytes());

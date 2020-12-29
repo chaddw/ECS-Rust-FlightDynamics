@@ -28,7 +28,7 @@ impl<'a> System<'a> for MakePacket
             let pitch: f32 = fdm.alpha as f32;
             let yaw: f32 = (90.0 + -fdm.heading_angle.to_degrees()) as f32; //heading on the longitude x axis
 
-            //Set lat, lon, and alt. Lat and lon need to be converted to radians for FlightGear
+            //Lat and lon degrees need to be converted to radians for FlightGear
             let lat = fdm.position[0].to_radians();
             let lon = fdm.position[1].to_radians();
             let alt = fdm.position[2] + fdm.q[5]; //add starting elevation offset to altitude

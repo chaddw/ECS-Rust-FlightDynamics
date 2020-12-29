@@ -108,8 +108,8 @@ fn main()
         m_inertia_inverse: myairplane.m_inertia_inverse,
 
         //Define initial flight parameters
-        //Wpafb runway geodetic coordinates at 2000 ft (609 meters)
-        v_position: common::Myvec{x: 0.6951355515021288, y: -1.4668619698501122, z: 609.0},
+        //Wpafb runway geodetic coordinates at 2000 ft (609 meters) above sea level, ground level is at 248 meters elevation
+        v_position: common::Myvec{x: 39.826 , y: -84.045, z: 609.0},
         v_velocity: common::Myvec{x: 60.0, y: 0.0, z: 0.0},
         f_speed: 60.0,
         v_forces: common::Myvec{x: 500.0, y: 0.0, z: 0.0},

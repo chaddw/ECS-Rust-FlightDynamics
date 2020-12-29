@@ -94,7 +94,6 @@ impl<'a> System<'a> for EquationsOfMotion
             { 
                 fdm.element[4].i_flap = -1;
                 fdm.element[5].i_flap = -1;
-
             } 
 
             //Flap States
@@ -122,10 +121,10 @@ impl<'a> System<'a> for EquationsOfMotion
             fdm.v_velocity = Myvec::addvec(&fdm.v_velocity, &Myvec::multiplyscalar(&ae, dt)); 
 
             //Calculate position of airplane in earth space
-            //Need to convert feet measurements in Bourg's model to meters, and then convert that to lat/lon for FlightGear
-            //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 meters (at 38 degrees north latitude)
-            let x_displacement = (fdm.v_velocity.x / 3.281) / 110947.2;
-            let y_displacement = (fdm.v_velocity.y / 3.281) / 87843.36;
+            //Need to convert feet displacement measurements native to Bourg's model to meters, and then convert that to lat/lon for FlightGear, and add that displacement to the position coordinates
+            //The displacement conversion from meters to degrees of lat/lon is a quick and dirty conversion. It works well for coordinates not too close to either pole 
+            let x_displacement = (fdm.v_velocity.x / 3.281) / 111111.0;
+            let y_displacement = (fdm.v_velocity.y / 3.281) / (111111.0 * 111111.0_f32.cos());
             let z_displacement = fdm.v_velocity.z / 3.281;
             let displacement = Myvec::new(x_displacement, y_displacement, z_displacement);
 
