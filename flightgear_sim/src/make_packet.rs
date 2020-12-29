@@ -22,7 +22,8 @@ impl<'a> System<'a> for MakePacket
         {
             //All data passed into the FGNetFDM struct is converted to network byte order
             
-            //Set Roll, Pitch, Yaw
+            //Set Roll, Pitch, Yaw in radians
+            //Negate to compensate for coordinate handedness differences
             let roll: f32 = -fdm.v_euler_angles.x.to_radians() as f32;
             let pitch: f32 = -fdm.v_euler_angles.y.to_radians() as f32; 
             let yaw: f32 = fdm.v_euler_angles.z.to_radians() as f32;
