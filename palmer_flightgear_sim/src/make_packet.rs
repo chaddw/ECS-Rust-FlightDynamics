@@ -23,10 +23,11 @@ impl<'a> System<'a> for MakePacket
         {
             //All data passed into the FGNetFDM struct is converted to network byte order
 
-            //Set Roll, Pitch, Yaw
-            let roll: f32 = fdm.bank as f32;
-            let pitch: f32 = fdm.alpha as f32;
-            let yaw: f32 = (90.0 + -fdm.heading_angle.to_degrees()) as f32; //heading on the longitude x axis
+            //Set Roll, Pitch, Yaw in radians
+            //Negate to compensate for coordinate differences
+            let roll: f32 = -fdm.bank.to_radians() as f32;
+            let pitch: f32 = fdm.alpha.to_radians() as f32;
+            let yaw: f32 = fdm.heading_angle as f32;
 
             //Lat and lon degrees need to be converted to radians for FlightGear
             let lat = fdm.position[0].to_radians();
@@ -39,9 +40,9 @@ impl<'a> System<'a> for MakePacket
             pckt.fgnetfdm.altitude = f64::from_be_bytes(alt.to_ne_bytes()); 
 
             //Roll, Pitch, Yaw
-            pckt.fgnetfdm.phi = f32::from_be_bytes((roll.to_radians()).to_ne_bytes());
-            pckt.fgnetfdm.theta = f32::from_be_bytes((pitch.to_radians()).to_ne_bytes());
-            pckt.fgnetfdm.psi = f32::from_be_bytes((yaw.to_radians()).to_ne_bytes());
+            pckt.fgnetfdm.phi = f32::from_be_bytes(roll.to_ne_bytes());
+            pckt.fgnetfdm.theta = f32::from_be_bytes(pitch.to_ne_bytes());
+            pckt.fgnetfdm.psi = f32::from_be_bytes(yaw.to_ne_bytes());
 
             //Other airplane data
             let fg_net_fdm_version = 24_u32;

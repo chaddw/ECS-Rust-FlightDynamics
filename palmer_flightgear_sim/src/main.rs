@@ -64,10 +64,10 @@ fn main()
         //Wpafb runway latitude/longitude/altitude. Ground level is 248.0 meters above sea level
         position: vec![39.826, -84.045, 248.0],
        
-        bank: 0.0, //bank angle
-        alpha: 0.0,//angle of attack
-        throttle: 0.0, //throttle percentage
-        flap: 0.0,  //flap deflection amount
+        bank: 0.0, //bank angle degrees (-20 - 20)
+        alpha: 0.0,//angle of attack degrees (-16 - 20)
+        throttle: 0.0, //throttle percentage (0 - 1)
+        flap: 0.0,  //flap deflection amount degrees (20 or 40)
 
         q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
         airspeed: 0.0,

@@ -62,12 +62,13 @@ impl<'a> System<'a> for EquationsOfMotion
             }  
 
             //Bank states
-            if fdm.bank < 20.0 && keystate.bank_right == true
+            //swapped functionality
+            if fdm.bank < 20.0 && keystate.bank_left == true
             {
                 fdm.bank = fdm.bank + 1.0;
             
             }  
-            else if fdm.bank > -20.0 && keystate.bank_left == true
+            else if fdm.bank > -20.0 && keystate.bank_right == true
             {
                 fdm.bank = fdm.bank - 1.0;
             }  
@@ -116,19 +117,21 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //Calculate displacement based on velocities to add to the latitude and longitude
             //The displacement needs to be converted to from meters to degrees of latitude and longitude
-            //The displacement conversion from meters to degrees of lat/lon is a quick and dirty conversion. It works well for coordinates not too close to either pole 
-            fdm.position[0] = fdm.position[0] + (fdm.q[2] / 111111.0) * ds;
-            fdm.position[1] = fdm.position[1] + (fdm.q[0] / (111111.0 * 111111.0_f64.cos())) * ds;
+            //The displacement conversion from meters to degrees of lat/lon is a quick and dirty conversion. It works well for coordinates not too close to either pole
+            //Latitude 
+            fdm.position[0] = fdm.position[0] + (fdm.q[0] / 111111.0) * ds;
+            //Longitude
+            fdm.position[1] = fdm.position[1] + (fdm.q[2] / (111111.0 * 111111.0_f64.cos())) * ds;
             
             //Print some relevant data, set precision to match that of Palmer's C model
-            println!("Latitude:                 {:.6}", fdm.position[0]);
-            println!("Longitude:                {:.6}", fdm.position[1]);
+            println!("Latitude (deg) x-axis =   {:.6}", fdm.position[0]);
+            println!("Longitude (deg) y-axis =  {:.6}", fdm.position[1]);
             println!("Altitude (m) =            {:.6}", fdm.q[5]);
             println!("Airspeed (km/hr) =        {:.6}", fdm.airspeed * 3.6); //convert from m/s to km/h
             println!("Heading angle (deg)       {}", fdm.heading_angle.to_degrees());
             println!("Climb angle (deg)         {}", fdm.climb_angle.to_degrees());
             println!("Climb rate (m/s)          {}", fdm.climb_rate);
-            println!("Throttle =                {}", fdm.throttle);
+            println!("Throttle % =              {}", fdm.throttle * 100.0);
             println!("Angle of attack (deg) =   {}", fdm.alpha);
             println!("Bank angle (deg) =        {}", fdm.bank);
             println!("Flap deflection (deg) =   {}", fdm.flap);

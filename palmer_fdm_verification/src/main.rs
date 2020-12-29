@@ -24,7 +24,7 @@ fn main()
     world.register::<DataFDM>();
 
     //Choose frame rate, which will calculate delta time
-    let frame_rate: f64 = 30.0;
+    let frame_rate: f64 = 10.0;
     let dt: f64 = 1.0 / frame_rate; //seconds
 
     //Add dt as a specs resource
@@ -45,10 +45,10 @@ fn main()
     .with(DataFDM{
         
         //Parameters altered for equivalency tests
-        throttle: 1.0, //throttle percentage
-        alpha: 4.0,//angle of attack
-        bank: 0.0, //bank angle
-        flap: 0.0,  //flap deflection amount
+        throttle: 1.0, //throttle percentage (0 - 1)
+        alpha: 4.0,//angle of attack degrees (-16 - 20)
+        bank: 4.0, //bank angle degrees (-20 - 20)
+        flap: 0.0,  //flap deflection amount degrees (20 or 40)
 
         climb_angle: 0.0,
         heading_angle: 0.0,
@@ -83,7 +83,7 @@ fn main()
     let timestep = time::Duration::from_millis((dt * 1000.0) as u64);
 
     //Loop simulation
-    while current_time < 40.0 //seconds
+    while current_time < 30.0 //seconds
     {
 
         //Get current time

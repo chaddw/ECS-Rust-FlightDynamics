@@ -58,13 +58,14 @@ impl<'a> System<'a> for EquationsOfMotion
 
 
             //Print some relevant data, set precision to match that of Palmer's C model
-            println!("Total distance x (m) =    {:.6}", fdm.q[1]);
+            println!("x-axis (m) =              {:.6}", fdm.q[1]);
+            println!("y-axis (m) =              {:.6}", fdm.q[3]);
             println!("Altitude (m) =            {:.6}", fdm.q[5]);
             println!("Airspeed (km/hr) =        {:.6}", fdm.airspeed * 3.6); //convert from m/s to km/h
             println!("Heading angle (deg)       {}", fdm.heading_angle.to_degrees());
             println!("Climb angle (deg)         {}", fdm.climb_angle.to_degrees());
             println!("Climb rate (m/s)          {}", fdm.climb_rate);
-            println!("Throttle =                {}", fdm.throttle);
+            println!("Throttle % =              {}", fdm.throttle * 100.0);
             println!("Angle of attack (deg) =   {}", fdm.alpha);
             println!("Bank angle (deg) =        {}", fdm.bank);
             println!("Flap deflection (deg) =   {}", fdm.flap);
