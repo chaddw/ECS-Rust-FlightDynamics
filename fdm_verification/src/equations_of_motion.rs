@@ -39,7 +39,7 @@ impl<'a> System<'a> for EquationsOfMotion
             //FOR EQUIVALENCY TESTS: increment current frame tracker
             fdm.current_frame = fdm.current_frame + 1;
 
-            //Reset/zero the elevators, rudders, and ailerons every loo
+            //Reset/zero the elevators, rudders, and ailerons every loop
             //Rudder
             fdm.element[6].f_incidence = 0.0;
             //Ailerons
@@ -63,28 +63,27 @@ impl<'a> System<'a> for EquationsOfMotion
             // }
 
             // //TEST 3 Roll 
-            // if fdm.current_frame >= 1 && fdm.current_frame <= 5
-            // {
-            //     //increase thrust
-            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
-            // }
-            // else if fdm.current_frame >= 6 && fdm.current_frame <= 246 //pitch up 8 seconds
-            // {
-            //     //pitch up
-            //     fdm.element[4].i_flap = 1;
-            //     fdm.element[5].i_flap = 1;
-            // }
-            // else if fdm.current_frame >= 247 && fdm.current_frame <= 307 //roll right for a 2 second
-            // {
-            //     //roll right
-            //     fdm.element[0].i_flap = -1;
-            //     fdm.element[3].i_flap = 1;
-            //     keystate.roll_right = true;
-            // }
+            if fdm.current_frame >= 1 && fdm.current_frame <= 5
+            {
+                //increase thrust
+                fdm.thrustforce = fdm.thrustforce + d_thrust;
+            }
+            else if fdm.current_frame >= 6 && fdm.current_frame <= 246 //pitch up 8 seconds
+            {
+                //pitch up
+                fdm.element[4].i_flap = 1;
+                fdm.element[5].i_flap = 1;
+            }
+            else if fdm.current_frame >= 247 && fdm.current_frame <= 307 //roll right for a 2 second
+            {
+                //roll right
+                fdm.element[0].i_flap = -1;
+                fdm.element[3].i_flap = 1;
+            }
 
 
             // //TEST 4 Pitch
-            // increase thrust by 500
+            //increase thrust by 500
             // if fdm.current_frame >= 1 && fdm.current_frame <= 5
             // {
             //     //increase thrust
@@ -117,6 +116,50 @@ impl<'a> System<'a> for EquationsOfMotion
             // fdm.element[1].i_flap = -1;
             // fdm.element[2].i_flap = -1;
             // fdm.flaps = true;
+
+
+            
+            //Bourg defined flight component activation guide
+
+            //thrust up
+            // fdm.thrustforce = fdm.thrustforce + d_thrust;
+            
+            //thrust down
+            // fdm.thrustforce = fdm.thrustforce - d_thrust;
+        
+            //left rudder
+            // fdm.element[6].f_incidence = 16.0;
+
+            //right rudder
+            // fdm.element[6].f_incidence = -16.0;
+
+            //roll left
+            // fdm.element[0].i_flap = 1;
+            // fdm.element[3].i_flap = -1;
+
+            //roll right
+            // fdm.element[0].i_flap = -1;
+            // fdm.element[3].i_flap = 1;
+
+            //pitch up
+            // fdm.element[4].i_flap = 1;
+            // fdm.element[5].i_flap = 1;
+
+            //pitch down
+            // fdm.element[4].i_flap = -1;
+            // fdm.element[5].i_flap = -1;
+        
+            //flaps deflected 
+            // fdm.element[1].i_flap = -1;
+            // fdm.element[2].i_flap = -1;
+            // fdm.flaps = true;
+        
+            //no flaps
+            // fdm.element[1].i_flap = 0;
+            // fdm.element[2].i_flap = 0;
+            // fdm.flaps = false;
+            
+
     
             //Calculate all of the forces and moments on the airplane
             calc_airplane_loads(&mut fdm);
@@ -168,7 +211,7 @@ impl<'a> System<'a> for EquationsOfMotion
             println!("Yaw:              {}", fdm.v_euler_angles.z);
             println!("Alt:              {}", fdm.v_position.z);
             println!("Thrust:           {}", fdm.thrustforce);
-            println!("Speed (knots):    {}", fdm.f_speed/1.688);
+            println!("Airspeed (knots): {}", fdm.f_speed/1.688);
             println!("Position x:       {}", fdm.v_position.x);
             println!("Position y:       {}", fdm.v_position.y);
             println!("Position z:       {}", fdm.v_position.z);
