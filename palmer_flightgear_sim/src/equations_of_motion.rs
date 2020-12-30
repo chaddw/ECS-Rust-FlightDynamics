@@ -117,11 +117,12 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //Calculate displacement based on velocities to add to the latitude and longitude
             //The displacement needs to be converted to from meters to degrees of latitude and longitude
-            //The displacement conversion from meters to degrees of lat/lon is a quick and dirty conversion. It works well for coordinates not too close to either pole
+            //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 meters (at 38 degrees north latitude)
+            //https://www.usgs.gov/faqs/how-much-distance-does-a-degree-minute-and-second-cover-your-maps?qt-news_science_products=0#qt-news_science_products
             //Latitude 
-            fdm.position[0] = fdm.position[0] + (fdm.q[0] / 111111.0) * ds;
+            fdm.position[0] = fdm.position[0] + (fdm.q[0] / 110947.2) * ds;
             //Longitude
-            fdm.position[1] = fdm.position[1] + (fdm.q[2] / (111111.0 * 111111.0_f64.cos())) * ds;
+            fdm.position[1] = fdm.position[1] + (fdm.q[2] / 87843.36) * ds;
             
             //Print some relevant data, set precision to match that of Palmer's C model
             println!("Latitude (deg) x-axis =   {:.6}", fdm.position[0]);
