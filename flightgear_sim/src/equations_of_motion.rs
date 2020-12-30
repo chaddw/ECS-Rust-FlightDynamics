@@ -122,9 +122,10 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //Calculate position of airplane in earth space
             //Need to convert feet displacement measurements native to Bourg's model to meters, and then convert that to lat/lon for FlightGear, and add that displacement to the position coordinates
-            //The displacement conversion from meters to degrees of lat/lon is a quick and dirty conversion. It works well for coordinates not too close to either pole 
-            let x_displacement = (fdm.v_velocity.x / 3.281) / 111111.0;
-            let y_displacement = (fdm.v_velocity.y / 3.281) / (111111.0 * 111111.0_f32.cos());
+            //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 meters (at 38 degrees north latitude)
+            //https://www.usgs.gov/faqs/how-much-distance-does-a-degree-minute-and-second-cover-your-maps?qt-news_science_products=0#qt-news_science_products
+            let x_displacement = (fdm.v_velocity.x / 3.281) / 110947.2;
+            let y_displacement = (fdm.v_velocity.y / 3.281) / 87843.36;
             let z_displacement = fdm.v_velocity.z / 3.281;
             let displacement = Myvec::new(x_displacement, y_displacement, z_displacement);
 
@@ -158,10 +159,6 @@ impl<'a> System<'a> for EquationsOfMotion
     
             //Get euler angles
             let euler = Myquaternion::make_euler_from_q(&fdm.q_orientation);
-            //FOR FLIGHTGEAR SIMULATION: 
-            //Yaw OR Roll is negated deepending on position on the Earth
-            //In Ohio, Roll is negated 
-            //Pitch is always negated
             fdm.v_euler_angles.x = euler.x; 
             fdm.v_euler_angles.y = euler.y;
             fdm.v_euler_angles.z = euler.z;
@@ -172,7 +169,7 @@ impl<'a> System<'a> for EquationsOfMotion
             println!("Yaw:              {}", fdm.v_euler_angles.z);
             println!("Alt:              {}", fdm.v_position.z);
             println!("Thrust:           {}", fdm.thrustforce);
-            println!("Speed (knots):    {}", fdm.f_speed/1.688);
+            println!("Airspeed (knots): {}", fdm.f_speed/1.688);
             println!("Position x:       {}", fdm.v_position.x);
             println!("Position y:       {}", fdm.v_position.y);
             println!("Position z:       {}", fdm.v_position.z);
