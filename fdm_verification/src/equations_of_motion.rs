@@ -51,75 +51,8 @@ impl<'a> System<'a> for EquationsOfMotion
             //Flaps will be toggled on and off so flaps does not need to be zerod each time
 
 
-            //FOR EQUIVALENCY TESTS: activate flight controls artificially based on current frame
-
-            //TEST 1 (its just the default with no functionality )
-
-            // //TEST 2 THRUST
-            // if fdm.current_frame >= 1 && fdm.current_frame <= 5
-            // {
-            //     //increase thrust
-            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
-            // }
-
-            // //TEST 3 Roll 
-            if fdm.current_frame >= 1 && fdm.current_frame <= 5
-            {
-                //increase thrust
-                fdm.thrustforce = fdm.thrustforce + d_thrust;
-            }
-            else if fdm.current_frame >= 6 && fdm.current_frame <= 246 //pitch up 8 seconds
-            {
-                //pitch up
-                fdm.element[4].i_flap = 1;
-                fdm.element[5].i_flap = 1;
-            }
-            else if fdm.current_frame >= 247 && fdm.current_frame <= 307 //roll right for a 2 second
-            {
-                //roll right
-                fdm.element[0].i_flap = -1;
-                fdm.element[3].i_flap = 1;
-            }
-
-
-            // //TEST 4 Pitch
-            //increase thrust by 500
-            // if fdm.current_frame >= 1 && fdm.current_frame <= 5
-            // {
-            //     //increase thrust
-            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
-            // }
-            // //pitch up
-            // fdm.element[4].i_flap = 1;
-            // fdm.element[5].i_flap = 1;
-
-
-            // //TEST 5 Yaw
-            // if fdm.current_frame >= 1 && fdm.current_frame <= 5
-            // {
-            //     //increase thrust
-            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
-            // }
-            // else if fdm.current_frame >= 6 && fdm.current_frame <= 246 
-            // {
-            //     //pitch up 8 seconds
-            //     fdm.element[4].i_flap = 1;
-            //     fdm.element[5].i_flap = 1;
-            // }
-            // else if fdm.current_frame % 9 == 0
-            // {
-            //     //yaw right
-            //     fdm.element[6].f_incidence = 16.0;
-            // }
-
-            // //TEST 6 Flaps
-            // fdm.element[1].i_flap = -1;
-            // fdm.element[2].i_flap = -1;
-            // fdm.flaps = true;
-
-
-            
-            //Bourg defined flight component activation guide
+        
+            //Flight component activation guide
 
             //thrust up
             // fdm.thrustforce = fdm.thrustforce + d_thrust;
@@ -158,6 +91,76 @@ impl<'a> System<'a> for EquationsOfMotion
             // fdm.element[1].i_flap = 0;
             // fdm.element[2].i_flap = 0;
             // fdm.flaps = false;
+
+
+            //FOR EQUIVALENCY TESTS: activate flight controls artificially based on current frame
+
+            //TEST 1 (no flight control)
+
+            // //TEST 2 THRUST
+            // if fdm.current_frame >= 1 && fdm.current_frame <= 5
+            // {
+            //     //increase thrust
+            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
+            // }
+
+            // //TEST 3 Roll 
+            // if fdm.current_frame >= 1 && fdm.current_frame <= 5
+            // {
+            //     //increase thrust
+            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
+            // }
+            // else if fdm.current_frame >= 6 && fdm.current_frame <= 246 //pitch up 8 seconds
+            // {
+            //     //pitch up
+            //     fdm.element[4].i_flap = 1;
+            //     fdm.element[5].i_flap = 1;
+            // }
+            // else if fdm.current_frame >= 247 && fdm.current_frame <= 307 //roll right for 2 seconds
+            // {
+            //     //roll right
+            //     fdm.element[0].i_flap = -1;
+            //     fdm.element[3].i_flap = 1;
+            // }
+
+
+            // //TEST 4 Pitch
+            //increase thrust by 500
+            // if fdm.current_frame >= 1 && fdm.current_frame <= 5
+            // {
+            //     //increase thrust
+            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
+            // }
+            // //pitch up
+            // fdm.element[4].i_flap = 1;
+            // fdm.element[5].i_flap = 1;
+
+
+            // //TEST 5 Yaw
+            // if fdm.current_frame >= 1 && fdm.current_frame <= 5
+            // {
+            //     //increase thrust
+            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
+            // }
+            // else if fdm.current_frame >= 6 && fdm.current_frame <= 246 
+            // {
+            //     //pitch up 8 seconds
+            //     fdm.element[4].i_flap = 1;
+            //     fdm.element[5].i_flap = 1;
+            // }
+            // else if fdm.current_frame >= 247 && fdm.current_frame <= 307 //yaw right for 2 seconds
+            // {
+            //     //yaw right
+            //     fdm.element[6].f_incidence = -16.0;
+            // }
+
+            // //TEST 6 Flaps
+            // fdm.element[1].i_flap = -1;
+            // fdm.element[2].i_flap = -1;
+            // fdm.flaps = true;
+
+
+    
             
 
     
@@ -247,11 +250,11 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
     {
         if i == 6 //Tail rudder. It is a special case because it can rotate, so the normal vector is recalculated
         {
-            let inn: f32 = (fdm.element[i].f_incidence).to_radians();
+            let inc: f32 = (fdm.element[i].f_incidence).to_radians();
             let di: f32 = (fdm.element[i].f_dihedral).to_radians();
-            fdm.element[i].v_normal = Myvec::new(inn.sin(),
-                                                              inn.cos() * di.sin(), 
-                                                              inn.cos() * di.cos());
+            fdm.element[i].v_normal = Myvec::new(inc.sin(),
+                                                 inc.cos() * di.sin(), 
+                                                 inc.cos() * di.cos());
             fdm.element[i].v_normal.normalize();
         }
        
@@ -347,15 +350,15 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
 //This is called from inside main before the airplane Entity is created
 pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
 {
-    let mut inn: f32;
+    let mut inc: f32;
     let mut di: f32;
 
     //Calculate the normal (perpendicular) vector to each lifting surface. This is needed for relative air velocity to find lift and drag.
     for  i in fdm.element.iter_mut()
     {
-        inn = (i.f_incidence).to_radians();
+        inc = (i.f_incidence).to_radians();
         di = (i.f_dihedral).to_radians();
-        i.v_normal = Myvec::new(inn.sin(), inn.cos() * di.sin(), inn.cos() * di.cos());
+        i.v_normal = Myvec::new(inc.sin(), inc.cos() * di.sin(), inc.cos() * di.cos());
         i.v_normal.normalize(); 
     }
 
@@ -416,8 +419,8 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
     //Finally, set up airplanes mass and inertia matrix
     fdm.mass = total_mass;
     fdm.m_inertia = Mymatrix::new(ixx, -ixy, -ixz,
-                                               -ixy, iyy, -iyz,
-                                               -ixz, -iyz, izz);
+                                  -ixy, iyy, -iyz,
+                                  -ixz, -iyz, izz);
 
     //Get inverse of matrix
     fdm.m_inertia_inverse = Mymatrix::inverse(&fdm.m_inertia);
