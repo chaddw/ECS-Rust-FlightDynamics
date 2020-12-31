@@ -205,11 +205,11 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
     {
         if i == 6 //Tail rudder. It is a special case because it can rotate, so the normal vector is recalculated
         {
-            let inn: f32 = (fdm.element[i].f_incidence).to_radians();
+            let inc: f32 = (fdm.element[i].f_incidence).to_radians();
             let di: f32 = (fdm.element[i].f_dihedral).to_radians();
-            fdm.element[i].v_normal = Myvec::new(inn.sin(),
-                                                              inn.cos() * di.sin(), 
-                                                              inn.cos() * di.cos());
+            fdm.element[i].v_normal = Myvec::new(inc.sin(),
+                                                 inc.cos() * di.sin(), 
+                                                 inc.cos() * di.cos());
             fdm.element[i].v_normal.normalize();
         }
        
@@ -294,10 +294,7 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
      fdm.v_forces = Myquaternion::qvrotate(&fdm.q_orientation, &fb);
 
     //Apply gravity (g is -32.174 ft/s^2), 
-    if fdm.v_position.z > 0.0 //only apply when the airplane is higher than an elevation of zero. This could be changed to elevation of desired flight location (248 meters at wpafb)
-    {
-        fdm.v_forces.z = fdm.v_forces.z + (-32.17399979) * fdm.mass;
-    }
+    fdm.v_forces.z = fdm.v_forces.z + (-32.17399979) * fdm.mass;
 
     fdm.v_moments = Myvec::addvec(&fdm.v_moments, &mb);
 }
@@ -307,15 +304,15 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
 //This is called from inside main before the airplane Entity is created
 pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
 {
-    let mut inn: f32;
+    let mut inc: f32;
     let mut di: f32;
 
     //Calculate the normal (perpendicular) vector to each lifting surface. This is needed for relative air velocity to find lift and drag.
     for  i in fdm.element.iter_mut()
     {
-        inn = (i.f_incidence).to_radians();
+        inc = (i.f_incidence).to_radians();
         di = (i.f_dihedral).to_radians();
-        i.v_normal = Myvec::new(inn.sin(), inn.cos() * di.sin(), inn.cos() * di.cos());
+        i.v_normal = Myvec::new(inc.sin(), inc.cos() * di.sin(), inc.cos() * di.cos());
         i.v_normal.normalize(); 
     }
 
