@@ -49,7 +49,7 @@ impl Myvec
     }
 
 
-    pub fn reverse_aka_conjugate(v: &Myvec) -> Myvec
+    pub fn reverse(v: &Myvec) -> Myvec
     {
         let vec = Myvec { 
             x: -v.x,
@@ -291,62 +291,62 @@ impl Myquaternion
     {
         let pi = 3.14159265359;
 
-        let q00 = q.n * q.n;
-        let q11 = q.v.x * q.v.x;
-        let q22 = q.v.y * q.v.y;
-        let q33 = q.v.z * q.v.z;
+        let q00: f64 = (q.n * q.n) as f64;
+        let q11: f64 = (q.v.x * q.v.x) as f64;
+        let q22: f64 = (q.v.y * q.v.y) as f64;
+        let q33: f64 = (q.v.z * q.v.z) as f64;
         
-        let r11 = q00 + q11 - q22 - q33;
-        let r21 = 2.0 * (q.v.x*q.v.y + q.n*q.v.z);
-        let r31 = 2.0 * (q.v.x*q.v.z - q.n*q.v.y);
-        let r32 = 2.0 * (q.v.y*q.v.z + q.n*q.v.x);
-        let r33 = q00 - q11 - q22 + q33;
+        let r11: f64 = (q00 + q11 - q22 - q33) as f64;
+        let r21: f64 = (2.0 * (q.v.x*q.v.y + q.n*q.v.z) ) as f64;
+        let r31: f64 = (2.0 * (q.v.x*q.v.z - q.n*q.v.y) ) as f64;
+        let r32: f64 = (2.0 * (q.v.y*q.v.z + q.n*q.v.x) ) as f64;
+        let r33: f64 = (q00 - q11 - q22 + q33) as f64;
         
         let mut u: Myvec = Default::default();
-        let tmp = r31.abs();
+        let tmp: f64 = r31.abs();
         if tmp > 0.999999
         {
-            let r12 = 2.0 * (q.v.x*q.v.y - q.n*q.v.z);
-            let r13 = 2.0 * (q.v.x*q.v.z + q.n*q.v.y);
+            let r12: f64 = (2.0 * (q.v.x*q.v.y - q.n*q.v.z) ) as f64;
+            let r13: f64 = (2.0 * (q.v.x*q.v.z + q.n*q.v.y) ) as f64;
         
             u.x = 0.0_f32.to_degrees(); //roll
-            u.y = (-(pi/2.0) * r31/tmp).to_degrees(); //pitch
-            u.z = (-r12.atan2(-r31*r13)).to_degrees(); //yaw
+            u.y = ( (-(pi/2.0) * r31/tmp).to_degrees() ) as f32; //pitch
+            u.z = ( (-r12.atan2(-r31*r13)).to_degrees() ) as f32; //yaw
             return u;
         }
         
-        u.x = (r32.atan2(r33)).to_degrees(); //roll
-        u.y = (-r31.asin()).to_degrees(); //pitch
-        u.z = (r21.atan2(r11)).to_degrees(); //yaw
+        u.x = ( (r32.atan2(r33)).to_degrees() ) as f32; //roll
+        u.y = ( (-r31.asin()).to_degrees() ) as f32; //pitch
+        u.z = ( (r21.atan2(r11)).to_degrees() ) as f32; //yaw
         return u;
 
     }
 
-    pub fn make_q_from_euler(x: f32, y: f32, z: f32) -> Myquaternion
+    pub fn make_q_from_euler(x: f64, y: f64, z: f64) -> Myquaternion
     {
         let mut q: Myquaternion = Default::default();
-        let roll: f32 = x.to_radians();
-        let pitch: f32 = y.to_radians();
-        let yaw: f32 = z.to_radians();
+        let roll: f64 = x.to_radians();
+        let pitch: f64 = y.to_radians();
+        let yaw: f64 = z.to_radians();
 
-        let cyaw: f32 = (0.5 * yaw).cos();
-        let cpitch: f32 = (0.5 * pitch).cos();
-        let croll: f32 = (0.5 * roll).cos();
+        let cyaw: f64 = (0.5 * yaw).cos();
+        let cpitch: f64 = (0.5 * pitch).cos();
+        let croll: f64 = (0.5 * roll).cos();
 
-        let syaw: f32 = (0.5 * yaw).sin();
-        let spitch: f32 = (0.5 * pitch).sin();
-        let sroll: f32 = (0.5 * roll).sin();
+        let syaw: f64 = (0.5 * yaw).sin();
+        let spitch: f64 = (0.5 * pitch).sin();
+        let sroll: f64 = (0.5 * roll).sin();
     
-        let cyawcpitch: f32 = cyaw * cpitch;
-        let syawspitch: f32 = syaw * spitch;
-        let cyawspitch: f32 = cyaw * spitch;
-        let syawcpitch: f32 = syaw * cpitch;
+        let cyawcpitch: f64 = cyaw * cpitch;
+        let syawspitch: f64 = syaw * spitch;
+        let cyawspitch: f64 = cyaw * spitch;
+        let syawcpitch: f64 = syaw * cpitch;
     
     
-        q.n = cyawcpitch * croll + syawspitch * sroll;
-        q.v.x = cyawcpitch * sroll - syawspitch * croll;
-        q.v.y = cyawspitch * croll + syawcpitch * sroll;
-        q.v.z = syawcpitch * croll - cyawspitch * sroll;
+        q.n = (cyawcpitch * croll + syawspitch * sroll) as f32;
+        q.v.x = (cyawcpitch * sroll - syawspitch * croll) as f32;
+        q.v.y = (cyawspitch * croll + syawcpitch * sroll) as f32;
+        q.v.z = (syawcpitch * croll - cyawspitch * sroll) as f32;
 
         return q;
     }

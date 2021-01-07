@@ -223,7 +223,7 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
         //Find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
         if f_local_speed > 1.0
         {
-            let v_local_vel_tmp = Myvec::reverse_aka_conjugate(&v_local_velocity); //-vLocalVelocity
+            let v_local_vel_tmp = Myvec::reverse(&v_local_velocity); //-vLocalVelocity
             v_drag_vector = Myvec::dividescalar(&v_local_vel_tmp, f_local_speed);
         }
 

@@ -127,13 +127,13 @@ fn main()
         world.maintain();
 
         //Find difference in time elapsed this loop versus the timestep
-        // let sleep_time = timestep.checked_sub(time::Instant::now().duration_since(start));
+        let sleep_time = timestep.checked_sub(time::Instant::now().duration_since(start));
 
-        // //Sleep for extra time if calculation took less time than the DT time step
-        // if sleep_time != None 
-        // {
-        //     thread::sleep(sleep_time.unwrap());
-        // }
+        //Sleep for extra time if calculation took less time than the DT time step
+        if sleep_time != None 
+        {
+            thread::sleep(sleep_time.unwrap());
+        }
     }
 }
 
