@@ -1,12 +1,18 @@
 
 #include <iostream>
-
 #include "Vector.hpp"
+#include <iomanip>
+#include <limits>
 
 using namespace std;
 
+
 int main()
-{
+{  
+   //Max out the precision
+   std::cout << setprecision(std::numeric_limits<float>::digits);
+
+
    cout << "--------------\n";
    cout << "Tests: Methods\n";
    cout << "--------------\n";

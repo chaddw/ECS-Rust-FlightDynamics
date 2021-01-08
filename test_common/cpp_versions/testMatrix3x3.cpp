@@ -1,7 +1,8 @@
 
 #include <iostream>
-
 #include "Matrix3x3.hpp"
+#include <iomanip>
+#include <limits>
 
 using namespace std;
 
@@ -14,6 +15,10 @@ void print_matrix(Matrix3x3 m)
 
 int main()
 {
+
+   //Max out the precision
+   std::cout << setprecision(std::numeric_limits<float>::digits);
+
    cout << "--------------\n";
    cout << "Tests: Methods\n";
    cout << "--------------\n";
