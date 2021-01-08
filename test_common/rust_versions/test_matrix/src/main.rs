@@ -1,48 +1,32 @@
 //Import Vector, Matrix, Quaternion module
 mod common;
 
+#[cfg(test)]
 
-fn print_matrix(m: &common::Mymatrix)
-{
-        println!("{} {} {}", m.e11, m.e12, m.e13);
-        println!("{} {} {}", m.e21, m.e22, m.e23);
-        println!("{} {} {}", m.e31, m.e32, m.e33);
+
+
+//MATRIX TESTS
+#[test]
+fn m_inverse_test1()
+{  
+        let m = common::Mymatrix::new(1.0, 2.0, 3.0, 
+                                          4.0, 5.0, 6.0,
+                                          7.0, 8.0, 9.0).inverse();
+
+        let equal = common::Mymatrix::new(-3.0, 6.0, -3.0,
+                                          6.0, -12.0, 6.0,
+                                          -3.0, 6.0, -3.0);
+        assert_eq!(m, equal);
 }
-
-
-
-fn main() 
-{
-
-        //TEST MATRIX
-        println!("{}", "--------------"); 
-        println!("{}", "Tests: Methods");
-        println!("{}", "--------------"); 
      
      
-        {  // inverse
-                let m = common::Mymatrix::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
-                println!("{}", "Inverse Test: Matrix3x3:"); 
-                print_matrix(&m);
-                println!("{}", "Inverse:"); 
-                print_matrix(&m.inverse());
-        }
-     
-        println!("{}", "--------------"); 
-        println!("{}", "Tests: Functions and Operators");
-        println!("{}", "--------------"); 
-     
-        {  // multiply matrix by vector
+#[test]
+fn m_multiply_by_vec_test1()
+{  
+        let m = common::Mymatrix::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+        let v = common::Mymatrix::multiply_matrix_by_vec(&m, &common::Myvec::new(3.0, 3.0, 3.0));
 
-                let m = common::Mymatrix::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
-                println!("{}", "Multiply matrix by vector test: Matrix3x3"); 
-                print_matrix(&m);
-
-                println!("{}", "Vector: (3,3,3)"); 
-
-                let mut v = common::Mymatrix::multiply_matrix_by_vec(&m, &common::Myvec::new(3.0, 3.0, 3.0));
-        
-                 println!("Matrix * Vector : v.x: {} v.y: {} v.z: {}", v.x, v.y, v.z);
-        }
+        let equal = common::Myvec::new(18.0, 45.0, 72.0);
+        assert_eq!(v, equal);
 
 }
