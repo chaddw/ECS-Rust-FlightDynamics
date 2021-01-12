@@ -2,7 +2,6 @@
 #include "Quaternion.hpp"
 #include "Vector.hpp"
 #include <iomanip>
-#include <limits>
 
 using namespace std;
 
@@ -15,7 +14,7 @@ int main()
 {
 
    //Max out the precision
-   std::cout << setprecision(std::numeric_limits<float>::digits);
+   std::cout << setprecision(100);
 
    cout << "--------------\n";
    cout << "Tests: Methods\n";
@@ -183,7 +182,7 @@ int main()
 
    {
       // make euler angles from quaternion test 2
-      Quaternion q(0.99817944, -0.022753572, -0.039973494,0.03901701);
+      Quaternion q(0.99817944, -0.022753572, -0.039973494, 0.03901701);
       
       Vector v = MakeEulerAnglesFromQ(q);
       cout << "make euler angles from q test 2: "  << v.x << " "

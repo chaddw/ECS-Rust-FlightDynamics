@@ -32,6 +32,14 @@ int main()
       print_matrix(m.inverse());
    }
 
+      {  // inverse
+      Matrix3x3 m(2549.629150390625, -0.0, 166.91925048828125, -0.0, 2024.4990234375, -0.0, 166.91925048828125, -0.0, 4414.73388671875);
+      cout << "Inverse Test: Matrix3x3:";
+      print_matrix(m);
+      cout << "Inverse:";
+      print_matrix(m.inverse());
+   }
+
 
    cout << "------------------------------\n";
    cout << "Tests: Functions and Operators\n";
@@ -49,6 +57,21 @@ int main()
                                     << " v.y: " << v.y
                                     << " v.z: " << v.z  << endl;
    }
+
+   {  // multiply matrix by vector
+      Matrix3x3 m(2549.629150390625, -0.0, 166.91925048828125, -0.0, 2024.4990234375, -0.0, 166.91925048828125, -0.0, 4414.73388671875);
+      cout << "Multiply matrix by vector test: Matrix3x3:";
+      print_matrix(m);
+
+      cout << "Vector: (0.000029893242754042148590087890625, 0.063622482120990753173828125, -0.000000184518285095691680908203125)" << std::endl;
+      Vector v = (m * Vector(0.000029893242754042148590087890625, 0.063622482120990753173828125, -0.000000184518285095691680908203125));
+
+      cout << "Matrix * Vector : "  << " v.x: " << v.x
+                                    << " v.y: " << v.y
+                                    << " v.z: " << v.z  << endl;
+   }
+
+   
 
    return 0;
 }
