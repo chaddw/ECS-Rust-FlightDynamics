@@ -160,54 +160,31 @@ impl<'a> System<'a> for EquationsOfMotion
             // fdm.element[2].i_flap = -1;
             // fdm.flaps = true;
 
-
-    
         
             //Calculate all of the forces and moments on the airplane
             calc_airplane_loads(&mut fdm);
 
             //Calculate acceleration of airplane in earth space
             let ae: Myvec = Myvec::dividescalar(&fdm.v_forces, fdm.mass);
-            //ERROR AFTER THE SECOND FRAME, STARTING ON THIRD FRAME
-           //println!("{:.50?}", ae);
-
-            //ERROR AFTER SECOND FRAME
-            //println!("{:.50?}", fdm.v_forces);
 
             //Calculate velocity of airplane in earth space
             fdm.v_velocity = Myvec::addvec(&fdm.v_velocity, &Myvec::multiplyscalar(&ae, dt)); 
-            //ERROR AFTER SECOND FRAME. RIGHT ON FIRST FRAME (ACTUALLY HAS DATA AND NOT JUST 0,0,0), SECOND FRAME CORRECT
-            //println!("{:.50?}", fdm.v_velocity);
 
             //Calculate position of airplane in earth space
             fdm.v_position = Myvec::addvec(&fdm.v_position, &Myvec::multiplyscalar(&fdm.v_velocity, dt));
-            //ERROR AFTER SECOND FRAME ON POSITION.Y, FOURTH FRAME ALSO ONLY ERROR ON Y, ALSO FRAME 5, ALSO FRAME 10, FRAME 50 HAS ERROR IN ALL 3 COORDINATES
-            //println!("{:.50?}", fdm.v_position);
 
             //Calculate angular velocity of airplane in body space
             let one = Mymatrix::multiply_matrix_by_vec(&fdm.m_inertia, &fdm.v_angular_velocity);
-            //println!("{:.25?}", one);
             let two = Myvec::crossproduct(&fdm.v_angular_velocity, &one);
-            //println!("{:.25?}", two);
             let three = Myvec::subtractvec(&fdm.v_moments, &two);
-            //println!("{:.25?}", three);
             let four = Mymatrix::multiply_matrix_by_vec(&fdm.m_inertia_inverse, &three);
-            //println!("{:.50?}", four);
             let five = Myvec::multiplyscalar(&four, dt);
-            //println!("{:.50?}", five);
-
             fdm.v_angular_velocity = Myvec::addvec(&fdm.v_angular_velocity, &five);
-            //ERROR STARTING ON SECOND FRAME
-           // println!("{:.50?}", fdm.v_angular_velocity);
-            //originalcode //angular_velocity += inertia_inverse * (moment - (angular_velocity^(inertia * angular_velocity))) * dt;
 
             //Calculate the new rotation quaternion
             let uno = Myquaternion::multiply_quat_by_vec(&fdm.q_orientation, &fdm.v_angular_velocity);
             let dos = Myquaternion::multiplyscalar(&uno, 0.5 * dt);
             fdm.q_orientation = Myquaternion::addquat(&fdm.q_orientation, &dos);
-
-            //ERROR STARTS IN SECOND FRAME, NO ERROR IN V.Y IN SECOND FRAME BUT ERROR AFTERWARDS
-            //println!("{:.50?}", fdm.q_orientation);
 
             //Now normalize the orientation quaternion (make into unit quaternion)
             let mag = fdm.q_orientation.magnitude();
@@ -215,39 +192,29 @@ impl<'a> System<'a> for EquationsOfMotion
             {
                fdm.q_orientation = Myquaternion::dividescalar(&fdm.q_orientation, mag);
             }
-            //println!("{:.50?}", fdm.q_orientation);
-            
-            //println!("{:.50?}", mag);
 
             //Calculate the velocity in body space
             fdm.v_velocity_body = Myquaternion::qvrotate(&Myquaternion::conjugate(&fdm.q_orientation), &fdm.v_velocity);
-            //ERROR AFTER SECOND FRAME (thats weird because orientation has error in second frame)
-            //println!("{:.50?}", fdm.v_velocity_body);
     
             //Calculate air speed
             fdm.f_speed = fdm.v_velocity.magnitude();
-            //ERROR AFTER THE SECOND FRAME
-            //println!("{:.50}",fdm.f_speed);
     
             //Get euler angles
             let euler = Myquaternion::make_euler_from_q(&fdm.q_orientation);
             fdm.v_euler_angles.x = euler.x;
             fdm.v_euler_angles.y = euler.y;
             fdm.v_euler_angles.z = euler.z; 
-            //println!("{:.50?}", fdm.v_euler_angles);
 
-            
             //Print some relevant data
-            println!("Roll:             {:.50}", fdm.v_euler_angles.x);
-            println!("Pitch:            {:.50}", -fdm.v_euler_angles.y);
-            println!("Yaw:              {:.50}", fdm.v_euler_angles.z);
+            println!("Roll:             {}", fdm.v_euler_angles.x);
+            println!("Pitch:            {}", -fdm.v_euler_angles.y);
+            println!("Yaw:              {}", fdm.v_euler_angles.z);
             println!("Alt:              {}", fdm.v_position.z);
             println!("Thrust:           {}", fdm.thrustforce);
             println!("Airspeed (knots): {}", fdm.f_speed/1.688);
             println!("Position x:       {}", fdm.v_position.x);
             println!("Position y:       {}", fdm.v_position.y);
             println!("Position z:       {}", fdm.v_position.z);
-
 
         }
     }
@@ -286,32 +253,15 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
                                                  inc.cos() * di.sin(), 
                                                  inc.cos() * di.cos());
             fdm.element[i].v_normal.normalize();
-
-           //println!("{:.25}", di);
-
-            //println!("{:.100?}", fdm.element[i].v_normal); 
                                                             
         }
        
         //Calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
         let mut vtmp = Myvec::crossproduct(&fdm.v_angular_velocity, &fdm.element[i].v_cg_coords);
-        //ERROR ANGULAR VELOCITY HERE AFTER SECOND FRAME
-       // println!("{:.50?}", fdm.v_angular_velocity);
-
-        //println!("{:.25?}", fdm.element[i].v_cg_coords);
-
-        //ERROR VTMP AFTER 2ND FRAME (frame 1 and 2 are all zero)
-        //println!("{:.50?}", vtmp);
-
         let v_local_velocity = Myvec::addvec(&fdm.v_velocity_body, &vtmp);
 
-        //ERROR IN VELOCITY BODY AFTER SECOND FRAME
-        //SO LOCAL VELOCITY WILL HAVE ERROR, ON TOP OF THE ERROR FROM VTMP....
-        //println!("{:.50?}", fdm.v_velocity_body);
-
-        //Calculate local air speed//
+        //Calculate local air speed
         let f_local_speed: f32 = v_local_velocity.magnitude(); 
-        //println!("{:.50?}", f_local_speed);
 
         //Find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
         if f_local_speed > 1.0
@@ -325,8 +275,6 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
         let mut v_lift_vector = Myvec::crossproduct(&lift_tmp, &v_drag_vector);
         let mut tmp = v_lift_vector.magnitude(); 
         v_lift_vector.normalize();
-        //ERROR AFTER SECOND FRAME
-        //println!("{:.60?}", v_lift_vector);
   
         //Find the angle of attack. its the angle between the lift vector and element normal vector 
         tmp = Myvec::dotproduct(&v_drag_vector, &fdm.element[i].v_normal);
@@ -341,7 +289,6 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
         }
 
         let f_attack_angle: f32 = rad_to_deg(tmp.asin());
-       // println!("{:.50}", f_attack_angle);
 
         //Determine lift and drag force on the element. Rho is defined as 0.0023769, which is density of air at sea level, slugs/ft^3
         tmp = 0.5 * 0.002376900055 * f_local_speed * f_local_speed * fdm.element[i].f_area;   
@@ -374,9 +321,6 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
                 fdm.stalling = true; 
             }
         }
-
-        //ERROR VRESULTANT AFTER SECOND FRAME
-        //println!("{:.25?}", v_resultant);
 
         //Keep running total of resultant forces (total force)
         fb = Myvec::addvec(&fb, &v_resultant);
@@ -415,8 +359,6 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
         di = deg_to_rad(fdm.element[i].f_dihedral);
         fdm.element[i].v_normal = Myvec::new(inc.sin(), inc.cos() * di.sin(), inc.cos() * di.cos());
         fdm.element[i].v_normal.normalize(); 
-        //println!("{:.25?}", inc);
-       // println!("{:.100?}", fdm.element[i].v_normal);
     }
 
     //Calculate total mass
@@ -434,17 +376,12 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
         v_moment = Myvec::addvec(&v_moment, &tmp);
     }
     let cg = Myvec::dividescalar(&v_moment, total_mass); 
-    //println!("{:.100?}", cg);
-    //println!("{:.100?}", v_moment);
 
     //Calculate coordinates of each element with respect to the combined CG, relative position
     for i in 0..8
     {
         fdm.element[i].v_cg_coords = Myvec::subtractvec(&fdm.element[i].v_d_coords, &cg);
-        //println!("{:.100?}", fdm.element[i].v_cg_coords);
     }
-
-    //EVEN THOUGH EVERYTHING ABOVE IN THIS FUNCTION IS CORRECT, WHAT IS BELOW ENDS UP INCORRECT
 
     //Calculate the moments and products of intertia for the combined elements
     let mut ixx: f32 = 0.0;
@@ -456,10 +393,6 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
 
     for i in 0..8
     {
-        //println!("{:.25?}", fdm.element[i].v_cg_coords);
-       // println!("{:.25?}", fdm.element[i].v_local_inertia);
-      // println!("{:.25}", fdm.element[i].f_mass);
-      //ALL THREE OF THE VARIABLES ABOVE ARE CORRECT
         ixx = ixx + fdm.element[i].v_local_inertia.x + fdm.element[i].f_mass *
             (fdm.element[i].v_cg_coords.y * fdm.element[i].v_cg_coords.y +
             fdm.element[i].v_cg_coords.z * fdm.element[i].v_cg_coords.z);
@@ -482,31 +415,16 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
             fdm.element[i].v_cg_coords.z);
 
     }
-    
-    //NOW ERROR APPEARS WITH THE INERTIA MATRIX AND THE INVERSE IN E11 AND E33 (THEY BOTH HAVE CG_COORDS.Y....)
-    // println!("{:.25}", ixx);
-    // println!("{:.25}", iyy);
-    // println!("{:.25}", izz);
-    // println!("{:.25}", ixy);
-    // println!("{:.25}", ixz);
-    // println!("{:.25}", iyz);
 
     //Finally, set up airplanes mass and inertia matrix
     fdm.mass = total_mass;
-    //println!("{:.25}", fdm.mass);
 
     fdm.m_inertia = Mymatrix::new(ixx, -ixy, -ixz,
                                   -ixy, iyy, -iyz,
                                   -ixz, -iyz, izz);
 
-    //ERROR IN E11 AND E 33 (IXX AND IZZ)
-    //println!("{:.25?}", fdm.m_inertia);
     //Get inverse of matrix
     fdm.m_inertia_inverse = Mymatrix::inverse(&fdm.m_inertia);
-
-    //ERROR
-   // println!("{:.25?}", fdm.m_inertia_inverse);
-
 
 }
 
