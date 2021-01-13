@@ -88,18 +88,18 @@ fn main()
 
         //Copy over the mass properties calculated
         mass: myairplane.mass,
-        m_inertia: myairplane.m_inertia,
-        m_inertia_inverse: myairplane.m_inertia_inverse,
+        // m_inertia: myairplane.m_inertia,
+        // m_inertia_inverse: myairplane.m_inertia_inverse,
 
-        //EVEN IF I COPY OVER THE INERTIA TENSORS COMPUTED FROM C++, THE RESULTS HARDLY CHANGE OVERALL. 2ND FRAME IS EQUAL, 3RD IS NOT
-        // m_inertia: common::Mymatrix{e11: 2549.629150390625, e12: -0.0, e13: 166.91925048828125,
-        //                             e21: -0.0, e22: 2024.4990234375, e23: -0.0,
-        //                             e31: 166.91925048828125, e32: -0.0, e33: 4414.73388671875},
+        //EVEN IF I COPY OVER THE INERTIA TENSORS COMPUTED FROM C++, THE RESULTS HARDLY CHANGE OVERALL
+        m_inertia: common::Mymatrix{e11: 2549.629150390625, e12: -0.0, e13: 166.91925048828125,
+                                    e21: -0.0, e22: 2024.4990234375, e23: -0.0,
+                                    e31: 166.91925048828125, e32: -0.0, e33: 4414.73388671875},
 
 
-        // m_inertia_inverse: common::Mymatrix{e11: 0.0003931871615350246429443359375, e12: -0.0,  e13: -0.0000148662438732571899890899658203125,
-        //                                     e21: -0.0, e22: 0.0004939493373967707157135009765625, e23: -0.0,
-        //                                     e31: -0.0000148662438732571899890899658203125, e32: -0.0, e33: 0.0002270762925036251544952392578125},
+        m_inertia_inverse: common::Mymatrix{e11: 0.0003931871615350246429443359375, e12: -0.0,  e13: -0.0000148662438732571899890899658203125,
+                                            e21: -0.0, e22: 0.0004939493373967707157135009765625, e23: -0.0,
+                                            e31: -0.0000148662438732571899890899658203125, e32: -0.0, e33: 0.0002270762925036251544952392578125},
 
         //Define initial flight parameters
         v_position: common::Myvec{x: -5000.0, y: 0.0, z: 2000.0},
@@ -108,6 +108,7 @@ fn main()
         v_forces: common::Myvec{x: 500.0, y: 0.0, z: 0.0},
         thrustforce: 500.0,
         q_orientation: common::Myquaternion::make_q_from_euler(0.0, 0.0, 0.0),
+        v_angular_velocity : common::Myvec {x: 0.0, y: 0.0, z: 0.0},
     
         //Copy over the defined PointMass elements
         element: myairplane.element,

@@ -169,7 +169,7 @@ impl<'a> System<'a> for EquationsOfMotion
             //Calculate acceleration of airplane in earth space
             let ae: Myvec = Myvec::dividescalar(&fdm.v_forces, fdm.mass);
             //ERROR AFTER THE SECOND FRAME, STARTING ON THIRD FRAME
-           // println!("{:.50?}", ae);
+           //println!("{:.50?}", ae);
 
             //ERROR AFTER SECOND FRAME
             //println!("{:.50?}", fdm.v_forces);
@@ -186,19 +186,26 @@ impl<'a> System<'a> for EquationsOfMotion
 
             //Calculate angular velocity of airplane in body space
             let one = Mymatrix::multiply_matrix_by_vec(&fdm.m_inertia, &fdm.v_angular_velocity);
+            //println!("{:.25?}", one);
             let two = Myvec::crossproduct(&fdm.v_angular_velocity, &one);
+            //println!("{:.25?}", two);
             let three = Myvec::subtractvec(&fdm.v_moments, &two);
+            //println!("{:.25?}", three);
             let four = Mymatrix::multiply_matrix_by_vec(&fdm.m_inertia_inverse, &three);
+            //println!("{:.50?}", four);
             let five = Myvec::multiplyscalar(&four, dt);
+            //println!("{:.50?}", five);
+
             fdm.v_angular_velocity = Myvec::addvec(&fdm.v_angular_velocity, &five);
             //ERROR STARTING ON SECOND FRAME
-            //println!("{:.50?}", fdm.v_angular_velocity);
+           // println!("{:.50?}", fdm.v_angular_velocity);
             //originalcode //angular_velocity += inertia_inverse * (moment - (angular_velocity^(inertia * angular_velocity))) * dt;
 
             //Calculate the new rotation quaternion
             let uno = Myquaternion::multiply_quat_by_vec(&fdm.q_orientation, &fdm.v_angular_velocity);
             let dos = Myquaternion::multiplyscalar(&uno, 0.5 * dt);
             fdm.q_orientation = Myquaternion::addquat(&fdm.q_orientation, &dos);
+
             //ERROR STARTS IN SECOND FRAME, NO ERROR IN V.Y IN SECOND FRAME BUT ERROR AFTERWARDS
             //println!("{:.50?}", fdm.q_orientation);
 
@@ -208,6 +215,8 @@ impl<'a> System<'a> for EquationsOfMotion
             {
                fdm.q_orientation = Myquaternion::dividescalar(&fdm.q_orientation, mag);
             }
+            //println!("{:.50?}", fdm.q_orientation);
+            
             //println!("{:.50?}", mag);
 
             //Calculate the velocity in body space
@@ -225,6 +234,8 @@ impl<'a> System<'a> for EquationsOfMotion
             fdm.v_euler_angles.x = euler.x;
             fdm.v_euler_angles.y = euler.y;
             fdm.v_euler_angles.z = euler.z; 
+            //println!("{:.50?}", fdm.v_euler_angles);
+
             
             //Print some relevant data
             println!("Roll:             {:.50}", fdm.v_euler_angles.x);
@@ -289,17 +300,18 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
 
         //println!("{:.25?}", fdm.element[i].v_cg_coords);
 
-        //ERROR VTMP AFTER THIRD FRAME (frame 1 and 2 are all zero)
-        //println!("{:.25?}", vtmp);
+        //ERROR VTMP AFTER 2ND FRAME (frame 1 and 2 are all zero)
+        //println!("{:.50?}", vtmp);
 
         let v_local_velocity = Myvec::addvec(&fdm.v_velocity_body, &vtmp);
 
         //ERROR IN VELOCITY BODY AFTER SECOND FRAME
         //SO LOCAL VELOCITY WILL HAVE ERROR, ON TOP OF THE ERROR FROM VTMP....
-        //println!("{:.25?}", fdm.v_velocity_body);
+        //println!("{:.50?}", fdm.v_velocity_body);
 
-        //Calculate local air speed
-        let f_local_speed: f32 = fdm.v_velocity_body.magnitude(); 
+        //Calculate local air speed//
+        let f_local_speed: f32 = v_local_velocity.magnitude(); 
+        //println!("{:.50?}", f_local_speed);
 
         //Find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
         if f_local_speed > 1.0
