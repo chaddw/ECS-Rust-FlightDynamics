@@ -325,7 +325,6 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
         //Keep running total of resultant forces (total force)
         fb = Myvec::addvec(&fb, &v_resultant);
 
-
         //Calculate the moment about the center of gravity of this element's force and keep them in a running total of these moments (total moment)
         vtmp = Myvec::crossproduct(&fdm.element[i].v_cg_coords, &v_resultant);
         mb = Myvec::addvec(&mb, &vtmp);
@@ -349,38 +348,39 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
 //This is called from inside main before the airplane Entity is created
 pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
 {
+      
     let mut inc: f32;
     let mut di: f32;
 
     //Calculate the normal (perpendicular) vector to each lifting surface. This is needed for relative air velocity to find lift and drag.
-    for i in 0..8
+    for  i in fdm.element.iter_mut()
     {
-        inc = deg_to_rad(fdm.element[i].f_incidence);
-        di = deg_to_rad(fdm.element[i].f_dihedral);
-        fdm.element[i].v_normal = Myvec::new(inc.sin(), inc.cos() * di.sin(), inc.cos() * di.cos());
-        fdm.element[i].v_normal.normalize(); 
+        inc = deg_to_rad(i.f_incidence);
+        di = deg_to_rad(i.f_dihedral);
+        i.v_normal = Myvec::new(inc.sin(), inc.cos() * di.sin(), inc.cos() * di.cos());
+        i.v_normal.normalize(); 
     }
 
     //Calculate total mass
     let mut total_mass: f32 = 0.0;
-    for i in 0..8
+    for i in fdm.element.iter()
     {
-        total_mass = total_mass + fdm.element[i].f_mass;
+        total_mass = total_mass + i.f_mass;
     }
 
     //Calculate combined center of gravity location
     let mut v_moment = Myvec::new(0.0,0.0,0.0);
-    for i in 0..8
+    for i in fdm.element.iter()
     {
-        let tmp = Myvec::multiplyscalar(&fdm.element[i].v_d_coords, fdm.element[i].f_mass);
+        let tmp = Myvec::multiplyscalar(&i.v_d_coords, i.f_mass);
         v_moment = Myvec::addvec(&v_moment, &tmp);
     }
     let cg = Myvec::dividescalar(&v_moment, total_mass); 
 
     //Calculate coordinates of each element with respect to the combined CG, relative position
-    for i in 0..8
+    for i in fdm.element.iter_mut()
     {
-        fdm.element[i].v_cg_coords = Myvec::subtractvec(&fdm.element[i].v_d_coords, &cg);
+        i.v_cg_coords = Myvec::subtractvec(&i.v_d_coords, &cg);
     }
 
     //Calculate the moments and products of intertia for the combined elements
@@ -391,34 +391,32 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
     let mut ixz: f32 = 0.0;
     let mut iyz: f32 = 0.0;
 
-    for i in 0..8
+    for i in fdm.element.iter()
     {
-        ixx = ixx + fdm.element[i].v_local_inertia.x + fdm.element[i].f_mass *
-            (fdm.element[i].v_cg_coords.y * fdm.element[i].v_cg_coords.y +
-            fdm.element[i].v_cg_coords.z * fdm.element[i].v_cg_coords.z);
+        ixx = ixx + i.v_local_inertia.x + i.f_mass *
+            (i.v_cg_coords.y * i.v_cg_coords.y +
+            i.v_cg_coords.z * i.v_cg_coords.z);
 
-        iyy = iyy + fdm.element[i].v_local_inertia.y + fdm.element[i].f_mass *
-            (fdm.element[i].v_cg_coords.z * fdm.element[i].v_cg_coords.z +
-            fdm.element[i].v_cg_coords.x * fdm.element[i].v_cg_coords.x);
+        iyy = iyy + i.v_local_inertia.y + i.f_mass *
+            (i.v_cg_coords.z * i.v_cg_coords.z +
+            i.v_cg_coords.x * i.v_cg_coords.x);
 
-        izz = izz + fdm.element[i].v_local_inertia.z + fdm.element[i].f_mass *
-            (fdm.element[i].v_cg_coords.x * fdm.element[i].v_cg_coords.x +
-            fdm.element[i].v_cg_coords.y * fdm.element[i].v_cg_coords.y);
+        izz = izz + i.v_local_inertia.z + i.f_mass *
+            (i.v_cg_coords.x * i.v_cg_coords.x +
+            i.v_cg_coords.y * i.v_cg_coords.y);
 
-        ixy = ixy + fdm.element[i].f_mass * (fdm.element[i].v_cg_coords.x * 
-            fdm.element[i].v_cg_coords.y);
+        ixy = ixy + i.f_mass * (i.v_cg_coords.x * 
+            i.v_cg_coords.y);
 
-        ixz = ixz + fdm.element[i].f_mass * (fdm.element[i].v_cg_coords.x * 
-            fdm.element[i].v_cg_coords.z);
+        ixz = ixz + i.f_mass * (i.v_cg_coords.x * 
+            i.v_cg_coords.z);
         
-        iyz = iyz + fdm.element[i].f_mass * (fdm.element[i].v_cg_coords.y *
-            fdm.element[i].v_cg_coords.z);
-
+        iyz = iyz + i.f_mass * (i.v_cg_coords.y *
+            i.v_cg_coords.z);
     }
 
     //Finally, set up airplanes mass and inertia matrix
     fdm.mass = total_mass;
-
     fdm.m_inertia = Mymatrix::new(ixx, -ixy, -ixz,
                                   -ixy, iyy, -iyz,
                                   -ixz, -iyz, izz);
@@ -600,7 +598,7 @@ mod tests
     }
 
     #[test]
-    fn FDM_test() //Can test one flight data variable of the entire FDM at a time. Must change frame #, and get that value to compare from C++ output. Can also add flight controls artificially
+    fn fdm_test() //Can test one flight data variable of the entire FDM at a time. Must change frame #, and get that value to compare from C++ output. Can also add flight controls artificially
     {
         let dt = 1.0 / 30.0;
         let d_thrust = 100.0;
@@ -634,7 +632,7 @@ mod tests
         //Calculate mass properties on this airplane
         calc_airplane_mass_properties(&mut fdm);
 
-        for i in 0..4 //frame #
+        for _ in 0..5 //frame #
         {
             fdm.current_frame = fdm.current_frame + 1;
 
@@ -708,23 +706,21 @@ mod tests
         //C++ value to match
 
         //with no roll
-        //let equal = 1999.9642333984375; //altitude (first frame) PASS
-        //let equal = 1999.899169921875; //altitude (second frame) PASS
-        //let equal = 1999.8056640625; //altitude (third frame) PASS
-        //let equal = 1973.194580078125; //altitude (frame 50) FAILS
+        //let equal = 1999.9642333984375; //altitude (first frame)
+        //let equal = 1999.899169921875; //altitude (second frame) 
+        //let equal = 1999.8056640625; //altitude (third frame) 
+        //let equal = 1973.194580078125; //altitude (frame 50) 
 
         //With roll
-        //let equal = 1999.9642333984375; //altitude (frame 1) PASS
-        //let equal = 1999.899169921875; //altitude (frame 2) PASS
-        //let equal =  1999.8056640625; //altitude (frame 3) PASS
-        //let equal =  1999.6846923828125; //altitude (frame 4) PASS
-        //let equal =  1999.537109375; //altitude (frame 5) FAILS
-
-        let equal =  Myvec::new(0.0002610101946629583835601806640625, 0.000321695930324494838714599609375, 0.00069090561009943485260009765625); //angular velocity (frame 2) FAILS
+        //let equal = 1999.9642333984375; //altitude (frame 1)
+        //let equal = 1999.899169921875; //altitude (frame 2) 
+        //let equal =  1999.8056640625; //altitude (frame 3)
+        //let equal =  1999.6846923828125; //altitude (frame 4)
+        let equal =  1999.537109375; //altitude (frame 5)
 
 
         //change variable as needed for testing
-         assert_eq!(fdm.v_angular_velocity, equal);
+         assert_eq!(fdm.v_position.z, equal);
          
     }
    

@@ -98,7 +98,6 @@ fn main()
         v_forces: common::Myvec{x: 500.0, y: 0.0, z: 0.0},
         thrustforce: 500.0,
         q_orientation: common::Myquaternion::make_q_from_euler(0.0, 0.0, 0.0),
-        v_angular_velocity : common::Myvec {x: 0.0, y: 0.0, z: 0.0},
     
         //Copy over the defined PointMass elements
         element: myairplane.element,

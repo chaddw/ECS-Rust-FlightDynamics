@@ -401,15 +401,15 @@ impl Mymatrix
         let matrix = Mymatrix
         {
 
-            e11:  (self.e22*self.e33-self.e23*self.e32)/d,
-            e12:  -(self.e12*self.e33-self.e13*self.e32)/d,
+            e11: (self.e22*self.e33-self.e23*self.e32)/d,
+            e12: -(self.e12*self.e33-self.e13*self.e32)/d,
             e13: (self.e12*self.e23-self.e13*self.e22)/d,
             e21: -(self.e21*self.e33-self.e23*self.e31)/d,
-            e22:  (self.e11*self.e33-self.e13*self.e31)/d,
-            e23:  -(self.e11*self.e23-self.e13*self.e21)/d,
-            e31:   (self.e21*self.e32-self.e22*self.e31)/d,
-            e32:  -(self.e11*self.e32-self.e12*self.e31)/d,
-            e33:  (self.e11*self.e22-self.e12*self.e21)/d,
+            e22: (self.e11*self.e33-self.e13*self.e31)/d,
+            e23: -(self.e11*self.e23-self.e13*self.e21)/d,
+            e31: (self.e21*self.e32-self.e22*self.e31)/d,
+            e32: -(self.e11*self.e32-self.e12*self.e31)/d,
+            e33: (self.e11*self.e22-self.e12*self.e21)/d,
 
         };
         return matrix;           

@@ -1,4 +1,4 @@
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Myvec
 {
     pub x: f32,
@@ -128,7 +128,7 @@ impl Myvec
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Myquaternion
 {
     pub n: f32, //scalar part
@@ -296,11 +296,11 @@ impl Myquaternion
         let q22: f64 = (q.v.y * q.v.y) as f64;
         let q33: f64 = (q.v.z * q.v.z) as f64;
         
-        let r11: f64 = (q00 + q11 - q22 - q33) as f64;
+        let r11: f64 = q00 + q11 - q22 - q33;
         let r21: f64 = (2.0 * (q.v.x*q.v.y + q.n*q.v.z) ) as f64;
         let r31: f64 = (2.0 * (q.v.x*q.v.z - q.n*q.v.y) ) as f64;
         let r32: f64 = (2.0 * (q.v.y*q.v.z + q.n*q.v.x) ) as f64;
-        let r33: f64 = (q00 - q11 - q22 + q33) as f64;
+        let r33: f64 = q00 - q11 - q22 + q33;
         
         let mut u: Myvec = Default::default();
         let tmp: f64 = r31.abs();
@@ -309,15 +309,15 @@ impl Myquaternion
             let r12: f64 = (2.0 * (q.v.x*q.v.y - q.n*q.v.z) ) as f64;
             let r13: f64 = (2.0 * (q.v.x*q.v.z + q.n*q.v.y) ) as f64;
         
-            u.x = 0.0_f32.to_degrees(); //roll
-            u.y = ( (-(pi/2.0) * r31/tmp).to_degrees() ) as f32; //pitch
-            u.z = ( (-r12.atan2(-r31*r13)).to_degrees() ) as f32; //yaw
+            u.x = rad_to_deg(0.0_f32); //roll //be sure these r right
+            u.y = rad_to_deg ((-(pi/2.0) * r31/tmp) as f32); //pitch
+            u.z = rad_to_deg(-r12.atan2(-r31*r13) as f32) ; //yaw
             return u;
         }
         
-        u.x = ( (r32.atan2(r33)).to_degrees() ) as f32; //roll
-        u.y = ( (-r31.asin()).to_degrees() ) as f32; //pitch
-        u.z = ( (r21.atan2(r11)).to_degrees() ) as f32; //yaw
+        u.x = rad_to_deg( (r32.atan2(r33)) as f32); //roll
+        u.y = rad_to_deg( (-r31.asin()) as f32) ; //pitch
+        u.z = rad_to_deg( (r21.atan2(r11)) as f32 ); //yaw
         return u;
 
     }
@@ -325,9 +325,9 @@ impl Myquaternion
     pub fn make_q_from_euler(x: f64, y: f64, z: f64) -> Myquaternion
     {
         let mut q: Myquaternion = Default::default();
-        let roll: f64 = x.to_radians();
-        let pitch: f64 = y.to_radians();
-        let yaw: f64 = z.to_radians();
+        let roll: f64 = deg_to_rad(x as f32) as f64;
+        let pitch: f64 = deg_to_rad(y as f32) as f64;
+        let yaw: f64 = deg_to_rad(z as f32) as f64;
 
         let cyaw: f64 = (0.5 * yaw).cos();
         let cpitch: f64 = (0.5 * pitch).cos();
@@ -353,7 +353,7 @@ impl Myquaternion
 }
 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Mymatrix
 {
     // elements eij: i -> row, j -> column
@@ -401,15 +401,15 @@ impl Mymatrix
         let matrix = Mymatrix
         {
 
-            e11:  (self.e22*self.e33-self.e23*self.e32)/d,
-            e12:  -(self.e12*self.e33-self.e13*self.e32)/d,
+            e11: (self.e22*self.e33-self.e23*self.e32)/d,
+            e12: -(self.e12*self.e33-self.e13*self.e32)/d,
             e13: (self.e12*self.e23-self.e13*self.e22)/d,
             e21: -(self.e21*self.e33-self.e23*self.e31)/d,
-            e22:  (self.e11*self.e33-self.e13*self.e31)/d,
-            e23:  -(self.e11*self.e23-self.e13*self.e21)/d,
-            e31:   (self.e21*self.e32-self.e22*self.e31)/d,
-            e32:  -(self.e11*self.e32-self.e12*self.e31)/d,
-            e33:  (self.e11*self.e22-self.e12*self.e21)/d,
+            e22: (self.e11*self.e33-self.e13*self.e31)/d,
+            e23: -(self.e11*self.e23-self.e13*self.e21)/d,
+            e31: (self.e21*self.e32-self.e22*self.e31)/d,
+            e32: -(self.e11*self.e32-self.e12*self.e31)/d,
+            e33: (self.e11*self.e22-self.e12*self.e21)/d,
 
         };
         return matrix;           
@@ -429,4 +429,19 @@ impl Mymatrix
         
     }
 
+}
+
+
+
+//Helper functions for degrees <---> radians conversion
+pub fn deg_to_rad(deg: f32) -> f32
+{
+    let pi: f32 = 3.14159265359;
+	deg * pi / 180.0
+}
+
+pub fn rad_to_deg(rad: f32) -> f32
+{	
+    let pi: f32 = 3.14159265359;
+	rad * 180.0 / pi
 }
