@@ -14,6 +14,11 @@ use crate::data::DeltaThrust;
 use crate::common::Myvec;
 use crate::common::Mymatrix;
 use crate::common::Myquaternion;
+use crate::common::deg_to_rad;
+use crate::common::rad_to_deg;
+
+//Coordinate transforms
+use coord_transforms::prelude::*;
 
 
 //System to perform equations of motion physics calculations based on forces
@@ -61,27 +66,25 @@ impl<'a> System<'a> for EquationsOfMotion
             }
 
             //Rudder States
-            //NOTE: the functionality was flipped between the two states to work with flightgear... 
             if keystate.left_rudder == true
-            { 
-                fdm.element[6].f_incidence = -16.0;
-            } 
-            else if keystate.right_rudder == true
             { 
                 fdm.element[6].f_incidence = 16.0;
             } 
+            else if keystate.right_rudder == true
+            { 
+                fdm.element[6].f_incidence = -16.0;
+            } 
 
             //Roll States
-            //NOTE: the functionality was flipped between the two states to work with flightgear... 
             if keystate.roll_left == true
-            { 
-                fdm.element[0].i_flap = -1;
-                fdm.element[3].i_flap = 1;
-            } 
-           else if keystate.roll_right == true
             { 
                 fdm.element[0].i_flap = 1;
                 fdm.element[3].i_flap = -1;
+            } 
+           else if keystate.roll_right == true
+            { 
+                fdm.element[0].i_flap = -1;
+                fdm.element[3].i_flap = 1;
             } 
 
             //Pitch States
@@ -120,16 +123,31 @@ impl<'a> System<'a> for EquationsOfMotion
             //Calculate velocity of airplane in earth space
             fdm.v_velocity = Myvec::addvec(&fdm.v_velocity, &Myvec::multiplyscalar(&ae, dt)); 
 
-            //Calculate position of airplane in earth space
-            //Need to convert feet displacement measurements native to Bourg's model to meters, and then convert that to lat/lon for FlightGear, and add that displacement to the position coordinates
-            //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 meters (at 38 degrees north latitude)
-            //https://www.usgs.gov/faqs/how-much-distance-does-a-degree-minute-and-second-cover-your-maps?qt-news_science_products=0#qt-news_science_products
-            let x_displacement = (fdm.v_velocity.x / 3.281) / 110947.2;
-            let y_displacement = (fdm.v_velocity.y / 3.281) / 87843.36;
-            let z_displacement = fdm.v_velocity.z / 3.281;
-            let displacement = Myvec::new(x_displacement, y_displacement, z_displacement);
 
+            //Calculate position of airplane in earth space
+
+            //Create WGS84 ellipsoid
+            let ellipsoid: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
+
+            //Take lat/lon origin and put into naglebra vector, and convert the lat/lon degrees to radians
+            let origin = Vector3::new(deg_to_rad(fdm.lla_origin.x) as f64, deg_to_rad(fdm.lla_origin.y) as f64, fdm.lla_origin.z as f64);
+
+            //Compute the x/y/z displacement based on velocity, and convert from feet to meters 
+            let d = Vector3::new(fdm.v_velocity.x as f64 / 3.281, fdm.v_velocity.y as f64 / 3.281, fdm.v_velocity.z as f64 / 3.281);
+
+            //Compute enu2lla (East North Up vector)
+            let enu2lla = geo::enu2lla(&origin, &d, &ellipsoid);
+
+            //Put the enu2lla results into the native custom vector type and convert lat/lon radians displaced to degrees 
+            let enu2lla_converted = Myvec::new(rad_to_deg(enu2lla.x as f32), rad_to_deg(enu2lla.y as f32), enu2lla.z as f32);
+
+            // Subtract the origin position by the enu2lla results to get the displacement. Negate altitude due to coordinate differences between FlightGear and ENU
+            let mut displacement = Myvec::subtractvec(&fdm.lla_origin, &enu2lla_converted);
+            displacement.z = -displacement.z;
+
+            //Update position by adding old position and displacement with respect to time
             fdm.v_position = Myvec::addvec(&fdm.v_position, &Myvec::multiplyscalar(&displacement, dt)); 
+
 
             //Calculate angular velocity of airplane in body space
             let one = Mymatrix::multiply_matrix_by_vec(&fdm.m_inertia, &fdm.v_angular_velocity);
@@ -205,8 +223,8 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
     {
         if i == 6 //Tail rudder. It is a special case because it can rotate, so the normal vector is recalculated
         {
-            let inc: f32 = (fdm.element[i].f_incidence).to_radians();
-            let di: f32 = (fdm.element[i].f_dihedral).to_radians();
+            let inc: f32 = deg_to_rad(fdm.element[i].f_incidence);
+            let di: f32 = deg_to_rad(fdm.element[i].f_dihedral);
             fdm.element[i].v_normal = Myvec::new(inc.sin(),
                                                  inc.cos() * di.sin(), 
                                                  inc.cos() * di.cos());
@@ -245,7 +263,7 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
             tmp = -1.0;
         }
 
-        let f_attack_angle: f32 = tmp.asin().to_degrees();
+        let f_attack_angle: f32 = rad_to_deg(tmp.asin());
 
         //Determine lift and drag force on the element. Rho is defined as 0.0023769, which is density of air at sea level, slugs/ft^3
         tmp = 0.5 * 0.002376900055 * f_local_speed * f_local_speed * fdm.element[i].f_area;   
@@ -310,8 +328,8 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
     //Calculate the normal (perpendicular) vector to each lifting surface. This is needed for relative air velocity to find lift and drag.
     for  i in fdm.element.iter_mut()
     {
-        inc = (i.f_incidence).to_radians();
-        di = (i.f_dihedral).to_radians();
+        inc = deg_to_rad(i.f_incidence);
+        di = deg_to_rad(i.f_dihedral);
         i.v_normal = Myvec::new(inc.sin(), inc.cos() * di.sin(), inc.cos() * di.cos());
         i.v_normal.normalize(); 
     }

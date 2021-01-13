@@ -26,6 +26,7 @@ pub struct MaxThrust(pub f32);
 #[derive(Default)]
 pub struct DeltaThrust(pub f32);
 
+
 //Component state machine for keyboard presses
 #[derive(Debug)]
 pub struct KeyboardState
@@ -73,6 +74,7 @@ pub struct DataFDM
     pub m_inertia: Mymatrix,
     pub m_inertia_inverse: Mymatrix,
     pub v_position: Myvec, // position in earth coordinates
+    pub lla_origin: Myvec, // geodetic origin position
     pub v_velocity: Myvec, // velocity in earth coordinates
     pub v_velocity_body: Myvec, // velocity in body coordinates
     pub v_angular_velocity: Myvec, // angular velocity in body coordinates

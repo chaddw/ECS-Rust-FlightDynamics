@@ -24,9 +24,9 @@ impl<'a> System<'a> for MakePacket
             
             //Set Roll, Pitch, Yaw in radians
             //Negate to compensate for coordinate handedness differences
-            let roll: f32 = -fdm.v_euler_angles.x.to_radians() as f32;
+            let roll: f32 = fdm.v_euler_angles.x.to_radians() as f32;
             let pitch: f32 = -fdm.v_euler_angles.y.to_radians() as f32; 
-            let yaw: f32 = fdm.v_euler_angles.z.to_radians() as f32;
+            let yaw: f32 =  -(-67.5 + fdm.v_euler_angles.z.to_radians()) as f32;
 
             //Lat and lon degrees need to be converted to radians for FlightGear
             let lat: f64 = fdm.v_position.x.to_radians() as f64;
@@ -36,7 +36,7 @@ impl<'a> System<'a> for MakePacket
             //Set lat, long, alt
             pckt.fgnetfdm.latitude = f64::from_be_bytes(lat.to_ne_bytes());
             pckt.fgnetfdm.longitude = f64::from_be_bytes(lon.to_ne_bytes()); 
-            pckt.fgnetfdm.altitude = f64::from_be_bytes(alt.to_ne_bytes()); //flightgear wants meters here, but on screen it displays feet
+            pckt.fgnetfdm.altitude = f64::from_be_bytes(alt.to_ne_bytes()); 
                                                                                     
             //Roll, Pitch, Yaw
             pckt.fgnetfdm.phi = f32::from_be_bytes(roll.to_ne_bytes());

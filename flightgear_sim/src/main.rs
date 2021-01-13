@@ -40,6 +40,7 @@ mod common;
 //Import calculate mass properties function for use when the airplane Entity is created
 use crate::equations_of_motion::calc_airplane_mass_properties;
 
+
 fn main()
 {
     //Create world
@@ -109,6 +110,7 @@ fn main()
 
         //Define initial flight parameters
         //Wpafb runway geodetic coordinates at 2000 ft (609 meters) above sea level, ground level is at 248 meters elevation
+        lla_origin: common::Myvec{x: 39.826, y: -84.045, z: 609.0},
         v_position: common::Myvec{x: 39.826 , y: -84.045, z: 609.0},
         v_velocity: common::Myvec{x: 60.0, y: 0.0, z: 0.0},
         f_speed: 60.0,
