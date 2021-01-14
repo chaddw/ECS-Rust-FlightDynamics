@@ -3,6 +3,9 @@
 //SPECS
 use specs::prelude::*;
 
+//Coordinate transforms
+use coord_transforms::prelude::*;
+
 //Get data needed to perform the System operations
 use crate::data::KeyboardState;
 use crate::data::DataFDM;
@@ -16,10 +19,6 @@ use crate::common::Mymatrix;
 use crate::common::Myquaternion;
 use crate::common::deg_to_rad;
 use crate::common::rad_to_deg;
-
-//Coordinate transforms
-use coord_transforms::prelude::*;
-
 
 //System to perform equations of motion physics calculations based on forces
 pub struct EquationsOfMotion;
@@ -132,18 +131,17 @@ impl<'a> System<'a> for EquationsOfMotion
             //Take lat/lon origin and put into naglebra vector, and convert the lat/lon degrees to radians
             let origin = Vector3::new(deg_to_rad(fdm.lla_origin.x) as f64, deg_to_rad(fdm.lla_origin.y) as f64, fdm.lla_origin.z as f64);
 
-            //Compute the x/y/z displacement based on velocity, and convert from feet to meters 
+            //Load x/y/z velocities into a nalgebra vector representing the displacement, convert from feet to meters
             let d = Vector3::new(fdm.v_velocity.x as f64 / 3.281, fdm.v_velocity.y as f64 / 3.281, fdm.v_velocity.z as f64 / 3.281);
 
-            //Compute enu2lla (East North Up vector)
+            //Take East North Up cartesian coordinate displacement and calculate a new lat/lon/alt with respect to the origin
             let enu2lla = geo::enu2lla(&origin, &d, &ellipsoid);
 
             //Put the enu2lla results into the native custom vector type and convert lat/lon radians displaced to degrees 
             let enu2lla_converted = Myvec::new(rad_to_deg(enu2lla.x as f32), rad_to_deg(enu2lla.y as f32), enu2lla.z as f32);
 
-            // Subtract the origin position by the enu2lla results to get the displacement. Negate altitude due to coordinate differences between FlightGear and ENU
-            let mut displacement = Myvec::subtractvec(&fdm.lla_origin, &enu2lla_converted);
-            displacement.z = -displacement.z;
+            //Subtract the enu2lla results by the origin position get the displacement for the frame
+            let mut displacement = Myvec::subtractvec(&enu2lla_converted, &fdm.lla_origin);
 
             //Update position by adding old position and displacement with respect to time
             fdm.v_position = Myvec::addvec(&fdm.v_position, &Myvec::multiplyscalar(&displacement, dt)); 
