@@ -1,15 +1,15 @@
 //This file contains EquationsOfMotion System
 
+//SPECS
+use specs::prelude::*;
+
+//Coordinate transforms/nalgebra vector
+use coord_transforms::prelude::*;
+
 //Get data needed to perform the System operations
 use crate::data::KeyboardState;
 use crate::data::DataFDM;
 use crate::data::DeltaTime;
-
-//SPECS
-use specs::prelude::*;
-
-//use geo::Point;
-//use geo::prelude::*;
 
 //System to perform physics calculations using a 4th-order Runge-Kutta solver
 pub struct EquationsOfMotion;
@@ -62,13 +62,12 @@ impl<'a> System<'a> for EquationsOfMotion
             }  
 
             //Bank states
-            //swapped functionality
-            if fdm.bank < 20.0 && keystate.bank_left == true
+            if fdm.bank < 20.0 && keystate.bank_right == true
             {
                 fdm.bank = fdm.bank + 1.0;
             
             }  
-            else if fdm.bank > -20.0 && keystate.bank_right == true
+            else if fdm.bank > -20.0 && keystate.bank_left == true
             {
                 fdm.bank = fdm.bank - 1.0;
             }  
@@ -116,17 +115,33 @@ impl<'a> System<'a> for EquationsOfMotion
             fdm.airspeed = (fdm.q[0] * fdm.q[0] + fdm.q[2] * fdm.q[2] + fdm.q[4] * fdm.q[4]).sqrt();
 
             //Calculate displacement based on velocities to add to the latitude and longitude
-            //The displacement needs to be converted to from meters to degrees of latitude and longitude
-            //1 deg latitude = 364,000 feet = 110947.2 meters, 1 deg lon = 288200 feet = 87843.36 meters (at 38 degrees north latitude)
-            //https://www.usgs.gov/faqs/how-much-distance-does-a-degree-minute-and-second-cover-your-maps?qt-news_science_products=0#qt-news_science_products
-            //Latitude 
-            fdm.position[0] = fdm.position[0] + (fdm.q[0] / 110947.2) * ds;
-            //Longitude
-            fdm.position[1] = fdm.position[1] + (fdm.q[2] / 87843.36) * ds;
+
+            //Create WGS84 ellipsoid
+            let ellipsoid: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
+
+            //Take lat/lon origin and put into naglebra vector, and convert the lat/lon degrees to radians
+            let origin = Vector3::new(fdm.lla_origin.x.to_radians(), fdm.lla_origin.y.to_radians(), fdm.lla_origin.z);
+
+            //Load x/y/z velocities into a nalgebra vector representing the displacement
+            let d = Vector3::new(fdm.q[0], fdm.q[2], fdm.q[4]);
+
+            //Take East North Up cartesian coordinate displacement and calculate a new lat/lon/alt with respect to the origin
+            let mut enu2lla = geo::enu2lla(&origin, &d, &ellipsoid);
+
+            //Convert the lat/lon radians to degrees
+            enu2lla.x = enu2lla.x.to_degrees();
+            enu2lla.y = enu2lla.y.to_degrees();
+
+            //Subtract the enu2lla results by the origin position get the displacement for the frame
+            let mut displacement =  enu2lla - fdm.lla_origin;
+
+            //Update position by adding old position and displacement with respect to time
+            fdm.position = fdm.position + displacement * ds;
+
             
             //Print some relevant data, set precision to match that of Palmer's C model
-            println!("Latitude (deg) x-axis =   {:.6}", fdm.position[0]);
-            println!("Longitude (deg) y-axis =  {:.6}", fdm.position[1]);
+            println!("Latitude (deg) x-axis =   {:.6}", fdm.position.x);
+            println!("Longitude (deg) y-axis =  {:.6}", fdm.position.y);
             println!("Altitude (m) =            {:.6}", fdm.q[5]);
             println!("Airspeed (km/hr) =        {:.6}", fdm.airspeed * 3.6); //convert from m/s to km/h
             println!("Heading angle (deg)       {}", fdm.heading_angle.to_degrees());

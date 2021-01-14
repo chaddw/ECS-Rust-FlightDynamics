@@ -25,14 +25,14 @@ impl<'a> System<'a> for MakePacket
 
             //Set Roll, Pitch, Yaw in radians
             //Negate to compensate for coordinate differences
-            let roll: f32 = -fdm.bank.to_radians() as f32;
+            let roll: f32 = fdm.bank.to_radians() as f32;
             let pitch: f32 = fdm.alpha.to_radians() as f32;
-            let yaw: f32 = fdm.heading_angle as f32;
+            let yaw: f32 = -(67.5 + fdm.heading_angle) as f32;
 
             //Lat and lon degrees need to be converted to radians for FlightGear
-            let lat = fdm.position[0].to_radians();
-            let lon = fdm.position[1].to_radians();
-            let alt = fdm.position[2] + fdm.q[5]; //add starting elevation offset to altitude
+            let lat = fdm.position.x.to_radians();
+            let lon = fdm.position.y.to_radians();
+            let alt = fdm.position.z; //add starting elevation offset to altitude
 
             //Set lat, long, alt
             pckt.fgnetfdm.latitude = f64::from_be_bytes(lat.to_ne_bytes()); 

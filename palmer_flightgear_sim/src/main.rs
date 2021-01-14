@@ -9,6 +9,9 @@
 //SPECS
 use specs::prelude::*;
 
+//Coordinate transforms/nalgebra vector
+use coord_transforms::prelude::*;
+
 //Main loop
 use std::{thread, time};
 
@@ -60,9 +63,11 @@ fn main()
     let _plane = world.create_entity()
     .with(DataFDM{
         
-        //Starting position in geodetic coordinates
+        //Starting position and origin in geodetic coordinates
         //Wpafb runway latitude/longitude/altitude. Ground level is 248.0 meters above sea level
-        position: vec![39.826, -84.045, 248.0],
+        position: Vector3::new(39.826, -84.045, 248.0),
+        //Origin remains constant 
+        lla_origin: Vector3::new(39.826, -84.045, 248.0),
        
         bank: 0.0, //bank angle degrees (-20 - 20)
         alpha: 0.0,//angle of attack degrees (-16 - 20)

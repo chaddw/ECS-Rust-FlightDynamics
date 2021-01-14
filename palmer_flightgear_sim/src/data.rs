@@ -9,6 +9,9 @@ use specs::prelude::*;
 //Converting FGNetFDM struct to bytes to be sent as a packet
 use serde::{Deserialize, Serialize};
 
+//Coordinate transforms/nalgebra vector
+use coord_transforms::prelude::*;
+
 //Time step (delta time) shared resource
 #[derive(Default)]
 pub struct DeltaTime(pub f64);
@@ -62,7 +65,8 @@ pub struct DataFDM
     pub q: Vec<f64>, //will store ODE results
     pub airspeed: f64, //speed m/s
 
-    pub position: Vec<f64>,
+    pub position: Vector3<f64>,
+    pub lla_origin: Vector3<f64>,
     pub climb_angle: f64,
     pub heading_angle: f64,
     pub climb_rate: f64,
