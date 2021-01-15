@@ -7,7 +7,7 @@ use specs::prelude::*;
 use std::net::UdpSocket;
 
 //Get data needed for the System
-use crate::data::Packet;
+use crate::component_packet::Packet;
 
 pub struct SendPacket;
 impl<'a> System<'a> for SendPacket 

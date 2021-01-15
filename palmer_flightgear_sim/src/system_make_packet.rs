@@ -4,8 +4,8 @@
 use specs::prelude::*;
 
 //Get data needed for the System to work
-use crate::data::Packet;
-use crate::data::DataFDM;
+use crate::component_packet::Packet;
+use crate::component_datafdm::DataFDM;
 
 //System to make packets
 pub struct MakePacket;
@@ -27,7 +27,7 @@ impl<'a> System<'a> for MakePacket
             //Negate to compensate for coordinate differences
             let roll: f32 = fdm.bank.to_radians() as f32;
             let pitch: f32 = fdm.alpha.to_radians() as f32;
-            let yaw: f32 = -(67.5 + fdm.heading_angle) as f32;
+            let yaw: f32 = 90.0_f32.to_radians() + -fdm.heading_angle as f32; //heading angle is already in radians
 
             //Lat and lon degrees need to be converted to radians for FlightGear
             let lat = fdm.position.x.to_radians();

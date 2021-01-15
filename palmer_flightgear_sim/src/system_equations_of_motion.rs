@@ -7,9 +7,9 @@ use specs::prelude::*;
 use coord_transforms::prelude::*;
 
 //Get data needed to perform the System operations
-use crate::data::KeyboardState;
-use crate::data::DataFDM;
-use crate::data::DeltaTime;
+use crate::component_keyboardstate::KeyboardState;
+use crate::component_datafdm::DataFDM;
+use crate::resources::DeltaTime;
 
 //System to perform physics calculations using a 4th-order Runge-Kutta solver
 pub struct EquationsOfMotion;
@@ -133,17 +133,17 @@ impl<'a> System<'a> for EquationsOfMotion
             enu2lla.y = enu2lla.y.to_degrees();
 
             //Subtract the enu2lla results by the origin position get the displacement for the frame
-            let mut displacement =  enu2lla - fdm.lla_origin;
+            let displacement =  enu2lla - fdm.lla_origin;
 
             //Update position by adding old position and displacement with respect to time
             fdm.position = fdm.position + displacement * ds;
 
             
-            //Print some relevant data, set precision to match that of Palmer's C model
-            println!("Latitude (deg) x-axis =   {:.6}", fdm.position.x);
-            println!("Longitude (deg) y-axis =  {:.6}", fdm.position.y);
-            println!("Altitude (m) =            {:.6}", fdm.q[5]);
-            println!("Airspeed (km/hr) =        {:.6}", fdm.airspeed * 3.6); //convert from m/s to km/h
+            //Print some relevant data
+            println!("Latitude (deg) x-axis =   {}", fdm.position.x);
+            println!("Longitude (deg) y-axis =  {}", fdm.position.y);
+            println!("Altitude (m) =            {}", fdm.q[5]);
+            println!("Airspeed (km/hr) =        {}", fdm.airspeed * 3.6); //convert from m/s to km/h
             println!("Heading angle (deg)       {}", fdm.heading_angle.to_degrees());
             println!("Climb angle (deg)         {}", fdm.climb_angle.to_degrees());
             println!("Climb rate (m/s)          {}", fdm.climb_rate);

@@ -1,112 +1,11 @@
-//This file contains all of the data required by the Systems: EquationsOfMotion, FlightControl, MakePacket, SendPacket
-//The Components are: KeyboardState, EquationsOfMotion, Packet 
-//The structure part of DataFDM is: Performance Data. The structure part of Packet is: FGNetFDM
-//The resource is: DeltaTime
-
-//SPECS
-use specs::prelude::*;
+//FGNetFDM packet structure required by FlightGear
 
 //Converting FGNetFDM struct to bytes to be sent as a packet
 use serde::{Deserialize, Serialize};
 
-//Coordinate transforms/nalgebra vector
-use coord_transforms::prelude::*;
-
-//Time step (delta time) shared resource
-#[derive(Default)]
-pub struct DeltaTime(pub f64);
-
-//Component tracking whether a key is pressed or not
-#[derive(Debug)]
-pub struct KeyboardState
-{
-    pub throttle_up: bool,
-    pub throttle_down: bool,
-    pub aoa_up: bool,
-    pub aoa_down: bool,
-    pub bank_right: bool,
-    pub bank_left: bool,
-    pub flaps_down: bool,
-    pub zero_flaps: bool,
-}
-impl Component for KeyboardState
-{
-    type Storage = VecStorage<Self>;
-}
-
-
-
-//Performance data of the airplane, contains lifting surface data and mass properties. This structure is used in DataFDM Component
-#[derive(Debug, Default)]
-pub struct PerformanceData
-{
-    pub wing_area: f64,
-    pub wing_span: f64,
-    pub tail_area: f64,
-    pub cl_slope0: f64,   // slope of Cl-alpha curve
-    pub cl0: f64,         // intercept of Cl-alpha curve
-    pub cl_slope1: f64,    // post-stall slope of Cl-alpha curve
-    pub cl1: f64,        // post-stall intercept of Cl-alpha curve
-    pub alpha_cl_max: f64,  // alpha when Cl=Clmax
-    pub cdp: f64,         // parasite drag coefficient
-    pub eff: f64,         // induced drag efficiency coefficient
-    pub mass: f64,
-    pub engine_power: f64,
-    pub engine_rps: f64,   // revolutions per second
-    pub prop_diameter: f64,
-    pub a: f64,           //  propeller efficiency coefficient
-    pub b: f64,           //  propeller efficiency coefficient
-}
-
-//Component containing data on the airplane
-#[derive(Debug, Default)]
-pub struct DataFDM
-{
-    pub q: Vec<f64>, //will store ODE results
-    pub airspeed: f64, //speed m/s
-
-    pub position: Vector3<f64>,
-    pub lla_origin: Vector3<f64>,
-    pub climb_angle: f64,
-    pub heading_angle: f64,
-    pub climb_rate: f64,
-
-    pub bank: f64, //bank angle
-    pub alpha: f64, //angle of attack
-    pub throttle: f64, //throttle percentage
-    pub flap: f64, //flap deflection amount
-
-    pub mass_properties : PerformanceData,
-
-
-
-}
-impl Component for DataFDM
-{
-    type Storage = VecStorage<Self>;
-}
-
-
-
-
-
-
-//Component containg the the FGNetFDM structure, and its conversion into bytes
-#[derive(Debug, Default)]
-pub struct Packet
-{
-    pub fgnetfdm: FGNetFDM,
-    pub bytes: Vec<u8>,
-}
-impl Component for Packet
-{
-    type Storage = VecStorage<Self>;
-}
-
-
-//FlightGear defined structure for UDP packets
+//Component for making a network packet to be sent to FlightGear
 #[derive(Debug, Default, Serialize, Deserialize)]
-#[repr(C)]
+#[repr(C)] 
 pub struct FGNetFDM
 {
     pub version: u32, // increment when data values change
@@ -186,3 +85,5 @@ pub struct FGNetFDM
     speedbrake: f32,
     spoilers: f32,
 }
+
+

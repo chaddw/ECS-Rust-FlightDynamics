@@ -15,19 +15,27 @@ use coord_transforms::prelude::*;
 //Main loop
 use std::{thread, time};
 
-//Import Components and resources
-mod data;
-use crate::data::KeyboardState;
-use crate::data::Packet;
-use crate::data::DataFDM;
-use crate::data::PerformanceData;
-use crate::data::DeltaTime;
+//Import Component modules
+mod component_keyboardstate;
+mod component_datafdm;
+mod component_packet;
+use crate::component_keyboardstate::KeyboardState;
+use crate::component_packet::Packet;
+use crate::component_datafdm::DataFDM;
+use crate::component_datafdm::PerformanceData;
+
+//Import Resources
+mod resources;
+use crate::resources::DeltaTime;
 
 //Import Systems
-mod equations_of_motion;
-mod flight_control;
-mod make_packet;
-mod send_packet;
+mod system_equations_of_motion;
+mod system_flight_control;
+mod system_make_packet;
+mod system_send_packet;
+
+//Import FGNetFDM structure
+mod net_fdm;
 
 fn main()
 {
@@ -52,10 +60,10 @@ fn main()
    
     //Create dispatcher of the Systems
     let mut dispatcher = DispatcherBuilder::new()
-    .with(flight_control::FlightControl, "flightcontrol", &[])
-    .with(equations_of_motion::EquationsOfMotion, "EOM", &["flightcontrol"])
-    .with(make_packet::MakePacket, "makepacket", &["EOM"])
-    .with(send_packet::SendPacket, "sendpacket", &["makepacket"])
+    .with(system_flight_control::FlightControl, "flightcontrol", &[])
+    .with(system_equations_of_motion::EquationsOfMotion, "EOM", &["flightcontrol"])
+    .with(system_make_packet::MakePacket, "makepacket", &["EOM"])
+    .with(system_send_packet::SendPacket, "sendpacket", &["makepacket"])
     .build();
     dispatcher.setup(&mut world);
 
