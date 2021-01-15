@@ -26,7 +26,7 @@ impl<'a> System<'a> for MakePacket
             //Negate to compensate for coordinate handedness differences
             let roll: f32 = fdm.v_euler_angles.x.to_radians() as f32;
             let pitch: f32 = -fdm.v_euler_angles.y.to_radians() as f32; 
-            let yaw: f32 = -(-90.0 + fdm.v_euler_angles.z).to_radians() as f32;
+            let yaw: f32 = (90.0 + -fdm.v_euler_angles.z).to_radians() as f32;
 
             //Lat and lon degrees need to be converted to radians for FlightGear
             let lat: f64 = fdm.v_position.x.to_radians() as f64;
