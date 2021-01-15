@@ -4,8 +4,8 @@
 use specs::prelude::*;
 
 //Get data needed for the System to work
-use crate::data::Packet;
-use crate::data::DataFDM;
+use crate::component_packet::Packet;
+use crate::component_datafdm::DataFDM;
 
 //System to make a packet based on fgnetfdm structure required by FlightGear 
 pub struct MakePacket;
@@ -26,7 +26,7 @@ impl<'a> System<'a> for MakePacket
             //Negate to compensate for coordinate handedness differences
             let roll: f32 = fdm.v_euler_angles.x.to_radians() as f32;
             let pitch: f32 = -fdm.v_euler_angles.y.to_radians() as f32; 
-            let yaw: f32 =  -(67.5 + fdm.v_euler_angles.z.to_radians()) as f32;
+            let yaw: f32 = -(-90.0 + fdm.v_euler_angles.z).to_radians() as f32;
 
             //Lat and lon degrees need to be converted to radians for FlightGear
             let lat: f64 = fdm.v_position.x.to_radians() as f64;

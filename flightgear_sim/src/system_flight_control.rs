@@ -10,7 +10,7 @@ use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::process;
 
 //Get data needed for the System to work
-use crate::data::KeyboardState;
+use crate::component_keyboardstate::KeyboardState;
 
 //System to handle user input
 pub struct FlightControl;

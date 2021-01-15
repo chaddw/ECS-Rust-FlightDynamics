@@ -12,34 +12,37 @@ use specs::prelude::*;
 //Main loop
 use std::{thread, time};
 
-//Import Components and resources
-mod data;
+//Import Component modules
+mod component_keyboardstate;
+mod component_datafdm;
+mod component_packet;
+use crate::component_keyboardstate::KeyboardState;
+use crate::component_packet::Packet;
+use crate::component_datafdm::DataFDM;
+use crate::component_datafdm::PointMass;
 
-//Components
-use crate::data::KeyboardState;
-use crate::data::Packet;
-use crate::data::DataFDM;
-
-//Structures inside Components
-use crate::data::PointMass;
-
-//Resources
-use crate::data::DeltaTime;
-use crate::data::MaxThrust;
-use crate::data::DeltaThrust;
+//Import Resources
+mod resources;
+use crate::resources::DeltaTime;
+use crate::resources::MaxThrust;
+use crate::resources::DeltaThrust;
 
 //Import Systems
-mod equations_of_motion;
-mod flight_control;
-mod make_packet;
-mod send_packet;
+mod system_equations_of_motion;
+mod system_flight_control;
+mod system_make_packet;
+mod system_send_packet;
 
-//Import Vector, Matrix, Quaternion module
+//Import Vector, Matrix, Quaternion, math utilities module
 mod common;
+use crate::common::vector::Myvec;
+use crate::common::quaternion::Myquaternion;
+
+//Import FGNetFDM structure
+mod net_fdm;
 
 //Import calculate mass properties function for use when the airplane Entity is created
-use crate::equations_of_motion::calc_airplane_mass_properties;
-
+use crate::system_equations_of_motion::calc_airplane_mass_properties;
 
 fn main()
 {
@@ -72,10 +75,10 @@ fn main()
 
     //Create a dispatcher to manage system execution
     let mut dispatcher = DispatcherBuilder::new()
-    .with(flight_control::FlightControl, "flightcontrol", &[])
-    .with(equations_of_motion::EquationsOfMotion, "EOM", &["flightcontrol"])
-    .with(make_packet::MakePacket, "makepacket", &["EOM"])
-    .with(send_packet::SendPacket, "sendpacket", &["makepacket"])
+    .with(system_flight_control::FlightControl, "flightcontrol", &[])
+    .with(system_equations_of_motion::EquationsOfMotion, "EOM", &["flightcontrol"])
+    .with(system_make_packet::MakePacket, "makepacket", &["EOM"])
+    .with(system_send_packet::SendPacket, "sendpacket", &["makepacket"])
     .build();
     dispatcher.setup(&mut world);
 
@@ -85,14 +88,14 @@ fn main()
     //This object is soley used to pass to the calculate_mass_properties function to determine total mass, and the inertia matrix
     let mut myairplane = DataFDM{ 
         element : vec![
-            PointMass{f_mass: 6.56, v_d_coords: common::Myvec::new(14.5, 12.0, 2.5), v_local_inertia: common::Myvec::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 7.31, v_d_coords: common::Myvec::new(14.5, 5.5, 2.5), v_local_inertia: common::Myvec::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 7.31, v_d_coords: common::Myvec::new(14.5, -5.5, 2.5), v_local_inertia: common::Myvec::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 6.56, v_d_coords: common::Myvec::new(14.5, -12.0, 2.5), v_local_inertia: common::Myvec::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 2.62, v_d_coords: common::Myvec::new(3.03, 2.5, 3.0), v_local_inertia: common::Myvec::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 2.62, v_d_coords: common::Myvec::new(3.03, -2.5, 3.0), v_local_inertia: common::Myvec::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 2.93, v_d_coords: common::Myvec::new(2.25, 0.0, 5.0), v_local_inertia: common::Myvec::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 31.8, v_d_coords: common::Myvec::new(15.25, 0.0, 1.5), v_local_inertia: common::Myvec::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: common::Myvec::new(0.0, 0.0, 0.0), v_cg_coords: common::Myvec::new(0.0, 0.0, 0.0) }
+            PointMass{f_mass: 6.56, v_d_coords: Myvec::new(14.5, 12.0, 2.5), v_local_inertia: Myvec::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 7.31, v_d_coords: Myvec::new(14.5, 5.5, 2.5), v_local_inertia: Myvec::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 7.31, v_d_coords: Myvec::new(14.5, -5.5, 2.5), v_local_inertia: Myvec::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 6.56, v_d_coords: Myvec::new(14.5, -12.0, 2.5), v_local_inertia: Myvec::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 2.62, v_d_coords: Myvec::new(3.03, 2.5, 3.0), v_local_inertia: Myvec::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 2.62, v_d_coords: Myvec::new(3.03, -2.5, 3.0), v_local_inertia: Myvec::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 2.93, v_d_coords: Myvec::new(2.25, 0.0, 5.0), v_local_inertia: Myvec::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 31.8, v_d_coords: Myvec::new(15.25, 0.0, 1.5), v_local_inertia: Myvec::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) }
         ], ..Default::default()};
 
     //Calculate mass properties on this airplane
@@ -110,13 +113,15 @@ fn main()
 
         //Define initial flight parameters
         //Wpafb runway geodetic coordinates at 2000 ft (609 meters) above sea level, ground level is at 248 meters elevation
-        lla_origin: common::Myvec{x: 39.826, y: -84.045, z: 609.0},
-        v_position: common::Myvec{x: 39.826 , y: -84.045, z: 609.0},
-        v_velocity: common::Myvec{x: 60.0, y: 0.0, z: 0.0},
+        //Note: make the origin and start position the same 
+        lla_origin: Myvec{x: 39.826, y: -84.045, z: 609.0},
+        v_position: Myvec{x: 39.826 , y: -84.045, z: 609.0},
+
+        v_velocity: Myvec{x: 60.0, y: 0.0, z: 0.0},
         f_speed: 60.0,
-        v_forces: common::Myvec{x: 500.0, y: 0.0, z: 0.0},
+        v_forces: Myvec{x: 500.0, y: 0.0, z: 0.0},
         thrustforce: 500.0,
-        q_orientation: common::Myquaternion::make_q_from_euler(0.0, 0.0, 0.0),
+        q_orientation: Myquaternion::make_q_from_euler(0.0, 0.0, 0.0),
     
         //Copy over the defined PointMass elements
         element: myairplane.element,

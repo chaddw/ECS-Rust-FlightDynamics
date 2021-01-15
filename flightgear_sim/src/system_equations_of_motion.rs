@@ -6,19 +6,21 @@ use specs::prelude::*;
 //Coordinate transforms
 use coord_transforms::prelude::*;
 
-//Get data needed to perform the System operations
-use crate::data::KeyboardState;
-use crate::data::DataFDM;
-use crate::data::DeltaTime;
-use crate::data::MaxThrust;
-use crate::data::DeltaThrust;
+//Get Component data needed to perform the System operations
+use crate::component_keyboardstate::KeyboardState;
+use crate::component_datafdm::DataFDM;
 
-//Vector, Matrix, Quaternion module
-use crate::common::Myvec;
-use crate::common::Mymatrix;
-use crate::common::Myquaternion;
-use crate::common::deg_to_rad;
-use crate::common::rad_to_deg;
+//Get Resources
+use crate::resources::DeltaTime;
+use crate::resources::MaxThrust;
+use crate::resources::DeltaThrust;
+
+//Vector, Matrix, Quaternion, math utilities
+use crate::common::vector::Myvec;
+use crate::common::matrix::Mymatrix;
+use crate::common::quaternion::Myquaternion;
+use crate::common::mathutils::deg_to_rad;
+use crate::common::mathutils::rad_to_deg;
 
 //System to perform equations of motion physics calculations based on forces
 pub struct EquationsOfMotion;
@@ -141,7 +143,7 @@ impl<'a> System<'a> for EquationsOfMotion
             let enu2lla_converted = Myvec::new(rad_to_deg(enu2lla.x as f32), rad_to_deg(enu2lla.y as f32), enu2lla.z as f32);
 
             //Subtract the enu2lla results by the origin position get the displacement for the frame
-            let mut displacement = Myvec::subtractvec(&enu2lla_converted, &fdm.lla_origin);
+            let displacement = Myvec::subtractvec(&enu2lla_converted, &fdm.lla_origin);
 
             //Update position by adding old position and displacement with respect to time
             fdm.v_position = Myvec::addvec(&fdm.v_position, &Myvec::multiplyscalar(&displacement, dt)); 
@@ -565,6 +567,8 @@ mod tests
          
     }
 
+
+
     #[test]
     fn fdm_test() //Can test one flight data variable of the entire FDM at a time. Must change frame #, and get that value to compare from C++ output. Can also add flight controls artificially
     {
@@ -583,7 +587,7 @@ mod tests
                 PointMass{f_mass: 2.93, v_d_coords: Myvec::new(2.25, 0.0, 5.0), v_local_inertia: Myvec::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
                 PointMass{f_mass: 31.8, v_d_coords: Myvec::new(15.25, 0.0, 1.5), v_local_inertia: Myvec::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) }
             ], 
-            
+        
             
         //Define initial flight parameters
         v_position: Myvec{x: -5000.0, y: 0.0, z: 2000.0},
