@@ -4,12 +4,12 @@
 use float_cmp::*;
 
 //Bring into scope the functions and data as necessary for testing
-use bourg_sim::common::vector::Myvec;
-use bourg_sim::common::matrix::Mymatrix;
-use bourg_sim::common::quaternion::Myquaternion;
-use bourg_sim::component_datafdm::*;
-use bourg_sim::system_equations_of_motion::calc_airplane_loads;
-use bourg_sim::system_equations_of_motion::calc_airplane_mass_properties;
+use flightgear_sim::common::vector::Myvec;
+use flightgear_sim::common::matrix::Mymatrix;
+use flightgear_sim::common::quaternion::Myquaternion;
+use flightgear_sim::component_datafdm::*;
+use flightgear_sim::system_equations_of_motion::calc_airplane_loads;
+use flightgear_sim::system_equations_of_motion::calc_airplane_mass_properties;
 
 #[test]
 fn fdm_test() //Can test one flight data variable of the entire FDM at a time. Must change frame #, and get that value to compare from C++ output. Can also add flight controls artificially
@@ -160,9 +160,68 @@ fn fdm_test() //Can test one flight data variable of the entire FDM at a time. M
             // }
 
             // //TEST 5 Flaps
-            fdm.element[1].i_flap = -1;
-            fdm.element[2].i_flap = -1;
-            fdm.flaps = true;
+            // fdm.element[1].i_flap = -1;
+            // fdm.element[2].i_flap = -1;
+            // fdm.flaps = true;
+
+
+            //TEST 6 EVERYTHING
+            if current_frame >= 1 && current_frame <= 5
+            {
+                //Increase thrust
+                fdm.thrustforce = fdm.thrustforce + d_thrust;
+            }
+            else if current_frame >= 6 && current_frame <= 246 
+            {
+                //Pitch up
+                fdm.element[4].i_flap = 1;
+                fdm.element[5].i_flap = 1;
+            }
+            else if current_frame >= 247 && current_frame <= 307
+            {
+                //Yaw left
+                fdm.element[6].f_incidence = 16.0;
+
+            }
+            else if current_frame >= 308 && current_frame <= 368
+            {
+                //Yaw right
+                fdm.element[6].f_incidence = -16.0;
+            }
+            else if current_frame >= 369 && current_frame <= 469
+            {
+                //Roll right
+                fdm.element[0].i_flap = -1;
+                fdm.element[3].i_flap = 1;
+            }
+            else if current_frame >= 470 && current_frame <= 530
+            {
+                //Roll left
+                fdm.element[0].i_flap = 1;
+                fdm.element[3].i_flap = -1;
+            }
+            else if current_frame >= 531 && current_frame <= 546
+            {
+                //pitch down
+                fdm.element[4].i_flap = -1;
+                fdm.element[5].i_flap = -1;
+            }
+            else if current_frame >= 547 && current_frame <= 552
+            {
+                //thrust down
+                fdm.thrustforce = fdm.thrustforce - d_thrust;
+            }
+
+            else if current_frame >= 553 && current_frame <= 900
+            {
+                //Flaps deflected
+                fdm.element[1].i_flap = -1;
+                fdm.element[2].i_flap = -1;
+                fdm.flaps = true;
+            }
+
+
+
 
 
         //Calculate all of the forces and moments on the airplane
@@ -219,12 +278,13 @@ fn fdm_test() //Can test one flight data variable of the entire FDM at a time. M
     //let benchmark_data = vec![-4794.57, -1924.94, 482.128, 19.3067, -4.04701, -168.199, 100.042]; //TEST 2 (ROLL)
     //let benchmark_data = vec![-2093.35, -3.95869, 2451.71, 0.404863, 34.7533, -0.581428, 51.8425]; //TEST 3 (PITCH)
     //let benchmark_data = vec![-2033.18, -1985.34, 1486.51, 15.1557, -4.85586, -76.4714, 94.558]; //TEST 4 (YAW)
-    let benchmark_data = vec![-1995.63, -0.401624, 1778.12, 0.0124067, 9.38473, -0.0325167, 57.0701]; //TEST 5 (FLAPS)
-    
+    //let benchmark_data = vec![-1995.63, -0.401624, 1778.12, 0.0124067, 9.38473, -0.0325167, 57.0701]; //TEST 5 (FLAPS)
+    let benchmark_data = vec![-2708.89, 59.6766, 540.036, 107.562, 64.6713, -105.868, 59.8944]; //TEST 6 (EVERYTHING)
 
     println!("Rust/ECS Flight Data  : {:?}", flight_test_data);
     println!("C++ Benchmark         : {:?}", benchmark_data);
    
+    //7 Variables to check for each of the 6 tests
     let cmp1 = approx_eq!(f32, flight_test_data[0], benchmark_data[0], epsilon = 0.01); //Pos x
     let cmp2 = approx_eq!(f32, flight_test_data[1], benchmark_data[1], epsilon = 0.01); //Pos y
     let cmp3 = approx_eq!(f32, flight_test_data[2], benchmark_data[2], epsilon = 0.01); //Pos z
