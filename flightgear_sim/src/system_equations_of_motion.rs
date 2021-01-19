@@ -199,7 +199,7 @@ impl<'a> System<'a> for EquationsOfMotion
 
 
 //Calculates all of the forces and moments on the plane at any time (called inside eom system)
-fn calc_airplane_loads(fdm: &mut DataFDM)
+pub fn calc_airplane_loads(fdm: &mut DataFDM)
 {
     let mut fb = Myvec::new(0.0, 0.0, 0.0); //total force
     let mut mb = Myvec::new(0.0, 0.0, 0.0); //total moment
@@ -236,7 +236,7 @@ fn calc_airplane_loads(fdm: &mut DataFDM)
         let v_local_velocity = Myvec::addvec(&fdm.v_velocity_body, &vtmp);
 
         //Calculate local air speed
-        let f_local_speed: f32 = fdm.v_velocity_body.magnitude(); 
+        let f_local_speed: f32 = v_local_velocity.magnitude(); 
 
         //Find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
         if f_local_speed > 1.0
