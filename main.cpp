@@ -28,13 +28,7 @@ int main()
         //FOR EQUIVALENCY TESTS: set flight controls artificially based on current frame
         //TEST 1 DO NOTHING
 
-       //TEST 2 THRUST
-        //if (current_frame >= 1 && current_frame <= 5)
-        //{
-        //    fdm.dec_thrust();
-        //}
-
-        //TEST 3 ROLL 
+        //TEST 2 ROLL 
         //if (current_frame >= 1 && current_frame <= 5)
         //{
         //    fdm.inc_thrust();
@@ -49,7 +43,7 @@ int main()
         //}
 
 
-        //TEST 4 PITCH
+        //TEST 3 PITCH
          //if (current_frame >= 1 && current_frame <= 5)
          //{
          //    fdm.inc_thrust();
@@ -58,7 +52,7 @@ int main()
          //fdm.pitch_up();
 
 
-       //TEST 5 YAW
+       //TEST 4 YAW
         //if (current_frame >= 1 && current_frame <= 5)
         //{
         //    fdm.inc_thrust();
@@ -67,38 +61,74 @@ int main()
         //{
         //    fdm.pitch_up();
         //}
-        //else if (current_frame % 9 == 0)
+        //else if (current_frame >= 247 && current_frame <= 307)//(current_frame % 9 == 0)
         //{
         //    fdm.right_rudder();
         //}
        
-        //TEST 6 FLAPS
+        //TEST 5 FLAPS
        //fdm.flaps_down();
 
 
+       //TEST 6 EVERYTHING
+        //if (current_frame >= 1 && current_frame <= 5)
+        //{
+        //    fdm.inc_thrust();
+        //}
+        //else if (current_frame >= 6 && current_frame <= 246)
+        //{
+        //    fdm.pitch_up();
+        //}
+        //else if (current_frame >= 247 && current_frame <= 307)
+        //{
+        //    fdm.left_rudder();
+        //}
+        //else if (current_frame >= 308 && current_frame <= 368)
+        //{
+        //    fdm.right_rudder();
+        //}
+        //else if (current_frame >= 369 && current_frame <= 469)
+        //{
+        //    fdm.roll_right();
+        //}
+        //else if (current_frame >= 470 && current_frame <= 530)
+        //{
+        //    fdm.roll_left();
+        //}
+
+        //else if (current_frame >= 531 && current_frame <= 546)
+        //{
+        //    fdm.pitch_down();
+        //}
+        //else if (current_frame >= 547 && current_frame <= 552)
+        //{
+        //    fdm.dec_thrust();
+        //}
+        //else if (current_frame >= 553 && current_frame <= 900)
+        //{
+        //    fdm.flaps_down();
+        //}
+
+
+
+
       fdm.update(dt);
-//      fdm.update2(dt);
+
       std::cout << "Simulation time : " << current_time << ", frames: " << current_frame << std::endl;
+      std::cout << "Position.x : " << fdm.position.x << std::endl;
+      std::cout << "Position.y : " << fdm.position.y << std::endl;
+      std::cout << "Position.z : " << fdm.position.z << std::endl;
       std::cout << "Roll   : " << fdm.euler_angles.x << std::endl;
       std::cout << "Pitch  : " << -fdm.euler_angles.y << std::endl;
       std::cout << "Yaw    : " << fdm.euler_angles.z << std::endl;
-      std::cout << "Alt    : " << fdm.position.z << std::endl;
-      std::cout << "Thrust : " << fdm.thrust_force << std::endl;
-      std::cout << "Speed  : " << fdm.speed / 1.688f << std::endl; // divide by 1.688 to convert ft/s to knots
-      std::cout << "Position.x : " << fdm.position.x << std::endl;
-      std::cout << "Position.y : " << fdm.position.y << std::endl;
-      std::cout << "Position.z (alt) : " << fdm.position.z << std::endl;
-
+      std::cout << "Airpeed  : " << fdm.speed / 1.688f << std::endl; // divide by 1.688 to convert ft/s to knots
 
       if (fdm.flaps) std::cout << "Flaps!\n";
       if (fdm.stalling) std::cout << "Stall!\n";
 
       std::cout << "===============================================\n";
 
-
    }
 
    return 0;
 }
-
-
