@@ -4,8 +4,8 @@
 use float_cmp::*;
 
 //Bring into scope the functions and data as necessary for testing
-use palmer_sim::component_datafdm::*;
-use palmer_sim::system_equations_of_motion::plane_right_hand_side;
+use palmer__flightgear_sim::component_datafdm::*;
+use palmer_flightgear_sim::system_equations_of_motion::plane_right_hand_side;
 
 #[test]
 fn fdm_test()
