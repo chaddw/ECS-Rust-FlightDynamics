@@ -71,43 +71,43 @@ int main()
 
 
        //TEST 6 EVERYTHING
-        //if (current_frame >= 1 && current_frame <= 5)
-        //{
-        //    fdm.inc_thrust();
-        //}
-        //else if (current_frame >= 6 && current_frame <= 246)
-        //{
-        //    fdm.pitch_up();
-        //}
-        //else if (current_frame >= 247 && current_frame <= 307)
-        //{
-        //    fdm.left_rudder();
-        //}
-        //else if (current_frame >= 308 && current_frame <= 368)
-        //{
-        //    fdm.right_rudder();
-        //}
-        //else if (current_frame >= 369 && current_frame <= 469)
-        //{
-        //    fdm.roll_right();
-        //}
-        //else if (current_frame >= 470 && current_frame <= 530)
-        //{
-        //    fdm.roll_left();
-        //}
+        if (current_frame >= 1 && current_frame <= 5)
+        {
+            fdm.inc_thrust();
+        }
+        else if (current_frame >= 6 && current_frame <= 246)
+        {
+            fdm.pitch_up();
+        }
+        else if (current_frame >= 247 && current_frame <= 307)
+        {
+            fdm.left_rudder();
+        }
+        else if (current_frame >= 308 && current_frame <= 368)
+        {
+            fdm.right_rudder();
+        }
+        else if (current_frame >= 369 && current_frame <= 429)
+        {
+            fdm.roll_right();
+        }
+        else if (current_frame >= 430 && current_frame <= 490)
+        {
+            fdm.roll_left();
+        }
 
-        //else if (current_frame >= 531 && current_frame <= 546)
-        //{
-        //    fdm.pitch_down();
-        //}
-        //else if (current_frame >= 547 && current_frame <= 552)
-        //{
-        //    fdm.dec_thrust();
-        //}
-        //else if (current_frame >= 553 && current_frame <= 900)
-        //{
-        //    fdm.flaps_down();
-        //}
+        else if (current_frame >= 491 && current_frame <= 505)
+        {
+            fdm.pitch_down();
+        }
+        else if (current_frame >= 506 && current_frame <= 511)
+        {
+            fdm.dec_thrust();
+        }
+        else if (current_frame >= 512 && current_frame <= 900)
+        {
+            fdm.flaps_down();
+        }
 
 
 
