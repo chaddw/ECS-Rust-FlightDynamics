@@ -7,7 +7,7 @@ use float_cmp::*;
 
 //Bring into scope the functions and data as necessary for testing
 use fdm_library::palmer_fdm::components::component_datafdm::*;
-use fdm_library::palmer_fdm::systems::system_equations_of_motion::plane_right_hand_side;
+use fdm_library::palmer_fdm::functions::plane_right_hand_side::plane_rhs;
 
 #[test]
 fn fdm_test()
@@ -56,7 +56,6 @@ fn fdm_test()
     };
 
 
-
     while current_time < 60.0 //seconds
     {
 
@@ -78,10 +77,10 @@ fn fdm_test()
         // Compute the four Runge-Kutta steps, The return 
         // value of plane_right_hand_side method is an array
         // of delta-q values for each of the four steps.
-        plane_right_hand_side(&mut fdm, &mut q, &mut qcopy,  &ds, 0.0, &mut dq1);
-        plane_right_hand_side(&mut fdm, &mut q, &mut dq1,    &ds, 0.5, &mut dq2);
-        plane_right_hand_side(&mut fdm, &mut q, &mut dq2,    &ds, 0.5, &mut dq3);
-        plane_right_hand_side(&mut fdm, &mut q, &mut dq3,    &ds, 1.0, &mut dq4);
+        plane_rhs(&mut fdm, &mut q, &mut qcopy,  &ds, 0.0, &mut dq1);
+        plane_rhs(&mut fdm, &mut q, &mut dq1,    &ds, 0.5, &mut dq2);
+        plane_rhs(&mut fdm, &mut q, &mut dq2,    &ds, 0.5, &mut dq3);
+        plane_rhs(&mut fdm, &mut q, &mut dq3,    &ds, 1.0, &mut dq4);
 
         //  Update the dependent and independent variable values
         //  at the new dependent variable location and store the
@@ -96,8 +95,6 @@ fn fdm_test()
         fdm.airspeed = (fdm.q[0] * fdm.q[0] + fdm.q[2] * fdm.q[2] + fdm.q[4] * fdm.q[4]).sqrt();
 
     }
-
-
 
     //Grab our test data results
     let flight_test_data = vec![fdm.q[1], fdm.q[3], fdm.q[5], fdm.airspeed];
@@ -133,7 +130,6 @@ fn fdm_test()
     {
         assert!(false);
     }
-
 
 }
    
