@@ -15,12 +15,14 @@ use crate::bourg_fdm::resources::delta_time::DeltaTime;
 use crate::bourg_fdm::resources::max_thrust::MaxThrust;
 use crate::bourg_fdm::resources::delta_thrust::DeltaThrust;
 
-//Vector, Matrix, Quaternion, math utilities
-use crate::bourg_fdm::common::vector::Myvec;
-use crate::bourg_fdm::common::matrix::Mymatrix;
-use crate::bourg_fdm::common::quaternion::Myquaternion;
-use crate::bourg_fdm::common::mathutils::deg_to_rad;
-use crate::bourg_fdm::common::mathutils::rad_to_deg;
+//Vector, Matrix, Quaternion, math utilities, constants
+use crate::bourg_fdm::common::vector::Vector;
+use crate::bourg_fdm::common::matrix::Matrix;
+use crate::bourg_fdm::common::quaternion::Quaternion;
+use crate::bourg_fdm::common::math_utils::deg_to_rad;
+use crate::bourg_fdm::common::math_utils::rad_to_deg;
+use crate::bourg_fdm::common::constants::RHO;
+use crate::bourg_fdm::common::constants::G;
 
 //System to perform equations of motion physics calculations based on forces
 pub struct EquationsOfMotion;
@@ -119,16 +121,16 @@ impl<'a> System<'a> for EquationsOfMotion
             calc_airplane_loads(&mut fdm);
 
             //Calculate acceleration of airplane in earth space
-            let ae: Myvec = Myvec::dividescalar(&fdm.v_forces, fdm.mass);
+            let ae = fdm.v_forces / fdm.mass;
 
             //Calculate velocity of airplane in earth space
-            fdm.v_velocity = Myvec::addvec(&fdm.v_velocity, &Myvec::multiplyscalar(&ae, dt)); 
+            fdm.v_velocity = fdm.v_velocity + ae * dt; 
 
 
             //Calculate position of airplane in earth space
 
             //Create WGS84 ellipsoid
-            let ellipsoid: coord_transforms::structs::geo_ellipsoid::geo_ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
+            let ellipsoid = geo_ellipsoid::geo_ellipsoid::new(geo_ellipsoid::WGS84_SEMI_MAJOR_AXIS_METERS, geo_ellipsoid::WGS84_FLATTENING);
 
             //Take lat/lon origin and put into naglebra vector, and convert the lat/lon degrees to radians
             let origin = Vector3::new(deg_to_rad(fdm.lla_origin.x) as f64, deg_to_rad(fdm.lla_origin.y) as f64, fdm.lla_origin.z as f64);
@@ -140,58 +142,50 @@ impl<'a> System<'a> for EquationsOfMotion
             let enu2lla = geo::enu2lla(&origin, &d, &ellipsoid);
 
             //Put the enu2lla results into the native custom vector type and convert lat/lon radians displaced to degrees 
-            let enu2lla_converted = Myvec::new(rad_to_deg(enu2lla.x as f32), rad_to_deg(enu2lla.y as f32), enu2lla.z as f32);
+            let enu2lla_converted = Vector::new(rad_to_deg(enu2lla.x as f32), rad_to_deg(enu2lla.y as f32), enu2lla.z as f32);
 
             //Subtract the enu2lla results by the origin position get the displacement for the frame
-            let displacement = Myvec::subtractvec(&enu2lla_converted, &fdm.lla_origin);
+            let displacement = enu2lla_converted - fdm.lla_origin;
 
             //Update position by adding old position and displacement with respect to time
-            fdm.v_position = Myvec::addvec(&fdm.v_position, &Myvec::multiplyscalar(&displacement, dt)); 
+            fdm.v_position = fdm.v_position + displacement * dt; 
 
 
             //Calculate angular velocity of airplane in body space
-            let one = Mymatrix::multiply_matrix_by_vec(&fdm.m_inertia, &fdm.v_angular_velocity);
-            let two = Myvec::crossproduct(&fdm.v_angular_velocity, &one);
-            let three = Myvec::subtractvec(&fdm.v_moments, &two);
-            let four = Mymatrix::multiply_matrix_by_vec(&fdm.m_inertia_inverse, &three);
-            let five = Myvec::multiplyscalar(&four, dt);
-            fdm.v_angular_velocity = Myvec::addvec(&fdm.v_angular_velocity, &five);
+            fdm.v_angular_velocity = fdm.v_angular_velocity + ((fdm.m_inertia_inverse * 
+                (fdm.v_moments - Vector::crossproduct(&fdm.v_angular_velocity, &(fdm.m_inertia * fdm.v_angular_velocity)))) * dt);
 
-            //Calculate the new rotation quaternion
-            let uno = Myquaternion::multiply_quat_by_vec(&fdm.q_orientation, &fdm.v_angular_velocity);
-            let dos = Myquaternion::multiplyscalar(&uno, 0.5 * dt);
-            fdm.q_orientation = Myquaternion::addquat(&fdm.q_orientation, &dos);
+            //Calculate the new rotation Quaternion
+            fdm.q_orientation = fdm.q_orientation + (fdm.q_orientation * fdm.v_angular_velocity) * (0.5 * dt);
 
-            //Now normalize the orientation quaternion (make into unit quaternion)
+            //Now normalize the orientation Quaternion (make into unit Quaternion)
             let mag = fdm.q_orientation.magnitude();
             if mag != 0.0
             {
-               fdm.q_orientation = Myquaternion::dividescalar(&fdm.q_orientation, mag);
+               fdm.q_orientation = fdm.q_orientation / mag;
             }
 
             //Calculate the velocity in body space
-            fdm.v_velocity_body = Myquaternion::qvrotate(&Myquaternion::conjugate(&fdm.q_orientation), &fdm.v_velocity);
+            fdm.v_velocity_body = Quaternion::qvrotate(&Quaternion::conjugate(&fdm.q_orientation), &fdm.v_velocity);
     
             //Calculate air speed
             fdm.f_speed = fdm.v_velocity.magnitude(); 
     
             //Get euler angles
-            let euler = Myquaternion::make_euler_from_q(&fdm.q_orientation);
+            let euler = Quaternion::make_euler_from_q(&fdm.q_orientation);
             fdm.v_euler_angles.x = euler.x; 
             fdm.v_euler_angles.y = euler.y;
             fdm.v_euler_angles.z = euler.z;
             
             //Print some relevant data
             println!("Roll:             {}", fdm.v_euler_angles.x);
-            println!("Pitch:            {}", -fdm.v_euler_angles.y); //Pitch was negated when Euler angles were computed
+            println!("Pitch:            {}", -fdm.v_euler_angles.y);
             println!("Yaw:              {}", fdm.v_euler_angles.z);
-            println!("Alt:              {}", fdm.v_position.z);
-            println!("Thrust:           {}", fdm.thrustforce);
-            println!("Airspeed (knots): {}", fdm.f_speed/1.688);
             println!("Position x:       {}", fdm.v_position.x);
             println!("Position y:       {}", fdm.v_position.y);
             println!("Position z:       {}", fdm.v_position.z);
-
+            println!("Airspeed (knots): {}", fdm.f_speed/1.688); //convert to knots
+            println!("Thrust:           {}", fdm.thrustforce);
         }
     }
 }
@@ -201,20 +195,20 @@ impl<'a> System<'a> for EquationsOfMotion
 //Calculates all of the forces and moments on the plane at any time (called inside eom system)
 pub fn calc_airplane_loads(fdm: &mut DataFDM)
 {
-    let mut fb = Myvec::new(0.0, 0.0, 0.0); //total force
-    let mut mb = Myvec::new(0.0, 0.0, 0.0); //total moment
+    let mut fb = Vector::new(0.0, 0.0, 0.0); //total force
+    let mut mb = Vector::new(0.0, 0.0, 0.0); //total moment
 
     //Reset forces and moments
-    fdm.v_forces = Myvec::new(0.0, 0.0, 0.0);
-    fdm.v_moments = Myvec::new(0.0, 0.0, 0.0);
+    fdm.v_forces = Vector::new(0.0, 0.0, 0.0);
+    fdm.v_moments = Vector::new(0.0, 0.0, 0.0);
 
     //Define thrust vector, which acts through the plane's center of gravity
-    let mut thrust = Myvec::new(1.0, 0.0, 0.0);
-    thrust = Myvec::multiplyscalar(&thrust, fdm.thrustforce);
+    let mut thrust = Vector::new(1.0, 0.0, 0.0);
+    thrust = thrust * fdm.thrustforce;
 
     //Calculate forces and moments in body space
-    let mut v_drag_vector = Myvec::new(0.0, 0.0, 0.0);
-    let mut _v_resultant= Myvec::new(0.0, 0.0, 0.0);
+    let mut v_drag_vector = Vector::new(0.0, 0.0, 0.0);
+    let mut _v_resultant= Vector::new(0.0, 0.0, 0.0);
 
     fdm.stalling = false;
 
@@ -225,15 +219,15 @@ pub fn calc_airplane_loads(fdm: &mut DataFDM)
         {
             let inc: f32 = deg_to_rad(fdm.element[i].f_incidence);
             let di: f32 = deg_to_rad(fdm.element[i].f_dihedral);
-            fdm.element[i].v_normal = Myvec::new(inc.sin(),
+            fdm.element[i].v_normal = Vector::new(inc.sin(),
                                                  inc.cos() * di.sin(), 
                                                  inc.cos() * di.cos());
             fdm.element[i].v_normal.normalize();
         }
        
         //Calculate local velocity at element. This includes the velocity due to linear motion of the airplane plus the velocity and each element due to rotation
-        let mut vtmp = Myvec::crossproduct(&fdm.v_angular_velocity, &fdm.element[i].v_cg_coords);
-        let v_local_velocity = Myvec::addvec(&fdm.v_velocity_body, &vtmp);
+        let mut vtmp = Vector::crossproduct(&fdm.v_angular_velocity, &fdm.element[i].v_cg_coords);
+        let v_local_velocity = fdm.v_velocity_body + vtmp;
 
         //Calculate local air speed
         let f_local_speed: f32 = v_local_velocity.magnitude(); 
@@ -241,18 +235,18 @@ pub fn calc_airplane_loads(fdm: &mut DataFDM)
         //Find the direction that drag will act. it will be in line with the relative velocity but going in the opposite direction
         if f_local_speed > 1.0
         {
-            let v_local_vel_tmp = Myvec::reverse(&v_local_velocity); //-vLocalVelocity
-            v_drag_vector = Myvec::dividescalar(&v_local_vel_tmp, f_local_speed);
+            let v_local_vel_tmp = -v_local_velocity;
+            v_drag_vector = v_local_vel_tmp / f_local_speed;
         }
 
         //Find direction that lift will act. lift is perpendicular to the drag vector
-        let lift_tmp = Myvec::crossproduct(&v_drag_vector, &fdm.element[i].v_normal);
-        let mut v_lift_vector = Myvec::crossproduct(&lift_tmp, &v_drag_vector);
+        let lift_tmp = Vector::crossproduct(&v_drag_vector, &fdm.element[i].v_normal);
+        let mut v_lift_vector = Vector::crossproduct(&lift_tmp, &v_drag_vector);
         let mut _tmp = v_lift_vector.magnitude(); 
         v_lift_vector.normalize();
   
         //Find the angle of attack. its the angle between the lift vector and element normal vector 
-        _tmp = Myvec::dotproduct(&v_drag_vector, &fdm.element[i].v_normal);
+        _tmp = v_drag_vector * fdm.element[i].v_normal;
 
         if _tmp > 1.0
         {
@@ -266,26 +260,21 @@ pub fn calc_airplane_loads(fdm: &mut DataFDM)
         let f_attack_angle: f32 = rad_to_deg(_tmp.asin());
 
         //Determine lift and drag force on the element. Rho is defined as 0.0023769, which is density of air at sea level, slugs/ft^3
-        _tmp = 0.5 * 0.002376900055 * f_local_speed * f_local_speed * fdm.element[i].f_area;   
+        _tmp = 0.5 * RHO * f_local_speed * f_local_speed * fdm.element[i].f_area;   
 
         if i == 6 //tail/rudder
         {
-            let firstpart = Myvec::multiplyscalar(&v_lift_vector, rudder_lift_coefficient(f_attack_angle));
-            let secondpart = Myvec::multiplyscalar(&v_drag_vector, rudder_drag_coefficient(f_attack_angle));
-            let addtogether = Myvec::addvec(&firstpart, &secondpart);
-            _v_resultant = Myvec::multiplyscalar(&addtogether, _tmp);
+            _v_resultant = (v_lift_vector * rudder_lift_coefficient(f_attack_angle) + v_drag_vector * rudder_drag_coefficient(f_attack_angle)) * _tmp;
+
         }
         else if i == 7
         {
-            _v_resultant = Myvec::multiplyscalar(&v_drag_vector, 0.5 * _tmp); //simulate fuselage drag
+            _v_resultant = v_drag_vector * 0.5 * _tmp; //simulate fuselage drag
 
         }
         else
         {
-            let firstpart = Myvec::multiplyscalar(&v_lift_vector, lift_coefficient(f_attack_angle, fdm.element[i].i_flap));
-            let secondpart = Myvec::multiplyscalar(&v_drag_vector, drag_coefficient(f_attack_angle, fdm.element[i].i_flap));
-            let addtogether = Myvec::addvec(&firstpart, &secondpart);
-            _v_resultant = Myvec::multiplyscalar(&addtogether, _tmp);
+            _v_resultant = (v_lift_vector * lift_coefficient(f_attack_angle, fdm.element[i].i_flap) + v_drag_vector * drag_coefficient(f_attack_angle, fdm.element[i].i_flap)) * _tmp;
         }
 
         //Check for stall. If the coefficient of lift is 0, stall is occuring.
@@ -298,23 +287,23 @@ pub fn calc_airplane_loads(fdm: &mut DataFDM)
         }
 
         //Keep running total of resultant forces (total force)
-        fb = Myvec::addvec(&fb, &_v_resultant);
+        fb = fb + _v_resultant;
 
         //Calculate the moment about the center of gravity of this element's force and keep them in a running total of these moments (total moment)
-        vtmp = Myvec::crossproduct(&fdm.element[i].v_cg_coords, &_v_resultant);
-        mb = Myvec::addvec(&mb, &vtmp);
+        vtmp = Vector::crossproduct(&fdm.element[i].v_cg_coords, &_v_resultant);
+        mb = mb + vtmp;
      }
 
     //Add thrust
-    fb = Myvec::addvec(&fb, &thrust);
+    fb = fb + thrust;
 
-    //Convert forces from model space to earth space. rotates the vector by the unit quaternion (QVRotate function)
-     fdm.v_forces = Myquaternion::qvrotate(&fdm.q_orientation, &fb);
+    //Convert forces from model space to earth space. rotates the vector by the unit Quaternion (QVRotate function)
+     fdm.v_forces = Quaternion::qvrotate(&fdm.q_orientation, &fb);
 
-    //Apply gravity (g is -32.174 ft/s^2), 
-    fdm.v_forces.z = fdm.v_forces.z + (-32.17399979) * fdm.mass;
+    //Apply gravity (G is -32.174 ft/s^2), 
+    fdm.v_forces.z = fdm.v_forces.z + (G) * fdm.mass;
 
-    fdm.v_moments = Myvec::addvec(&fdm.v_moments, &mb);
+    fdm.v_moments = fdm.v_moments + mb;
 }
 
 
@@ -330,7 +319,7 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
     {
         inc = deg_to_rad(i.f_incidence);
         di = deg_to_rad(i.f_dihedral);
-        i.v_normal = Myvec::new(inc.sin(), inc.cos() * di.sin(), inc.cos() * di.cos());
+        i.v_normal = Vector::new(inc.sin(), inc.cos() * di.sin(), inc.cos() * di.cos());
         i.v_normal.normalize(); 
     }
 
@@ -342,18 +331,18 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
     }
 
     //Calculate combined center of gravity location
-    let mut v_moment = Myvec::new(0.0,0.0,0.0);
+    let mut v_moment = Vector::new(0.0,0.0,0.0);
     for i in fdm.element.iter()
     {
-        let _tmp = Myvec::multiplyscalar(&i.v_d_coords, i.f_mass);
-        v_moment = Myvec::addvec(&v_moment, &_tmp);
+        let _tmp = i.v_d_coords * i.f_mass;
+        v_moment = v_moment + _tmp;
     }
-    let cg = Myvec::dividescalar(&v_moment, total_mass); 
+    let cg = v_moment / total_mass; 
 
     //Calculate coordinates of each element with respect to the combined CG, relative position
     for i in fdm.element.iter_mut()
     {
-        i.v_cg_coords = Myvec::subtractvec(&i.v_d_coords, &cg);
+        i.v_cg_coords = i.v_d_coords - cg;
     }
 
     //Calculate the moments and products of intertia for the combined elements
@@ -388,14 +377,14 @@ pub fn calc_airplane_mass_properties(fdm: &mut DataFDM)
             i.v_cg_coords.z);
     }
 
-    //Finally, set up airplanes mass and inertia matrix
+    //Finally, set up airplanes mass and inertia Matrix
     fdm.mass = total_mass;
-    fdm.m_inertia = Mymatrix::new(ixx, -ixy, -ixz,
+    fdm.m_inertia = Matrix::new(ixx, -ixy, -ixz,
                                   -ixy, iyy, -iyz,
                                   -ixz, -iyz, izz);
 
-    //Get inverse of matrix
-    fdm.m_inertia_inverse = Mymatrix::inverse(&fdm.m_inertia);
+    //Get inverse of Matrix
+    fdm.m_inertia_inverse = Matrix::inverse(&fdm.m_inertia);
 }
 
 

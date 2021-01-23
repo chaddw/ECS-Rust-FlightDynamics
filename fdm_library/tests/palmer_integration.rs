@@ -103,11 +103,15 @@ fn fdm_test()
     let flight_test_data = vec![fdm.q[1], fdm.q[3], fdm.q[5], fdm.airspeed];
     
     //Copy over the data from the c benchmark tests
-    //let benchmark_data = vec![2245.945807, 0.000000, 157.184886, 44.737909]; //TEST 1 (ANGLE OF ATTACK)
 
-    //let benchmark_data = vec![1824.183957, -1148.138559, 155.741858, 44.905979]; //TEST 2 (BANK)
+    //TEST 1 (ANGLE OF ATTACK)
+    //let benchmark_data = vec![2245.945807, 0.000000, 157.184886, 44.737909]; 
 
-    let benchmark_data = vec![1924.086822, 0.000000, 187.228017, 38.606508]; //TEST 3 (FLAPS)
+    //TEST 2 (BANK)
+    //let benchmark_data = vec![1824.183957, -1148.138559, 155.741858, 44.905979]; 
+    
+    //TEST 3 (FLAPS)
+    let benchmark_data = vec![1924.086822, 0.000000, 187.228017, 38.606508]; 
 
 
     println!("Rust/ECS Flight Data  : {:?}", flight_test_data);
