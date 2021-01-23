@@ -9,8 +9,9 @@ use float_cmp::*;
 use fdm_library::bourg_fdm::common::vector::Vector;
 use fdm_library::bourg_fdm::common::quaternion::Quaternion;
 use fdm_library::bourg_fdm::components::component_datafdm::*;
-use fdm_library::bourg_fdm::systems::system_equations_of_motion::calc_airplane_loads;
-use fdm_library::bourg_fdm::systems::system_equations_of_motion::calc_airplane_mass_properties;
+use fdm_library::bourg_fdm::functions::calc_loads::calc_airplane_loads;
+use fdm_library::bourg_fdm::functions::mass_properties::calc_airplane_mass_properties;
+use fdm_library::bourg_fdm::functions::flight_controls::*;
 
 #[test]
 fn fdm_test() 
@@ -55,58 +56,12 @@ fn fdm_test()
         current_frame = current_frame + 1;
 
         //Reset/zero the elevators, rudders, and ailerons every loop
-        //Rudder
-        fdm.element[6].f_incidence = 0.0;
-        //Ailerons
-        fdm.element[0].i_flap = 0;
-        fdm.element[3].i_flap = 0;
-        //Elevators
-        fdm.element[4].i_flap = 0;
-        fdm.element[5].i_flap = 0;
+        zero_rudder(&mut fdm);
+        zero_ailerons(&mut fdm);
+        zero_elevators(&mut fdm);
         //Flaps will be toggled on and off so flaps does not need to be zerod each time
 
-            //TESTS WILL ARTIFICIALLY STIMULATE THE AIRPLANE'S COMPONENTS FOR A GIVEN FRAME
-
-            //Flight component activation guide
-
-            //thrust up
-            // fdm.thrustforce = fdm.thrustforce + d_thrust;
-            
-            //thrust down
-            // fdm.thrustforce = fdm.thrustforce - d_thrust;
-        
-            //left rudder
-            // fdm.element[6].f_incidence = 16.0;
-
-            //right rudder
-            // fdm.element[6].f_incidence = -16.0;
-
-            //roll left
-            // fdm.element[0].i_flap = 1;
-            // fdm.element[3].i_flap = -1;
-
-            //roll right
-            // fdm.element[0].i_flap = -1;
-            // fdm.element[3].i_flap = 1;
-
-            //pitch up
-            // fdm.element[4].i_flap = 1;
-            // fdm.element[5].i_flap = 1;
-
-            //pitch down
-            // fdm.element[4].i_flap = -1;
-            // fdm.element[5].i_flap = -1;
-        
-            //flaps deflected 
-            // fdm.element[1].i_flap = -1;
-            // fdm.element[2].i_flap = -1;
-            // fdm.flaps = true;
-        
-            //no flaps
-            // fdm.element[1].i_flap = 0;
-            // fdm.element[2].i_flap = 0;
-            // fdm.flaps = false;
-
+            //TESTS WILL STIMULATE THE AIRPLANE'S COMPONENTS FOR A GIVEN FRAME
 
             //---------------------------------------
             //TEST 1 (no flight control)
@@ -114,112 +69,81 @@ fn fdm_test()
             // //TEST 2 Roll 
             // if current_frame >= 1 && current_frame <= 5
             // {
-            //     //increase thrust
-            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
+            //     thrust_up(&mut fdm, d_thrust);
             // }
             // else if current_frame >= 6 && current_frame <= 246
             // {
-            //     //pitch up
-            //     fdm.element[4].i_flap = 1;
-            //     fdm.element[5].i_flap = 1;
+            //     pitch_up(&mut fdm);
             // }
             // else if current_frame >= 247 && current_frame <= 307 
             // {
-            //     //roll right
-            //     fdm.element[0].i_flap = -1;
-            //     fdm.element[3].i_flap = 1;
+            //     roll_right(&mut fdm);
             // }
 
 
             // //TEST 3 Pitch
             // if current_frame >= 1 && current_frame <= 5
             // {
-            //     //increase thrust
-            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
+            //     thrust_up(&mut fdm, d_thrust);
             // }
-            // //pitch up
-            // fdm.element[4].i_flap = 1;
-            // fdm.element[5].i_flap = 1;
+            // pitch_up(&mut fdm);
 
 
             // //TEST 4 Yaw
             // if current_frame >= 1 && current_frame <= 5
             // {
-            //     //increase thrust
-            //     fdm.thrustforce = fdm.thrustforce + d_thrust;
+            //     thrust_up(&mut fdm, d_thrust);
             // }
             // else if current_frame >= 6 && current_frame <= 246 
             // {
-            //     //pitch up 8 seconds
-            //     fdm.element[4].i_flap = 1;
-            //     fdm.element[5].i_flap = 1;
+            //     pitch_up(&mut fdm);
             // }
             // else if current_frame >= 247 && current_frame <= 307
             // {
-            //     //yaw right
-            //     fdm.element[6].f_incidence = -16.0;
+            //     yaw_right(&mut fdm);
             // }
 
 
             // //TEST 5 Flaps
-            // fdm.element[1].i_flap = -1;
-            // fdm.element[2].i_flap = -1;
-            // fdm.flaps = true;
+            // flaps_down(&mut fdm);
 
 
             //TEST 6 EVERYTHING
             if current_frame >= 1 && current_frame <= 5
             {
-                //Increase thrust
-                fdm.thrustforce = fdm.thrustforce + d_thrust;
+                thrust_up(&mut fdm, d_thrust);
             }
             else if current_frame >= 6 && current_frame <= 246 
             {
-                //Pitch up
-                fdm.element[4].i_flap = 1;
-                fdm.element[5].i_flap = 1;
+                pitch_up(&mut fdm);
             }
             else if current_frame >= 247 && current_frame <= 307
             {
-                //Yaw left
-                fdm.element[6].f_incidence = 16.0;
-
+                yaw_left(&mut fdm);
             }
             else if current_frame >= 308 && current_frame <= 368
             {
-                //Yaw right
-                fdm.element[6].f_incidence = -16.0;
+                yaw_right(&mut fdm);
             }
             else if current_frame >= 369 && current_frame <= 429
             {
-                //Roll right
-                fdm.element[0].i_flap = -1;
-                fdm.element[3].i_flap = 1;
+                roll_right(&mut fdm);
             }
             else if current_frame >= 430 && current_frame <= 490
             {
-                //Roll left
-                fdm.element[0].i_flap = 1;
-                fdm.element[3].i_flap = -1;
+                roll_left(&mut fdm);
             }
             else if current_frame >= 491 && current_frame <= 505
             {
-                //pitch down
-                fdm.element[4].i_flap = -1;
-                fdm.element[5].i_flap = -1;
+                pitch_down(&mut fdm);
             }
             else if current_frame >= 506 && current_frame <= 511
             {
-                //thrust down
-                fdm.thrustforce = fdm.thrustforce - d_thrust;
+                thrust_down(&mut fdm, d_thrust);
             }
-
             else if current_frame >= 512 && current_frame <= 900
             {
-                //Flaps deflected
-                fdm.element[1].i_flap = -1;
-                fdm.element[2].i_flap = -1;
-                fdm.flaps = true;
+                flaps_down(&mut fdm);
             }
 
         //Calculate all of the forces and moments on the airplane
@@ -287,7 +211,6 @@ fn fdm_test()
     let benchmark_data = vec![-2360.21, 322.768, 587.561, -0.994568, -17.7002, 17.7958, 101.768]; 
     
     
-   
 
     println!("Rust/ECS Flight Data  : {:?}", flight_test_data);
     println!("C++ Benchmark         : {:?}", benchmark_data);

@@ -34,11 +34,11 @@ use fdm_library::bourg_fdm::systems::system_make_packet::MakePacket;
 use fdm_library::bourg_fdm::systems::system_send_packet::SendPacket;
 
 //Import Vector, Matrix, Quaternion, math utilities module if required for setup
-use fdm_library::bourg_fdm::common::vector::Myvec;
-use fdm_library::bourg_fdm::common::quaternion::Myquaternion;
+use fdm_library::bourg_fdm::common::vector::Vector;
+use fdm_library::bourg_fdm::common::quaternion::Quaternion;
 
 //Import calculate mass properties function for use when the airplane Entity is created
-use fdm_library::bourg_fdm::systems::system_equations_of_motion::calc_airplane_mass_properties;
+use fdm_library::bourg_fdm::functions::mass_properties::calc_airplane_mass_properties;
 
 fn main()
 {
@@ -84,14 +84,14 @@ fn main()
     //This object is soley used to pass to the calculate_mass_properties function to determine total mass, and the inertia matrix
     let mut myairplane = DataFDM{ 
         element : vec![
-            PointMass{f_mass: 6.56, v_d_coords: Myvec::new(14.5, 12.0, 2.5), v_local_inertia: Myvec::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 7.31, v_d_coords: Myvec::new(14.5, 5.5, 2.5), v_local_inertia: Myvec::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 7.31, v_d_coords: Myvec::new(14.5, -5.5, 2.5), v_local_inertia: Myvec::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 6.56, v_d_coords: Myvec::new(14.5, -12.0, 2.5), v_local_inertia: Myvec::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 2.62, v_d_coords: Myvec::new(3.03, 2.5, 3.0), v_local_inertia: Myvec::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 2.62, v_d_coords: Myvec::new(3.03, -2.5, 3.0), v_local_inertia: Myvec::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 2.93, v_d_coords: Myvec::new(2.25, 0.0, 5.0), v_local_inertia: Myvec::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) },
-            PointMass{f_mass: 31.8, v_d_coords: Myvec::new(15.25, 0.0, 1.5), v_local_inertia: Myvec::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: Myvec::new(0.0, 0.0, 0.0), v_cg_coords: Myvec::new(0.0, 0.0, 0.0) }
+            PointMass{f_mass: 6.56, v_d_coords: Vector::new(14.5, 12.0, 2.5), v_local_inertia: Vector::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Vector::new(0.0, 0.0, 0.0), v_cg_coords: Vector::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 7.31, v_d_coords: Vector::new(14.5, 5.5, 2.5), v_local_inertia: Vector::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Vector::new(0.0, 0.0, 0.0), v_cg_coords: Vector::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 7.31, v_d_coords: Vector::new(14.5, -5.5, 2.5), v_local_inertia: Vector::new(21.95, 12.22, 33.67), f_incidence: -3.5, f_dihedral: 0.0, f_area: 36.4, i_flap: 0, v_normal: Vector::new(0.0, 0.0, 0.0), v_cg_coords: Vector::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 6.56, v_d_coords: Vector::new(14.5, -12.0, 2.5), v_local_inertia: Vector::new(13.92, 10.50, 24.00), f_incidence: -3.5, f_dihedral: 0.0, f_area: 31.2, i_flap: 0, v_normal: Vector::new(0.0, 0.0, 0.0), v_cg_coords: Vector::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 2.62, v_d_coords: Vector::new(3.03, 2.5, 3.0), v_local_inertia: Vector::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: Vector::new(0.0, 0.0, 0.0), v_cg_coords: Vector::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 2.62, v_d_coords: Vector::new(3.03, -2.5, 3.0), v_local_inertia: Vector::new(0.837, 0.385, 1.206), f_incidence: 0.0, f_dihedral: 0.0, f_area: 10.8, i_flap: 0, v_normal: Vector::new(0.0, 0.0, 0.0), v_cg_coords: Vector::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 2.93, v_d_coords: Vector::new(2.25, 0.0, 5.0), v_local_inertia: Vector::new(1.262, 1.942, 0.718), f_incidence: 0.0, f_dihedral: 90.0, f_area: 12.0, i_flap: 0, v_normal: Vector::new(0.0, 0.0, 0.0), v_cg_coords: Vector::new(0.0, 0.0, 0.0) },
+            PointMass{f_mass: 31.8, v_d_coords: Vector::new(15.25, 0.0, 1.5), v_local_inertia: Vector::new(66.30, 861.9, 861.9), f_incidence: 0.0, f_dihedral: 0.0, f_area: 84.0, i_flap: 0, v_normal: Vector::new(0.0, 0.0, 0.0), v_cg_coords: Vector::new(0.0, 0.0, 0.0) }
         ], ..Default::default()};
 
     //Calculate mass properties on this airplane
@@ -110,14 +110,14 @@ fn main()
         //Define initial flight parameters
         //Wpafb runway geodetic coordinates at 2000 ft (609 meters) above sea level, ground level is at 248 meters elevation
         //Note: make the origin and start position the same 
-        lla_origin: Myvec{x: 39.826, y: -84.045, z: 609.0},
-        v_position: Myvec{x: 39.826 , y: -84.045, z: 609.0},
+        lla_origin: Vector{x: 39.826, y: -84.045, z: 609.0},
+        v_position: Vector{x: 39.826 , y: -84.045, z: 609.0},
 
-        v_velocity: Myvec{x: 60.0, y: 0.0, z: 0.0},
+        v_velocity: Vector{x: 60.0, y: 0.0, z: 0.0},
         f_speed: 60.0,
-        v_forces: Myvec{x: 500.0, y: 0.0, z: 0.0},
+        v_forces: Vector{x: 500.0, y: 0.0, z: 0.0},
         thrustforce: 500.0,
-        q_orientation: Myquaternion::make_q_from_euler(0.0, 0.0, 0.0),
+        q_orientation: Quaternion::make_q_from_euler(0.0, 0.0, 0.0),
     
         //Copy over the defined PointMass elements
         element: myairplane.element,
