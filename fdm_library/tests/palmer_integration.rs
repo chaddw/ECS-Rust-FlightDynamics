@@ -5,9 +5,10 @@
 //Float_cmp crate for comparing floats
 use float_cmp::*;
 
-//Bring into scope the functions and data as necessary for testing
-use fdm_library::palmer_fdm::components::component_datafdm::*;
-use fdm_library::palmer_fdm::functions::plane_right_hand_side::plane_rhs;
+//Bring into scope the functions and structures as necessary for testing
+use fdm_library::palmer::fdm::plane_right_hand_side::plane_rhs;
+use fdm_library::palmer::fdm::structures::DataFDM;
+use fdm_library::palmer::fdm::structures::PerformanceData;
 
 #[test]
 fn fdm_test()

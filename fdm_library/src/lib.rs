@@ -1,7 +1,6 @@
 //Library to make the modules public
-
-pub mod palmer_fdm;
-pub mod bourg_fdm;
+pub mod palmer;
+pub mod bourg;
 
 //FlightGear packet structure
 pub mod flightgear;

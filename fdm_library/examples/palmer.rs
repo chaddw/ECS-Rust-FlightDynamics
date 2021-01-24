@@ -18,19 +18,19 @@ use coord_transforms::prelude::*;
 use std::{thread, time};
 
 //Import Component modules
-use fdm_library::palmer_fdm::components::component_keyboardstate::KeyboardState;
-use fdm_library::palmer_fdm::components::component_packet::Packet;
-use fdm_library::palmer_fdm::components::component_datafdm::DataFDM;
-use fdm_library::palmer_fdm::components::component_datafdm::PerformanceData;
+use fdm_library::palmer::fdm::structures::KeyboardState;
+use fdm_library::palmer::fdm::structures::DataFDM;
+use fdm_library::palmer::fdm::structures::PerformanceData;
+use fdm_library::flightgear::FGNetFDM;
 
 //Import Resources
-use fdm_library::palmer_fdm::resources::delta_time::DeltaTime;
+use fdm_library::palmer::resources::delta_time::DeltaTime;
 
 //Import Systems
-use fdm_library::palmer_fdm::systems::system_flight_control::FlightControl;
-use fdm_library::palmer_fdm::systems::system_equations_of_motion::EquationsOfMotion;
-use fdm_library::palmer_fdm::systems::system_make_packet::MakePacket;
-use fdm_library::palmer_fdm::systems::system_send_packet::SendPacket;
+use fdm_library::palmer::systems::system_flight_control::FlightControl;
+use fdm_library::palmer::systems::system_equations_of_motion::EquationsOfMotion;
+use fdm_library::palmer::systems::system_make_packet::MakePacket;
+use fdm_library::palmer::systems::system_send_packet::SendPacket;
 
 
 fn main()
@@ -41,7 +41,7 @@ fn main()
     //Register Components in the world
     world.register::<DataFDM>();
     world.register::<KeyboardState>();
-    world.register::<Packet>();
+    world.register::<FGNetFDM>();
 
     //Choose frame rate, which will calculate delta time
     let frame_rate: f64 = 30.0;
@@ -115,7 +115,7 @@ fn main()
         flaps_down: false,
         zero_flaps: false,
     })
-    .with(Packet{
+    .with(FGNetFDM{
         ..Default::default()
     })
     .build();

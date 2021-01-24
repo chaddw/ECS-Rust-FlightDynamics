@@ -6,12 +6,13 @@
 use float_cmp::*;
 
 //Bring into scope the functions and data as necessary for testing
-use fdm_library::bourg_fdm::common::vector::Vector;
-use fdm_library::bourg_fdm::common::quaternion::Quaternion;
-use fdm_library::bourg_fdm::components::component_datafdm::*;
-use fdm_library::bourg_fdm::functions::calc_loads::calc_airplane_loads;
-use fdm_library::bourg_fdm::functions::mass_properties::calc_airplane_mass_properties;
-use fdm_library::bourg_fdm::functions::flight_controls::*;
+use fdm_library::bourg::common::vector::Vector;
+use fdm_library::bourg::common::quaternion::Quaternion;
+use fdm_library::bourg::fdm::structures::DataFDM;
+use fdm_library::bourg::fdm::structures::PointMass;
+use fdm_library::bourg::fdm::calc_loads::calc_airplane_loads;
+use fdm_library::bourg::fdm::mass_properties::calc_airplane_mass_properties;
+use fdm_library::bourg::fdm::keypresses::*;
 
 #[test]
 fn fdm_test() 

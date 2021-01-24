@@ -17,28 +17,28 @@ use specs::prelude::*;
 use std::{thread, time};
 
 //Import Component modules
-use fdm_library::bourg_fdm::components::component_keyboardstate::KeyboardState;
-use fdm_library::bourg_fdm::components::component_packet::Packet;
-use fdm_library::bourg_fdm::components::component_datafdm::DataFDM;
-use fdm_library::bourg_fdm::components::component_datafdm::PointMass;
+use fdm_library::bourg::fdm::structures::KeyboardState;
+use fdm_library::bourg::fdm::structures::DataFDM;
+use fdm_library::bourg::fdm::structures::PointMass;
+use fdm_library::flightgear::FGNetFDM;
 
 //Import Resources
-use fdm_library::bourg_fdm::resources::delta_time::DeltaTime;
-use fdm_library::bourg_fdm::resources::max_thrust::MaxThrust;
-use fdm_library::bourg_fdm::resources::delta_thrust::DeltaThrust;
+use fdm_library::bourg::resources::delta_time::DeltaTime;
+use fdm_library::bourg::resources::max_thrust::MaxThrust;
+use fdm_library::bourg::resources::delta_thrust::DeltaThrust;
 
 //Import Systems
-use fdm_library::bourg_fdm::systems::system_flight_control::FlightControl;
-use fdm_library::bourg_fdm::systems::system_equations_of_motion::EquationsOfMotion;
-use fdm_library::bourg_fdm::systems::system_make_packet::MakePacket;
-use fdm_library::bourg_fdm::systems::system_send_packet::SendPacket;
+use fdm_library::bourg::systems::system_flight_control::FlightControl;
+use fdm_library::bourg::systems::system_equations_of_motion::EquationsOfMotion;
+use fdm_library::bourg::systems::system_make_packet::MakePacket;
+use fdm_library::bourg::systems::system_send_packet::SendPacket;
 
 //Import Vector, Matrix, Quaternion, math utilities module if required for setup
-use fdm_library::bourg_fdm::common::vector::Vector;
-use fdm_library::bourg_fdm::common::quaternion::Quaternion;
+use fdm_library::bourg::common::vector::Vector;
+use fdm_library::bourg::common::quaternion::Quaternion;
 
 //Import calculate mass properties function for use when the airplane Entity is created
-use fdm_library::bourg_fdm::functions::mass_properties::calc_airplane_mass_properties;
+use fdm_library::bourg::fdm::mass_properties::calc_airplane_mass_properties;
 
 fn main()
 {
@@ -48,7 +48,7 @@ fn main()
     //Register the Components to the world
     world.register::<DataFDM>();
     world.register::<KeyboardState>();
-    world.register::<Packet>();
+    world.register::<FGNetFDM>();
 
     //Choose frame rate, which will calculate delta time
     let frame_rate: f32 = 30.0;
@@ -137,7 +137,7 @@ fn main()
         flaps_down: false,
         zero_flaps: false,
     })
-    .with(Packet{
+    .with(FGNetFDM{
         ..Default::default()
     })
     .build();
