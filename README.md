@@ -1,27 +1,13 @@
-#readme
-
----Palmer re-implememtation
-
-"palmer_fdm_verification" - the flight dynamics model with no add-ons. This is what is used for the equivalency verification with Palmer's original C FDM
-
-"palmer_flightgear_sim" - the FlightGear flight simulation using the flight dynamics model
+fdm_library - contains both the Bourg and Palmer re-implementation library, along with tests and simulation examples
 
 
-
-
----Bourg re-implementation
-
-"fdm_verification" - same description, but for bourg
-
-"flightgear_sim" - same description
-
-
-
----Benchmarks for equivalency
+---Benchmarks for equivalency verification
 
 FlightSimulator.c - Palmer's C code with some extra output
 
 main.cpp - Bourg's C++ main file for chapter 15 flight sim folder
+
+test_common/cpp_versions - Custom vector, quaternion, matrix c++ tests
 
 
 
