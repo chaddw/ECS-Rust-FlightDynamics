@@ -33,11 +33,11 @@ pub fn flt_ctrl(keystate: &mut KeyboardState)
     let keys: Vec<Keycode> = device_state.get_keys();
 
     //Thrust
-    if keys.contains(&Keycode::A)
+    if keys.contains(&Keycode::E)
     {
         keystate.thrust_up = true;
     }
-    else if keys.contains(&Keycode::Z)
+    else if keys.contains(&Keycode::D)
     {
         keystate.thrust_down = true;
     }
@@ -73,12 +73,12 @@ pub fn flt_ctrl(keystate: &mut KeyboardState)
     }
 
     //Flaps for lift
-    if keys.contains(&Keycode::F)
+    if keys.contains(&Keycode::K)
     {
         keystate.flaps_down = true;
         keystate.zero_flaps = false;
     }
-    else if keys.contains(&Keycode::G)
+    else if keys.contains(&Keycode::L)
     {
         keystate.zero_flaps = true;
         keystate.flaps_down = false;

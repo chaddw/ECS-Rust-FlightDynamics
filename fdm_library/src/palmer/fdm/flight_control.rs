@@ -26,16 +26,16 @@ pub fn flt_ctrl(keystate: &mut KeyboardState)
         let keys: Vec<Keycode> = device_state.get_keys();
 
         //Throttle
-        if keys.contains(&Keycode::A)
+        if keys.contains(&Keycode::E)
         {
             keystate.throttle_up = true;
         }
-        else if keys.contains(&Keycode::Z)
+        else if keys.contains(&Keycode::D)
         {
             keystate.throttle_down = true;
         }
 
-        //angle of attack
+        //Angle of attack
         if keys.contains(&Keycode::Down)
         {
             keystate.aoa_up = true;
@@ -45,7 +45,7 @@ pub fn flt_ctrl(keystate: &mut KeyboardState)
             keystate.aoa_down = true;
         }
 
-        //bank 
+        //Bank 
         if keys.contains(&Keycode::Left)
         {
             keystate.bank_left = true;
@@ -55,12 +55,12 @@ pub fn flt_ctrl(keystate: &mut KeyboardState)
             keystate.bank_right = true;
         }
 
-        //flaps
-        if keys.contains(&Keycode::F)
+        //Flaps
+        if keys.contains(&Keycode::K)
         {
             keystate.flaps_down = true;
         }
-        else if keys.contains(&Keycode::G)
+        else if keys.contains(&Keycode::L)
         {
             keystate.zero_flaps = true;
         }
