@@ -66,24 +66,22 @@ fn main()
     //Create airplane Entity with Components
     let _plane = world.create_entity()
     .with(DataFDM{
-        
         //Starting position and origin in geodetic coordinates
-        //Wpafb runway latitude/longitude/altitude. Ground level is 248.0 meters above sea level
+        //Wpafb runway latitude/longitude/altitude. Ground level is 248.0 meters elevation
+        //Note: make the origin and start position the same, origin will remain constant throughout simulation
         position: Vector3::new(39.826, -84.045, 248.0),
-        //Origin remains constant 
         lla_origin: Vector3::new(39.826, -84.045, 248.0),
        
         bank: 0.0, //bank angle degrees (-20 - 20)
         alpha: 0.0,//angle of attack degrees (-16 - 20)
         throttle: 0.0, //throttle percentage (0 - 1)
         flap: 0.0,  //flap deflection amount degrees (20 or 40)
-
-        q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
         airspeed: 0.0,
 
         climb_angle: 0.0,
         heading_angle: 0.0,
         climb_rate: 0.0,
+        q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
         
         mass_properties: PerformanceData{
             wing_area: 16.2,            //  wing wetted area, m^2

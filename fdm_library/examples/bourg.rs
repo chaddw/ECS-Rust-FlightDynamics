@@ -101,24 +101,23 @@ fn main()
     //Additionally, define the starting flight values and position
     let _plane = world.create_entity()
     .with(DataFDM{
-
-        //Copy over the mass properties calculated
-        mass: myairplane.mass,
-        m_inertia: myairplane.m_inertia,
-        m_inertia_inverse: myairplane.m_inertia_inverse,
-
         //Define initial flight parameters
         //Wpafb runway geodetic coordinates at 2000 ft (609 meters) above sea level, ground level is at 248 meters elevation
-        //Note: make the origin and start position the same 
+        //Note: make the origin and start position the same, origin will remain constant throughout simulation
         lla_origin: Vector{x: 39.826, y: -84.045, z: 609.0},
         v_position: Vector{x: 39.826 , y: -84.045, z: 609.0},
-
+        
         v_velocity: Vector{x: 60.0, y: 0.0, z: 0.0},
         f_speed: 60.0,
         v_forces: Vector{x: 500.0, y: 0.0, z: 0.0},
         thrustforce: 500.0,
         q_orientation: Quaternion::make_q_from_euler(0.0, 0.0, 0.0),
     
+        //Copy over the mass properties calculated
+        mass: myairplane.mass,
+        m_inertia: myairplane.m_inertia,
+        m_inertia_inverse: myairplane.m_inertia_inverse,
+
         //Copy over the defined PointMass elements
         element: myairplane.element,
 
