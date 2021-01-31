@@ -27,7 +27,7 @@ fn fdm_test()
         //Parameters altered for equivalency tests
         throttle: 1.0, //throttle percentage (0.0 - 1.0)
         alpha: 4.0,//angle of attack degrees (-16.0 - 20.0)
-        bank: 0.0, //bank angle degrees (-20.0 - 20.0)
+        bank: 5.0, //bank angle degrees (-20.0 - 20.0)
         flap: 20.0,  //flap deflection amount degrees (20.0 or 40.0)
 
         q: vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0], //will store ODE results
@@ -109,7 +109,10 @@ fn fdm_test()
     //let benchmark_data = vec![1824.183957, -1148.138559, 155.741858, 44.905979]; 
     
     //TEST 3 (FLAPS)
-    let benchmark_data = vec![1924.086822, 0.000000, 187.228017, 38.606508]; 
+    //let benchmark_data = vec![1924.086822, 0.000000, 187.228017, 38.606508]; 
+
+    //TEST 4 (EVERYTHING)
+    let benchmark_data = vec![1428.695336, -1109.084685, 186.708746, 38.629151];
 
 
     println!("Rust/ECS Flight Data  : {:?}", flight_test_data);
