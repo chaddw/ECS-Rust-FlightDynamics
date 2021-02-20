@@ -203,7 +203,7 @@ fn bench_fdms(c: &mut Criterion)
     let mut group = c.benchmark_group("FDMs");
     let frame_count = 100;
 
-    for i in [10.0, 30.0].iter() //Input a number of frame counts
+    for i in [10.0, 30.0, 60.0, 100.0].iter() //Input Frames Per Second that will determine the time step
     {
         group.bench_with_input(BenchmarkId::new("Bourg", i), i, 
             |b, i| b.iter(|| bourg(*i, frame_count)));
