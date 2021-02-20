@@ -2,6 +2,11 @@
 //To run the benches: cargo bench
 //Results are posted in the target/criterion/report
 
+/*
+The airplanes in both models are flying and pitching up for every frame of the bench.
+We set up the two functions, bourg and palmer,
+that take in the # of frames to execute and then run the functions for that many frames
+*/
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 
 //Bring into scope the functions and data as necessary for Bourg
@@ -124,7 +129,7 @@ fn palmer(frames: usize)
     //Create airplane
     let mut fdm = OtherDataFDM{
     
-        //Parameters altered for equivalency tests
+        //Parameters that get modified by keypress
         throttle: 0.15, //throttle percentage (0.0 - 1.0)
         alpha: 20.0,//angle of attack degrees (-16.0 - 20.0)
         bank: 0.0, //bank angle degrees (-20.0 - 20.0)
