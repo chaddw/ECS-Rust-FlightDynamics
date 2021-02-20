@@ -5,7 +5,7 @@
 /*
 The airplanes in both models are flying and pitching up for every frame of the bench.
 We set up the two functions, bourg and palmer,
-that take in the # of frames to execute and then run the functions for that many frames
+that take in the Frames Per Second and # of frames to execute and then run the function for that many frames
 */
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 
@@ -24,11 +24,9 @@ use fdm_library::palmer::fdm::structures::DataFDM as OtherDataFDM;
 use fdm_library::palmer::fdm::structures::PerformanceData;
 
 
-fn bourg(frames: usize) 
+fn bourg(fps: f32, frames: usize) 
 {
-    let fps = 30.0;
     let dt = 1.0 / fps;
-    //let d_thrust = 100.0;
 
     //Create airplane to compute mass properties
     let mut fdm = DataFDM{ 
@@ -119,11 +117,8 @@ fn bourg(frames: usize)
 
 
 
-fn palmer(frames: usize)
+fn palmer(fps: f64, frames: usize)
 {
-
-    //Choose FPS to get dt
-    let fps = 30.0;
     let dt = 1.0 / fps;
 
     //Create airplane
@@ -206,12 +201,14 @@ fn palmer(frames: usize)
 fn bench_fdms(c: &mut Criterion) 
 {
     let mut group = c.benchmark_group("FDMs");
-    for i in [150, 300].iter() //Input a number of frame counts
+    let frame_count = 100;
+
+    for i in [10.0, 30.0].iter() //Input a number of frame counts
     {
         group.bench_with_input(BenchmarkId::new("Bourg", i), i, 
-            |b, i| b.iter(|| bourg(*i)));
+            |b, i| b.iter(|| bourg(*i, frame_count)));
         group.bench_with_input(BenchmarkId::new("Palmer", i), i, 
-            |b, i| b.iter(|| palmer(*i)));
+            |b, i| b.iter(|| palmer(*i as f64, frame_count)));
     }
     group.finish();
 }
