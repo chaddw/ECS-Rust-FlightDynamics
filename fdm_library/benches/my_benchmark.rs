@@ -1,4 +1,5 @@
-//Benhcmark Bourg vs Palmer
+//Benchmark Bourg vs Palmer
+//To run the benches: cargo bench
 //Results are posted in the target/criterion/report
 
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
@@ -197,10 +198,10 @@ fn palmer(frames: usize)
 
 //Benching as a group
 
-fn bench_fibs(c: &mut Criterion) 
+fn bench_fdms(c: &mut Criterion) 
 {
     let mut group = c.benchmark_group("FDMs");
-    for i in [150, 300].iter() //Input of 150 and 300 frames
+    for i in [150, 300].iter() //Input a number of frame counts
     {
         group.bench_with_input(BenchmarkId::new("Bourg", i), i, 
             |b, i| b.iter(|| bourg(*i)));
@@ -210,5 +211,5 @@ fn bench_fibs(c: &mut Criterion)
     group.finish();
 }
 
-criterion_group!(benches, bench_fibs);
+criterion_group!(benches, bench_fdms);
 criterion_main!(benches);
